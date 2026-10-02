@@ -28,7 +28,7 @@ jobs:
       - run: npm run build
       # Upload-ready zips and marketplace listing kits. Not published on the site.
       - run: npm run package
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fulfillment-packages
           path: out/
