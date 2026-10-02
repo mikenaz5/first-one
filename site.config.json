@@ -1,0 +1,11 @@
+{
+  "name": "Tidy Sheets",
+  "tagline": "Spreadsheets that do the boring maths.",
+  "baseUrl": "https://mikenaz5.github.io/first-one",
+  "customDomain": "",
+  "contactEmail": "",
+  "currency": "USD",
+  "paymentProvider": "our payment provider",
+  "refundDays": 14,
+  "headHtml": ""
+}

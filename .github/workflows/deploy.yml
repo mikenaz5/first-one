@@ -1,0 +1,49 @@
+name: Deploy storefront
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 2 1 *" # rebuild each 2 January so the footer year stays current
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - run: npm run build
+      # Upload-ready zips and marketplace listing kits. Not published on the site.
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fulfillment-packages
+          path: out/
+          retention-days: 30
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

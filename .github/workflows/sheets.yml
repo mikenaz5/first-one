@@ -1,0 +1,24 @@
+name: Verify spreadsheets
+
+# Recalculates every .xlsx in LibreOffice and checks the totals. Only runs when templates change.
+on:
+  pull_request:
+    paths:
+      - "tools/**"
+      - "products/**/files/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tools/requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-calc
+      - run: python3 tools/verify_spreadsheets.py

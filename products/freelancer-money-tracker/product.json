@@ -1,0 +1,32 @@
+{
+  "slug": "freelancer-money-tracker",
+  "name": "Freelancer Money Tracker",
+  "tagline": "Know who owes you, what you earned and what to set aside for tax.",
+  "price": 19,
+  "accent": "#1f6f78",
+  "checkoutUrl": "",
+  "description": [
+    "A spreadsheet for freelancers and one-person businesses who are tired of piecing their income together from bank statements. Log each invoice and expense once. Everything else works itself out.",
+    "Enter an invoice and the due date is filled in for you. Enter the date it was paid and the money moves from outstanding to income in the right month. A summary sheet shows income, expenses, profit and a suggested tax set-aside for the whole year."
+  ],
+  "features": [
+    "Invoice list with automatic due dates and Paid, Sent and Overdue status",
+    "Days-overdue counter, so you know whom to chase today",
+    "Monthly income, expenses and profit for the year, with a chart",
+    "Suggested tax set-aside at a rate you choose (planning estimate only)",
+    "Expense categories you can rename, with a drop-down on every row",
+    "Room for 500 invoices and 500 expenses, with formulas already in place"
+  ],
+  "contents": [
+    "freelancer-money-tracker-example.xlsx: filled with sample data so you can see how it works",
+    "freelancer-money-tracker-blank.xlsx: your clean working copy",
+    "A Start Here sheet in each file with a two-minute setup guide"
+  ],
+  "faq": [
+    {"q": "Which apps does it work in?", "a": "It is a standard .xlsx file built on common formulas (SUMIFS, EDATE, VLOOKUP) that Excel, Google Sheets, LibreOffice and Apple Numbers all support. For Google Sheets, upload the file to Google Drive and open it with Sheets."},
+    {"q": "Is the tax figure tax advice?", "a": "No. It multiplies your profit by the rate you set, so you can plan how much cash to park. What you actually owe depends on where you live and your situation, so check with an accountant."},
+    {"q": "Does it cover VAT, sales tax or multiple currencies?", "a": "No. It tracks a single currency and does not calculate VAT or sales tax. Keep amounts in whatever currency you invoice in."},
+    {"q": "Can I use it for my clients' books?", "a": "It is licensed for you and your own business. See the licence terms on the Terms page."}
+  ],
+  "tags": ["freelancer template", "invoice tracker", "income tracker", "expense tracker", "excel template", "google sheets", "self employed", "small business", "bookkeeping", "tax set aside", "spreadsheet", "finance tracker", "freelance finance"]
+}

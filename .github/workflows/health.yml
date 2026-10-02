@@ -1,0 +1,56 @@
+name: Health check
+
+# Weekly: is the site up, do product pages load, do the checkout links still work?
+# A failure opens one GitHub issue (you get an email). A later pass closes it.
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: check
+        run: |
+          set +e
+          node scripts/check.mjs --online > report.txt
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+      - name: Open an issue on failure
+        if: steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create health --color D93F0B --description "Automated store health alerts" || true
+          if [ -z "$(gh issue list --label health --state open --json number --jq '.[0].number')" ]; then
+            {
+              echo "The weekly health check found problems:"
+              echo
+              echo '```'
+              cat report.txt
+              echo '```'
+              echo
+              echo "See docs/RUNBOOK.md for what to do. This issue closes itself once the check passes again."
+            } > body.md
+            gh issue create --title "Store health check failed" --label health --body-file body.md
+          fi
+      - name: Close the issue once healthy
+        if: steps.check.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --label health --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Health check is passing again."
+          done
+      - name: Fail the run if unhealthy
+        if: steps.check.outputs.status != '0'
+        run: exit 1

@@ -1,0 +1,30 @@
+{
+  "slug": "subscription-auditor",
+  "name": "Subscription Auditor",
+  "tagline": "Find out what your subscriptions really cost and which ones to cut.",
+  "price": 9,
+  "accent": "#b4532a",
+  "checkoutUrl": "",
+  "description": [
+    "Most people have no idea what they pay for on repeat. This spreadsheet gives you one place to list every subscription and shows the real total: per month, per year, and by category.",
+    "Mark how often you actually use each one and decide Keep, Review or Cancel. The dashboard adds up what you could save and flags what renews in the next two weeks, so nothing renews by surprise."
+  ],
+  "features": [
+    "Weekly, fortnightly, monthly, quarterly, six-monthly and yearly billing, all converted to a monthly and yearly cost",
+    "Automatic flags: Renews soon, Low use, Update renewal date, Cancelling",
+    "Dashboard with total cost, renewals due in 30 days and potential yearly savings",
+    "Cost by category chart, with categories you can rename",
+    "Room for 200 subscriptions, with formulas already in place"
+  ],
+  "contents": [
+    "subscription-auditor-example.xlsx: filled with sample data so you can see how it works",
+    "subscription-auditor-blank.xlsx: your clean working copy",
+    "A Start Here sheet in each file with a ten-minute setup guide"
+  ],
+  "faq": [
+    {"q": "Which apps does it work in?", "a": "It is a standard .xlsx file built on common formulas (SUMIFS, VLOOKUP) that Excel, Google Sheets, LibreOffice and Apple Numbers all support. For Google Sheets, upload the file to Google Drive and open it with Sheets."},
+    {"q": "Will it remind me before something renews?", "a": "It flags anything renewing within 14 days when you open the file, but it does not send notifications."},
+    {"q": "Does it connect to my bank?", "a": "No. You type the subscriptions in once, which takes about ten minutes. Nothing is linked to your accounts, and your data stays in your file."}
+  ],
+  "tags": ["subscription tracker", "budget template", "expense tracker", "excel template", "google sheets", "personal finance", "money saving", "bill tracker", "recurring payments", "spreadsheet", "budget planner", "finance template", "save money"]
+}

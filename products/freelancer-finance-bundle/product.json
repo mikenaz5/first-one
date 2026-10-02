@@ -1,0 +1,50 @@
+{
+  "slug": "freelancer-finance-bundle",
+  "name": "Freelancer Finance Bundle",
+  "tagline": "Both spreadsheets: track your business money and your recurring costs.",
+  "price": 24,
+  "accent": "#2f6b3f",
+  "checkoutUrl": "",
+  "bundleOf": [
+    "freelancer-money-tracker",
+    "subscription-auditor"
+  ],
+  "description": [
+    "The Freelancer Money Tracker and the Subscription Auditor together, for less than buying them separately.",
+    "Use the tracker to see what your business earns and what to set aside, then use the auditor to trim the recurring costs that eat into it."
+  ],
+  "features": [
+    "Freelancer Money Tracker: invoices, expenses, monthly summary and tax set-aside",
+    "Subscription Auditor: recurring costs, renewal flags and potential savings",
+    "Costs less than buying both separately"
+  ],
+  "contents": [
+    "Freelancer Money Tracker (example and blank .xlsx files)",
+    "Subscription Auditor (example and blank .xlsx files)"
+  ],
+  "faq": [
+    {
+      "q": "Is anything different from buying them separately?",
+      "a": "No. The files are identical to the individual products. The bundle is just cheaper."
+    },
+    {
+      "q": "Which apps does it work in?",
+      "a": "Both files are standard .xlsx files that Excel, Google Sheets, LibreOffice and Apple Numbers support."
+    }
+  ],
+  "tags": [
+    "freelancer template",
+    "invoice tracker",
+    "subscription tracker",
+    "expense tracker",
+    "excel template",
+    "google sheets",
+    "self employed",
+    "small business",
+    "spreadsheet bundle",
+    "finance template",
+    "bookkeeping",
+    "budget template",
+    "money tracker"
+  ]
+}
