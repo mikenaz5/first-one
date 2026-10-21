@@ -1,0 +1,11 @@
+// Shared build settings for the Slate app target.
+//
+// Leave SUPABASE_URL / SUPABASE_ANON_KEY empty to run against the on-device
+// LocalBackend (no network, no account needed). To use a real backend, copy
+// Secrets.example.xcconfig to Secrets.xcconfig (git-ignored) and fill it in.
+
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+DEVELOPMENT_TEAM =
+
+#include? "Secrets.xcconfig"

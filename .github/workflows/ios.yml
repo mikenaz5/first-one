@@ -1,0 +1,75 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -oE '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run unit tests
+        run: |
+          mkdir -p build
+          if ! xcodebuild test \
+              -project Slate.xcodeproj \
+              -scheme Slate \
+              -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+              -resultBundlePath build/Slate.xcresult \
+              CODE_SIGNING_ALLOWED=NO \
+              > build/xcodebuild.log 2>&1; then
+            echo "::group::Errors"
+            grep -E "error:" build/xcodebuild.log | sort -u | head -100 || true
+            echo "::endgroup::"
+            echo "::group::Last 80 lines"
+            tail -n 80 build/xcodebuild.log
+            echo "::endgroup::"
+            exit 1
+          fi
+          grep -E "Executed [0-9]+ tests" build/xcodebuild.log | tail -n 3
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ios/build/xcodebuild.log
+          if-no-files-found: ignore
