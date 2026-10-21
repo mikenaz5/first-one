@@ -7,31 +7,23 @@ enum AppTab: Hashable {
 /// The five tabs from the spec. Each tab owns its own `NavigationStack`.
 /// Bars use the system's default look, so they pick up OS-level design updates automatically.
 struct MainTabView: View {
-    @State private var selection: AppTab = .home
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        TabView(selection: $selection) {
+        @Bindable var model = model
+
+        TabView(selection: $model.selectedTab) {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
 
-            PlaceholderScreen(
-                title: "Bookings",
-                systemImage: "calendar",
-                headline: "No bookings yet",
-                message: "Confirmed bookings, with their signed contracts and payments, will appear here."
-            )
-            .tabItem { Label("Bookings", systemImage: "calendar") }
-            .tag(AppTab.bookings)
+            BookingsView()
+                .tabItem { Label("Bookings", systemImage: "calendar") }
+                .tag(AppTab.bookings)
 
-            PlaceholderScreen(
-                title: "Services",
-                systemImage: "camera.aperture",
-                headline: "Packages come next",
-                message: "Create packages, attach contract templates and set your availability here."
-            )
-            .tabItem { Label("Services", systemImage: "camera.aperture") }
-            .tag(AppTab.services)
+            ServicesView()
+                .tabItem { Label("Services", systemImage: "camera.aperture") }
+                .tag(AppTab.services)
 
             PlaceholderScreen(
                 title: "Messages",
@@ -46,6 +38,6 @@ struct MainTabView: View {
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
         }
-        .sensoryFeedback(.selection, trigger: selection)
+        .sensoryFeedback(.selection, trigger: model.selectedTab)
     }
 }

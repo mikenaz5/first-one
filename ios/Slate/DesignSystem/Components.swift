@@ -235,3 +235,12 @@ extension View {
         #endif
     }
 }
+
+// MARK: - Keyboard
+
+extension UIApplication {
+    /// Dismisses the keyboard from anywhere. Number pads have no Return key, so forms offer a Done button.
+    static func dismissKeyboard() {
+        shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}

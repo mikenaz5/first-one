@@ -6,8 +6,8 @@ import Foundation
 /// Files are referenced by relative name and resolved at load time, because an app's
 /// container path can change between launches or updates.
 actor LocalBackend: SlateBackend {
-    private let root: URL
-    private let fileManager = FileManager.default
+    let root: URL
+    let fileManager = FileManager.default
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
@@ -65,9 +65,9 @@ actor LocalBackend: SlateBackend {
     // MARK: - Paths
 
     private var sessionURL: URL { root.appendingPathComponent("session.json") }
-    private var accountsURL: URL { root.appendingPathComponent("accounts.json") }
+    var accountsURL: URL { root.appendingPathComponent("accounts.json") }
 
-    private func userDirectory(_ userID: UUID) -> URL {
+    func userDirectory(_ userID: UUID) -> URL {
         root.appendingPathComponent(userID.uuidString.lowercased(), isDirectory: true)
     }
 
@@ -297,12 +297,12 @@ actor LocalBackend: SlateBackend {
         }
     }
 
-    private func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
+    func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? decoder.decode(type, from: data)
     }
 
-    private func write<T: Encodable>(_ value: T, to url: URL) throws {
+    func write<T: Encodable>(_ value: T, to url: URL) throws {
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(value).write(to: url, options: .atomic)
     }

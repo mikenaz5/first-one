@@ -57,6 +57,12 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        NSCalendarsFullAccessUsageDescription: Slate reads your calendars so clients can't book times when you're busy. Only the start and end times of busy events are shared, never their titles or details.
+        NSCalendarsWriteOnlyAccessUsageDescription: Slate adds your bookings to your calendar.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.example.slate
+            CFBundleURLSchemes:
+              - slate
 
   SlateTests:
     type: bundle.unit-test

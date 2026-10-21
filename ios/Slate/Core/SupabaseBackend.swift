@@ -7,7 +7,7 @@ import Supabase
 /// Apple sign-in uses the native ID-token flow, so the Apple provider must be enabled in the
 /// Supabase dashboard with this app's bundle ID as an authorized client ID.
 final class SupabaseBackend: SlateBackend, @unchecked Sendable {
-    private let client: SupabaseClient
+    let client: SupabaseClient
 
     init(url: URL, anonKey: String) {
         client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
@@ -69,7 +69,7 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         var id: String
     }
 
-    private static func key(_ id: UUID) -> String { id.uuidString.lowercased() }
+    static func key(_ id: UUID) -> String { id.uuidString.lowercased() }
 
     // MARK: - Auth
 
@@ -117,6 +117,18 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             .from("creator_profiles")
             .select()
             .eq("id", value: Self.key(userID))
+            .limit(1)
+            .execute()
+            .value
+        return try rows.first.map(makeProfile)
+    }
+
+    /// A creator's public profile, found by the name in their booking link.
+    func loadProfile(handle: String) async throws -> CreatorProfile? {
+        let rows: [ProfileRow] = try await client
+            .from("creator_profiles")
+            .select()
+            .eq("handle", value: handle)
             .limit(1)
             .execute()
             .value

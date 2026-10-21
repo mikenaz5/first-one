@@ -31,6 +31,20 @@ final class AppModel {
     private(set) var portfolio: [PortfolioItem] = []
     var alert: ErrorAlert?
 
+    // Scheduling state. Internal (not private(set)) because the extensions in
+    // AppModel+Packages / +Booking / +Calendar update it from their own files.
+    var packages: [ServicePackage] = []
+    var availability: AvailabilitySettings?
+    var bookings: [Booking] = []
+    var calendarPrefs = CalendarPreferences.load()
+    var calendarAccess: CalendarService.Access = .notDetermined
+    /// Which tab is showing. Lives here so deep links can switch tabs.
+    var selectedTab: AppTab = .home
+    /// A creator's public page opened from a booking link, shown over the app.
+    var presentedPage: PublicCreatorPage?
+    @ObservationIgnored var pendingBookingHandle: String?
+    let calendar = CalendarService()
+
     init(backend: any SlateBackend) {
         self.backend = backend
     }
@@ -123,6 +137,13 @@ final class AppModel {
         session = nil
         profile = nil
         portfolio = []
+        packages = []
+        availability = nil
+        bookings = []
+        presentedPage = nil
+        pendingBookingHandle = nil
+        CalendarPreferences.clear()
+        calendarPrefs = CalendarPreferences()
         phase = .signedOut
     }
 
@@ -133,8 +154,10 @@ final class AppModel {
         do {
             profile = try await backend.loadProfile(for: session.userID)
             portfolio = try await backend.loadPortfolio(for: session.userID)
+            try await loadScheduling(for: session.userID)
             loadErrorMessage = nil
             updatePhase()
+            afterAccountLoaded()
         } catch {
             loadErrorMessage = error.localizedDescription
             phase = .loadFailed
@@ -151,6 +174,8 @@ final class AppModel {
         do {
             profile = try await backend.loadProfile(for: session.userID)
             portfolio = try await backend.loadPortfolio(for: session.userID)
+            try await loadScheduling(for: session.userID)
+            Task { await syncCalendar() }
         } catch {
             show(error, title: "Couldn't refresh")
         }
@@ -161,6 +186,7 @@ final class AppModel {
             phase = .signedOut
         } else if profile?.isComplete == true {
             phase = .ready
+            Task { await openPendingBookingLinkIfNeeded() }
         } else {
             phase = .onboarding
         }

@@ -212,6 +212,14 @@ enum SlateError: LocalizedError, Equatable {
     case portfolioFull(limit: Int)
     case videoTooLong(maxSeconds: Int)
     case mediaUnreadable
+    case invalidPackage
+    case packageUnavailable
+    case invalidAvailability
+    case slotTaken
+    case slotUnavailable
+    case cannotBookYourself
+    case notCancellable
+    case calendarAccessDenied
     case backend(String)
 
     var errorDescription: String? {
@@ -228,6 +236,22 @@ enum SlateError: LocalizedError, Equatable {
             "Reels can be up to \(maxSeconds / 60) minutes long."
         case .mediaUnreadable:
             "That file couldn't be read."
+        case .invalidPackage:
+            "This package has a problem. Check the fields and try again."
+        case .packageUnavailable:
+            "This package isn't available anymore."
+        case .invalidAvailability:
+            "Those availability settings aren't valid."
+        case .slotTaken:
+            "Someone just booked that time. Please choose another."
+        case .slotUnavailable:
+            "That time isn't available anymore. Please choose another."
+        case .cannotBookYourself:
+            "You can't book your own package."
+        case .notCancellable:
+            "This booking can't be cancelled."
+        case .calendarAccessDenied:
+            "Calendar access is off. You can allow it in Settings."
         case .backend(let message):
             message
         }
@@ -248,6 +272,13 @@ enum AppConfig {
     static let appleUserIDKey = "slate.appleUserID"
     /// Fake Apple user identifier used by the debug-only demo sign-in.
     static let demoAppleUserID = "slate.demo"
+
+    /// Custom URL scheme: `slate://book/<handle>` opens a creator's page in the app.
+    static let urlScheme = "slate"
+
+    static func bookingDeepLink(handle: String) -> URL? {
+        URL(string: "\(urlScheme)://book/\(handle)")
+    }
 
     static func bookingURL(handle: String) -> URL? {
         URL(string: "https://\(bookingLinkHost)/\(handle)")

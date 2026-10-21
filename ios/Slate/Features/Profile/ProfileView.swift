@@ -49,7 +49,7 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $showPreview) {
                 if let profile = model.profile {
-                    CreatorPageView(profile: profile, portfolio: model.portfolio, mode: .preview)
+                    CreatorPageView(profile: profile, portfolio: model.portfolio, packages: model.publishedPackages, mode: .preview)
                         .navigationTitle("Client view")
                         .navigationBarTitleDisplayMode(.inline)
                 }
@@ -75,19 +75,23 @@ struct ProfileView: View {
 
 /// How a creator's page looks. `owner` adds editing affordances; `preview` is what clients see.
 struct CreatorPageView: View {
-    enum Mode { case owner, preview }
+    /// `owner` is your own page with editing tools, `preview` is your page as a client sees it,
+    /// and `client` is someone else's page opened from a booking link.
+    enum Mode { case owner, preview, client }
 
     let profile: CreatorProfile
     let portfolio: [PortfolioItem]
+    var packages: [ServicePackage] = []
     let mode: Mode
 
     @Environment(AppModel.self) private var model
+    @State private var bookingTarget: ServicePackage?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
                 if mode == .preview {
-                    Label("This is how clients see your page.", systemImage: "eye")
+                    Label("This is how clients see your page. Bookings made here are test bookings.", systemImage: "eye")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
@@ -97,6 +101,10 @@ struct CreatorPageView: View {
 
                 if mode == .owner, let completeness = model.completeness, !completeness.isComplete {
                     CompletenessCard(completeness: completeness)
+                }
+
+                if mode != .owner {
+                    packagesSection
                 }
 
                 PortfolioSection(items: portfolio, isOwner: mode == .owner)
@@ -109,6 +117,32 @@ struct CreatorPageView: View {
         }
         .refreshable { await model.refresh() }
         .slatePageBackground()
+        .sheet(item: $bookingTarget) { package in
+            BookingSheet(creator: profile, package: package)
+        }
+    }
+
+    private var packagesSection: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeader("Packages")
+            if packages.isEmpty {
+                Text("No packages to book yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 100)
+                    .card(.outlined)
+            } else {
+                ForEach(packages) { package in
+                    Button {
+                        bookingTarget = package
+                    } label: {
+                        PackageCard(package: package, style: .client)
+                    }
+                    .buttonStyle(PressableTileStyle())
+                    .accessibilityHint("Opens booking")
+                }
+            }
+        }
     }
 
     private var header: some View {

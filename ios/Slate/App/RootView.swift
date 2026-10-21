@@ -1,11 +1,15 @@
 import AuthenticationServices
+import EventKit
 import SwiftUI
 
 /// Chooses what to show from the account state, and animates between states.
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        @Bindable var model = model
+
         ZStack {
             switch model.phase {
             case .launching:
@@ -29,6 +33,23 @@ struct RootView: View {
             }
         }
         .motionSafe(.slateSmooth, value: model.phase)
+        .onOpenURL { model.handle(url: $0) }
+        .sheet(item: $model.presentedPage) { page in
+            ClientPageSheet(page: page)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Pick up calendar changes and new bookings whenever the app comes back.
+            if phase == .active, model.phase == .ready {
+                Task { await model.syncCalendar() }
+            }
+        }
+        .task {
+            // Re-sync busy time (after a short pause) whenever the person edits their calendar.
+            for await _ in NotificationCenter.default.notifications(named: .EKEventStoreChanged) {
+                try? await Task.sleep(for: .seconds(2))
+                await model.syncBusyTime()
+            }
+        }
         .task { await model.bootstrap() }
         .task {
             // If the person revokes Slate in Settings > Apple Account, sign them out.
@@ -86,5 +107,24 @@ private struct LoadFailedView: View {
             }
         }
         .slatePageBackground()
+    }
+}
+
+/// A creator's page opened from a booking link, on top of whatever the person was doing.
+private struct ClientPageSheet: View {
+    let page: PublicCreatorPage
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            CreatorPageView(profile: page.profile, portfolio: page.portfolio, packages: page.packages, mode: .client)
+                .navigationTitle(page.profile.displayName)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
     }
 }

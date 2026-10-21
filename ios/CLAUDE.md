@@ -28,5 +28,9 @@ SwiftUI app for creators (photographers, videographers) to get booked with a con
 
 - Add unit tests for any logic you add in `Core/` or `ProfileDraft`. UI is verified by building and running, not unit tests.
 - Keep `HandleRules` and the `creator_profiles.handle` SQL check in sync, and likewise the portfolio limit (12) in `AppConfig` and the SQL trigger.
+- Booking rules live in two places that must agree: `AvailabilityEngine` + `PriceSummary` (Swift, used by the screen and `LocalBackend`) and `create_booking()` (SQL). Change one, change the other, and extend both test suites (`SchedulingBackendTests`, `supabase/tests/booking_rules.py`).
+- Never take a price, duration or availability decision from the client. `BookingRequest` carries ids and a start time only; backends recompute the rest.
+- Run the SQL rule tests with a local Postgres: `PGPORT=5432 python3 supabase/tests/booking_rules.py` (needs `psycopg2`).
+- Tests that depend on "now" must not depend on the time of day. Use fixed dates (see `TestClock`) or pick days a few days ahead.
 - Storage paths use lowercase UUIDs, because Postgres compares `auth.uid()::text` case-sensitively.
 - Secrets live in `Config/Secrets.xcconfig` (git-ignored). Only the Supabase anon key belongs in the app, never the service-role key.

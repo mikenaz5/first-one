@@ -2,7 +2,15 @@
 
 SwiftUI app for photographers, videographers and freelance creators to get booked with a contract built into every booking. Product details are in [`../SPEC.md`](../SPEC.md).
 
-**What exists today:** the project scaffold, the design system, the five-tab shell, and creator onboarding and profiles (Sign in with Apple, profile photo, bio, specialties, location, a photo and reel portfolio). Bookings, Services and Messages are labelled placeholders. Booking, contracts and payments are not built yet.
+**What exists today:**
+
+- The project scaffold, design system and five-tab shell.
+- Creator onboarding and profiles: Sign in with Apple, profile photo, bio, specialties, location, a photo and reel portfolio.
+- **Service builder:** creators make packages (price, duration, deliverables, turnaround, deposit, optional add-ons such as extra hours, drone footage and rush delivery). Clients see them as cards.
+- **Availability and booking:** working hours, blackout dates, booking rules, Apple Calendar sync via EventKit, and a client booking sheet with add-ons, date and time, and a price summary. Double-booking is prevented.
+- A basic Bookings tab (upcoming and past, detail, cancel).
+
+Messages, contracts and payments are not built yet. A booking today reserves the time; nothing is signed or charged.
 
 ## Backend recommendation: Supabase, with Stripe Connect for money
 
@@ -59,6 +67,28 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
 
 Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The app currently uses one capability, Sign in with Apple (`Config/Slate.entitlements`). Apple's free "Personal Team" doesn't support it; use a paid developer account. Change the bundle ID (`com.example.slate` in `project.yml`) before shipping.
 
+## Packages, availability and booking
+
+**Packages** are plain values (`ServicePackage`, `AddOn`) validated by `PackageRules`, which is the one list of limits the form, both backends and the SQL agree on. Prices are whole cents. The deposit is a fixed amount set per package; add-ons are settled in the balance. An "extra time" add-on lengthens the booking (so it blocks more of the calendar) and a "rush" add-on shortens delivery (never below one day).
+
+**Finding open times** is a pure function, `AvailabilityEngine`, over the creator's working hours, blackout dates, minimum notice, how far ahead people can book, the gap after each booking, and blocked time ranges. It runs in the creator's time zone, so a client in another zone sees exactly when the shoot is. It handles daylight-saving gaps (the missing 2:00 AM on spring-forward day is not offered twice). The booking sheet preselects the earliest opening, so the usual path is: tap a package, tap Book.
+
+**No double booking** is enforced in the data layer, not only on the screen:
+
+| Backend | How |
+|---|---|
+| Postgres (`supabase/migrations/…packages_availability_bookings.sql`) | An exclusion constraint forbids two active bookings for one creator with overlapping time ranges (`[start, end + buffer)`), so it holds even if two clients tap Book at the same instant. Clients can't write `bookings` directly: they call `create_booking()`, which re-checks hours, blackouts, notice, grid, the creator's busy time and the add-ons, and **computes the price itself** from the creator's package. |
+| On-device (`LocalBackend`) | It is an actor, so the check-then-save runs as one step. It re-checks with the same `AvailabilityEngine` the screen used, so what the screen offers is what is accepted. |
+
+If someone else takes the time first, the sheet says so, refreshes, and preselects the next opening.
+
+**Apple Calendar** (`CalendarService`, `AppModel+Calendar`, the Availability sheet):
+- *Block times I'm busy* reads the chosen calendars and uploads **only merged start and end times**, never titles, places or guests. It skips cancelled events, events marked free, declined invitations, all-day events (unless switched on) and Slate's own booking events. Busy time is only as fresh as the creator's last sync (when they open the app or edit their calendar), so it is a convenience, not a guarantee.
+- *Add bookings to my calendar* writes confirmed bookings as events with reminders. Clients are only ever asked for write-only access, the lightest permission.
+- Calendar settings are stored on the device, because calendar identifiers only mean something there.
+
+**Trying the client side alone.** On-device mode lets you book your own packages (a server-backed account can't). Use *Profile → Preview as a client*, or *Home → Open as a client*, or open `slate://book/<your-handle>`. Bookings made this way are labelled "Test booking".
+
 ## Layout
 
 ```
@@ -67,22 +97,31 @@ ios/
   Config/                     xcconfig, entitlements (Info.plist is generated)
   Slate/
     App/                      Entry point, root state (AppModel), tabs
-    Core/                     Models, rules, backend protocol + Local and Supabase backends, media processing
+    Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
+    Services/                 EventKit (CalendarService)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings
     Resources/                Asset catalog (accent color, app icon)
-  SlateTests/                 Unit tests (rules, models, draft logic, LocalBackend)
-  supabase/                   SQL migration + delete-account Edge Function
+  SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow)
+  supabase/                   SQL migrations, Postgres rule tests, delete-account Edge Function
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.
 
 ## Status of verification
 
-Written on a Linux machine with no Xcode. Before this was pushed, the Swift files were syntax-checked with tree-sitter and the SQL was parsed with Postgres's own parser, but **nothing was compiled or run locally.** The `iOS` GitHub Actions workflow builds the app and runs the unit tests on a macOS runner; treat that as the source of truth. Still never exercised on a real device or against a live Supabase project: Sign in with Apple, Supabase auth and storage, the Edge Function, and the photo and video picking flows.
+Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth.
+
+The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, and 30 clients racing for one slot). The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
+
+**Never exercised** (needs a device, an Apple ID or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking functions, the Edge Function, EventKit permission prompts and event writing, and the photo and video picking flows. The Swift side of the Supabase calls compiles but has not talked to a database.
 
 ## Known gaps
 
+- **A booking doesn't collect a deposit or a signed contract yet.** The sheet says so. Cancelling doesn't refund anything.
+- **No holds.** The spec's 10-minute slot hold isn't needed until payment exists; bookings are confirmed immediately.
+- **Calendar busy time is device-synced**, so it can be stale, and events written with write-only access can't be removed again on cancel.
+- **No push notifications or reminders** beyond the calendar alarms.
 - **Booking links don't resolve.** `slate.example` is a reserved placeholder host. The Home tab says so.
 - **Apple token revocation on account deletion** is not implemented (Apple requires it). It needs a client secret signed with your Apple key; see the TODO in `supabase/functions/delete-account/index.ts`.
 - **The Apple user ID is kept in `UserDefaults`**, not the Keychain. It's an identifier, not a secret, but Keychain is the better home.
