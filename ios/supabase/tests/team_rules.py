@@ -448,7 +448,7 @@ check("signed out, acts_for is false", rpc(None, "acts_for", ORG, "team.view", r
 check("accounts only show a person's own companies", [c["name"] for c in rpc(rival_owner, "my_accounts")["companies"]] == ["Rival Films"])
 
 print("\n[the public team]")
-pub = rows(None, "org_public_team", ORG) if False else sql_as(None, "select display_name from org_public_team(%s)", (ORG,), role="anon")[0]
+pub = sql_as(None, "select display_name from org_public_team(%s)", (ORG,), role="anon")[0]
 names = [r[0] for r in pub]
 check("the public team lists bookable, listed members and no Viewers", "Vee T" not in names and "Olivia Ng" in names and len(names) == 4, names)
 rpc(admin_u, "member_update", ORG, creator_u, None, False, None)

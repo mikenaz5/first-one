@@ -633,6 +633,53 @@ describe("connectOnboarding", () => {
     assert.equal("url" in (status.body as object), false);
   });
 
+  it("sets up a company's account, not the person's, when its Owner asks", async () => {
+    const COMPANY = "11111111-2222-4333-8444-555555555555";
+    let stored: string | null = null;
+    const db = new FakeDb({
+      connect_authorize: () => true,
+      connect_account_for: () => stored,
+      connect_account_save: (args) => { stored = args.p_account_id as string; return null; },
+      connect_account_update: () => null,
+    });
+    const { stripe, calls } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+
+    const result = await connectOnboarding(deps, USER, { organization_id: COMPANY });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(db.called("connect_authorize")[0].args, { p_user: USER, p_owner: COMPANY });
+    assert.deepEqual(db.called("connect_account_save")[0].args, { p_creator_id: COMPANY, p_account_id: "acct_new" });
+    assert.equal(calls.accountsCreated[0].key, `connect-account-${COMPANY}`, "one account per company");
+    assert.deepEqual(calls.accountsCreated[0].params.metadata, { user_id: USER, organization_id: COMPANY });
+  });
+
+  it("refuses to touch a company's account for anyone who isn't allowed to", async () => {
+    const COMPANY = "11111111-2222-4333-8444-555555555555";
+    const db = new FakeDb({ connect_authorize: () => false });
+    const { stripe, calls } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+
+    const result = await connectOnboarding(deps, USER, { organization_id: COMPANY });
+
+    assert.equal(result.status, 404);
+    assert.deepEqual(result.body, { error: "not_found" });
+    assert.equal(calls.accountsCreated.length, 0);
+    assert.equal(db.called("connect_account_for").length, 0, "nothing is even looked up");
+    assert.equal(db.called("connect_account_save").length, 0);
+  });
+
+  it("refuses a company id that isn't one", async () => {
+    const db = new FakeDb({});
+    const { stripe } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    for (const bad of ["acct_123", 7, "", null, "../../etc"]) {
+      const result = await connectOnboarding(deps, USER, { organization_id: bad });
+      assert.equal(result.status, 400, JSON.stringify(bad));
+    }
+    assert.equal(db.calls.length, 0);
+  });
+
   it("asks for a profile first when the creator hasn't made one", async () => {
     const db = new FakeDb({
       connect_account_for: () => null,

@@ -219,7 +219,11 @@ export function compose(row: Pick<QueuedPush, "kind" | "booking_id" | "data">, n
   switch (row.kind) {
     case "new_booking": {
       const client = tidy(d.clientName, 60, "a client");
-      return notice(`New booking from ${client}`, dotted(pkg, when, d.pendingDeposit ? "Waiting for the deposit" : ""));
+      return notice(
+        `New booking from ${client}`,
+        // A company booking waiting for someone to take it says so, to the people who can assign it.
+        dotted(pkg, when, d.unassigned === true ? "Needs someone assigned" : "", d.pendingDeposit ? "Waiting for the deposit" : ""),
+      );
     }
     case "booking_cancelled": {
       const by = tidy(d.byName, 60);
@@ -284,6 +288,11 @@ export function compose(row: Pick<QueuedPush, "kind" | "booking_id" | "data">, n
         collapseId: `rem-${bookingId}-${lead}`,
         expiresAt: start,
       };
+      if (d.unassigned === true && role === "creator") {
+        // Said to the people who can assign it: nobody is booked for this shoot yet.
+        const day = label === "today" || label === "tomorrow" ? label : `on ${label}`;
+        return notice("Shoot still unassigned", `${withWho} ${day} at ${time}`, reminder);
+      }
       if (lead >= 720) {
         const title = label === "tomorrow" ? "Shoot tomorrow" : label === "today" ? "Shoot today" : "Shoot coming up";
         const body = label === "today" || label === "tomorrow" ? `${withWho} at ${time}` : `${withWho} on ${label} at ${time}`;

@@ -458,10 +458,20 @@ export interface ConnectStatus {
  * (unless `action` is "status") returns a link to finish onboarding when there is more to do.
  */
 export async function connectOnboarding(deps: Deps, userId: string, input: unknown): Promise<HttpResult> {
-  const wantsLink = asObject(input)?.action !== "status";
+  const asked = asObject(input);
+  const wantsLink = asked?.action !== "status";
+
+  // The account belongs to whoever sells: the person, or a company they run. A company's is the Owner's to manage,
+  // and the database says who that is, so a user id sent in the body is never trusted for it.
+  const company = asked?.organization_id;
+  if (company !== undefined && (typeof company !== "string" || !UUID.test(company))) return fail(400, "invalid_request");
+  const owner = typeof company === "string" ? company.toLowerCase() : userId;
 
   try {
-    let accountId = await deps.db.rpc<string | null>("connect_account_for", { p_creator_id: userId });
+    if (owner !== userId && !(await deps.db.rpc<boolean>("connect_authorize", { p_user: userId, p_owner: owner }))) {
+      return fail(404, "not_found");
+    }
+    let accountId = await deps.db.rpc<string | null>("connect_account_for", { p_creator_id: owner });
 
     if (!accountId) {
       if (!wantsLink) {
@@ -472,19 +482,19 @@ export async function connectOnboarding(deps: Deps, userId: string, input: unkno
         {
           type: "express",
           capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-          metadata: { user_id: userId },
+          metadata: owner === userId ? { user_id: userId } : { user_id: userId, organization_id: owner },
         },
-        // One account per person even if two taps race.
-        { idempotencyKey: `connect-account-${userId}` },
+        // One account per person or company even if two taps race.
+        { idempotencyKey: `connect-account-${owner}` },
       );
       try {
-        await deps.db.rpc("connect_account_save", { p_creator_id: userId, p_account_id: created.id });
+        await deps.db.rpc("connect_account_save", { p_creator_id: owner, p_account_id: created.id });
       } catch (error) {
         // The creator has no profile yet; the account is kept by Stripe and picked up again next time.
         if (/foreign key|creator_profiles/i.test(messageOf(error))) return fail(409, "profile_required");
         throw error;
       }
-      accountId = (await deps.db.rpc<string | null>("connect_account_for", { p_creator_id: userId })) ?? created.id;
+      accountId = (await deps.db.rpc<string | null>("connect_account_for", { p_creator_id: owner })) ?? created.id;
     }
 
     const account = await deps.stripe.accounts.retrieve(accountId);

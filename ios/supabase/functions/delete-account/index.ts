@@ -1,6 +1,8 @@
 // Deletes the signed-in user's account: their files, then the auth user (which cascades to
 // creator_profiles and portfolio_items through foreign keys).
 //
+// Refuses (409) while the person is the Owner of a company; see account_blockers.
+//
 // Needs the service role, so it must run server-side and never in the app.
 //
 // TODO before App Store submission: Apple requires revoking the Sign in with Apple token when
@@ -35,6 +37,19 @@ Deno.serve(async (request) => {
   }
 
   const admin = createClient(url, serviceKey);
+
+  // The Owner of a company can't walk away from it: it would be left with no one to run it or pay for it. They hand
+  // it to someone else or close it first (account_blockers lists the companies they still own).
+  const { data: blockers, error: blockersError } = await admin.rpc("account_blockers", { p_user: user.id });
+  if (blockersError) {
+    return new Response(`Could not check companies: ${blockersError.message}`, { status: 500 });
+  }
+  if (Array.isArray(blockers) && blockers.length > 0) {
+    return new Response(JSON.stringify({ error: "owns_company", companies: blockers }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   for (const bucket of BUCKETS) {
     const { data: files, error: listError } = await admin.storage.from(bucket).list(user.id, { limit: 1000 });

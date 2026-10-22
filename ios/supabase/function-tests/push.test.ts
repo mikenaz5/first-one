@@ -109,6 +109,12 @@ describe("wording each kind of notification", () => {
     assert.equal(n.body, "Wedding day · Sat, Nov 14 at 10:00 AM · Waiting for the deposit");
   });
 
+  it("tells the people who can assign a company booking that it has no one yet", () => {
+    const n = compose(row("new_booking", { ...base, role: "creator", clientName: "Alex", unassigned: true, pendingDeposit: true }), NOW);
+    assert.equal(n.body, "Wedding day · Sat, Nov 14 at 10:00 AM · Needs someone assigned · Waiting for the deposit");
+    assert.equal(compose(row("new_booking", { ...base, clientName: "Alex", unassigned: false }), NOW).body, "Wedding day · Sat, Nov 14 at 10:00 AM");
+  });
+
   it("copes with a client with no name", () => {
     assert.equal(compose(row("new_booking", { ...base, clientName: "  " }), NOW).title, "New booking from a client");
   });
@@ -237,6 +243,16 @@ describe("wording each kind of notification", () => {
   it("falls back to the row's booking when the data lacks one", () => {
     const n = compose(row("balance_due", { creatorName: "Maya", balanceCents: 100 }), NOW);
     assert.equal(n.url, `slate://booking/${BOOKING}`);
+  });
+
+  it("reminds the people who can assign a booking that nobody has it yet", () => {
+    const tomorrow = compose(row("shoot_reminder", { ...base, role: "creator", otherName: "Alex", leadMinutes: 1440, unassigned: true }), new Date("2026-11-13T16:00:00Z"));
+    assert.equal(tomorrow.title, "Shoot still unassigned");
+    assert.equal(tomorrow.body, "Wedding day with Alex tomorrow at 10:00 AM");
+    const later = compose(row("shoot_reminder", { ...base, role: "creator", otherName: "Alex", leadMinutes: 1440, unassigned: true }), new Date("2026-11-12T16:00:00Z"));
+    assert.equal(later.body, "Wedding day with Alex on Sat, Nov 14 at 10:00 AM");
+    const client = compose(row("shoot_reminder", { ...base, role: "client", otherName: "Acme", leadMinutes: 1440, unassigned: true }), new Date("2026-11-13T16:00:00Z"));
+    assert.equal(client.title, "Shoot tomorrow", "clients are never told about assignment");
   });
 
   it("cleans names that someone typed", () => {
