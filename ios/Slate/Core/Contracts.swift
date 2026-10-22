@@ -377,6 +377,9 @@ struct ContractSignature: Identifiable, Codable, Equatable, Hashable {
     var signedAt: Date
     var consentVersion: Int
     var device: String
+    /// For a company's contract: the company this person signed for, and the title they signed with.
+    var onBehalfOf: String? = nil
+    var signerTitle: String? = nil
 }
 
 enum ContractStatus: String, Codable, Hashable {
@@ -408,6 +411,12 @@ struct Contract: Identifiable, Codable, Equatable, Hashable {
     var signatures: [ContractSignature]
     var createdAt: Date
     var executedAt: Date?
+    /// For a company's contract: the company's legal name, and the person authorised to sign for it. Fixed when the
+    /// client signs, so later changes to who signs never touch a contract already made.
+    var providerLegalName: String? = nil
+    var countersignerID: UUID? = nil
+    var countersignerName: String? = nil
+    var countersignerTitle: String? = nil
 
     func signature(for role: SignerRole) -> ContractSignature? {
         signatures.first { $0.role == role }

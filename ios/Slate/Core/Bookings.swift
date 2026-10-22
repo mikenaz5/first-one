@@ -61,6 +61,14 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
     var cancelledByID: UUID? = nil
     /// The policy the client agreed to, kept with the booking so later package edits can't change a refund.
     var cancellationPolicy: CancellationPolicy = .moderate
+    /// For a company's booking: the team member who has it. Nil while it waits for a manager to choose, and always nil
+    /// for a person's own booking (where `creatorID` is the person).
+    var assignedTo: UUID? = nil
+    var assignedAt: Date? = nil
+    /// True when the client asked for this person by name.
+    var requestedMember: Bool = false
+    /// The assigned person's share, in basis points, fixed when the booking was assigned. Nil unless the company splits.
+    var assigneeShareBps: Int? = nil
 
     var balanceCents: Int { max(0, totalCents - depositCents) }
     var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
@@ -78,6 +86,9 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
         guard effectiveStatus(at: now) == .held, let holdExpiresAt else { return nil }
         return holdExpiresAt.timeIntervalSince(now)
     }
+
+    /// A company's booking that no one has been given yet.
+    var isWaitingForAssignment: Bool { assignedTo == nil && status.blocksTime }
 
     var isDelivered: Bool { deliveredAt != nil }
     var isReceived: Bool { receiptConfirmedAt != nil }
@@ -142,6 +153,10 @@ extension Booking {
         cancelledAt = try c.decodeIfPresent(Date.self, forKey: .cancelledAt)
         cancelledByID = try c.decodeIfPresent(UUID.self, forKey: .cancelledByID)
         cancellationPolicy = try c.decodeIfPresent(CancellationPolicy.self, forKey: .cancellationPolicy) ?? .moderate
+        assignedTo = try c.decodeIfPresent(UUID.self, forKey: .assignedTo)
+        assignedAt = try c.decodeIfPresent(Date.self, forKey: .assignedAt)
+        requestedMember = try c.decodeIfPresent(Bool.self, forKey: .requestedMember) ?? false
+        assigneeShareBps = try c.decodeIfPresent(Int.self, forKey: .assigneeShareBps)
     }
 }
 
@@ -152,6 +167,8 @@ struct BookingRequest: Equatable {
     var addOnIDs: [UUID]
     var startAt: Date
     var notes: String
+    /// For a company: book this person. Nil lets the company choose.
+    var memberID: UUID? = nil
 }
 
 /// Everything a client sees at a creator's booking link.
@@ -160,6 +177,8 @@ struct PublicCreatorPage: Equatable {
     var portfolio: [PortfolioItem]
     /// Only published packages.
     var packages: [ServicePackage]
+    /// For a company: the people clients can book directly. Empty for a person.
+    var team: [PublicTeamMember] = []
 }
 
 extension PublicCreatorPage: Identifiable {

@@ -70,6 +70,40 @@ struct CreatorProfile: Codable, Equatable, Identifiable {
     var avatarURL: URL?
     var createdAt: Date
     var updatedAt: Date
+    /// A person, or a company with a team. A company's id is its organization id.
+    var kind: ProfileKind = .person
+
+    init(
+        id: UUID, handle: String, displayName: String, bio: String, specialties: [Specialty],
+        location: CreatorLocation? = nil, avatarURL: URL? = nil, createdAt: Date, updatedAt: Date,
+        kind: ProfileKind = .person
+    ) {
+        self.id = id
+        self.handle = handle
+        self.displayName = displayName
+        self.bio = bio
+        self.specialties = specialties
+        self.location = location
+        self.avatarURL = avatarURL
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.kind = kind
+    }
+
+    /// Profiles saved before companies existed have no `kind`; they are people.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        handle = try c.decode(String.self, forKey: .handle)
+        displayName = try c.decode(String.self, forKey: .displayName)
+        bio = try c.decode(String.self, forKey: .bio)
+        specialties = try c.decode([Specialty].self, forKey: .specialties)
+        location = try c.decodeIfPresent(CreatorLocation.self, forKey: .location)
+        avatarURL = try c.decodeIfPresent(URL.self, forKey: .avatarURL)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        kind = try c.decodeIfPresent(ProfileKind.self, forKey: .kind) ?? .person
+    }
 
     /// The minimum a creator needs before the app treats onboarding as done.
     var isComplete: Bool {
@@ -247,6 +281,25 @@ enum SlateError: LocalizedError, Equatable {
     case invalidMessage
     case messageTooLong
     case rateLimited
+    case notFound
+    case notAllowed
+    case invalidInput
+    case planInactive
+    case seatLimit
+    case inviteInvalid
+    case alreadyMember
+    case lastOwner
+    case invalidRole
+    case hasUpcomingBookings
+    case teamNotEmpty
+    case bookingsInHold
+    case signatureRequired
+    case signerRoleNotAllowed
+    case invalidAssignee
+    case notAssignable
+    case memberUnavailable
+    case profileRequired
+    case billingUnavailable
     case backend(String)
 
     var errorDescription: String? {
@@ -333,6 +386,44 @@ enum SlateError: LocalizedError, Equatable {
             "Messages can be up to \(MessageRules.maxLength.formatted()) characters."
         case .rateLimited:
             "You're sending messages very quickly. Wait a moment and try again."
+        case .notFound:
+            "That couldn't be found."
+        case .notAllowed:
+            "Your role doesn't allow that. Ask an owner or admin of the company."
+        case .invalidInput:
+            "Something in that isn't valid. Check it and try again."
+        case .planInactive:
+            "The company's plan isn't active. An owner can fix this under Billing."
+        case .seatLimit:
+            "The team is full. Remove someone, or an open invite, to make room."
+        case .inviteInvalid:
+            "This invite is no longer valid. Ask for a new one."
+        case .alreadyMember:
+            "You're already part of this company."
+        case .lastOwner:
+            "A company needs an owner. Transfer ownership first."
+        case .invalidRole:
+            "That isn't a role you can give."
+        case .hasUpcomingBookings:
+            "They still have upcoming bookings. Move those to someone else first."
+        case .teamNotEmpty:
+            "Remove the other people from the team first."
+        case .bookingsInHold:
+            "A booking is waiting for its deposit. Wait for it, or cancel it, first."
+        case .signatureRequired:
+            "Add a signature first."
+        case .signerRoleNotAllowed:
+            "That person's role isn't allowed to sign contracts for the company. Change the allowed roles first."
+        case .invalidAssignee:
+            "That person can't take this booking."
+        case .notAssignable:
+            "This booking can't be assigned anymore."
+        case .memberUnavailable:
+            "That person isn't available to be booked."
+        case .profileRequired:
+            "Set up your own profile first."
+        case .billingUnavailable:
+            "Billing isn't available in this build. It needs a server with Stripe set up; see the README."
         case .backend(let message):
             message
         }
@@ -363,6 +454,11 @@ enum AppConfig {
 
     static func bookingDeepLink(handle: String) -> URL? {
         URL(string: "\(urlScheme)://book/\(handle)")
+    }
+
+    /// `slate://join/<token>` opens the app on a company invite.
+    static func joinDeepLink(token: String) -> URL? {
+        URL(string: "\(urlScheme)://join/\(token)")
     }
 
     static func bookingURL(handle: String) -> URL? {

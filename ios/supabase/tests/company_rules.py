@@ -7,6 +7,7 @@ a person to a company and back.
 
 Companion to booking_rules.py (one creator) and team_rules.py (roles, invites, seats).
 """
+import datetime
 import json
 import os
 import pathlib
@@ -373,6 +374,12 @@ check("the client's view gives each person's effective hours", w[kim][0]["window
       and w[cal][0]["window"] == {"startMinute": 540, "endMinute": 1020}, w)
 check("...and when each is busy, without saying why", all(set(b) == {"starts_at", "ends_at"} for m in ta["members"] for b in m["busy"])
       and any(m["busy"] for m in ta["members"]))
+a.execute("insert into busy_blocks (creator_id, starts_at, ends_at) values (%s,%s,%s)", (cal, at(MON + 17, 10), at(MON + 17, 11)))
+ta2 = rpc(client_a, "team_availability", PKG, cal, at(MON + 14, 0), at(MON + 21, 0))
+ends = [datetime.datetime.fromisoformat(b["ends_at"]) for b in ta2["members"][0]["busy"]]
+a.execute("select %s::timestamptz + interval '30 minutes'", (at(MON + 17, 11),))
+check("outside busy time is reported with the buffer after it, like bookings, so a client never picks a time the server refuses",
+      a.fetchone()[0] in ends, ends)
 check("a company that isn't taking bookings has no availability", err(rpc(client_a, "team_availability", add_package(dee, "Hidden", published=False)[0][0][0]), "package_unavailable"))
 
 print("\n[nobody is in two places]")

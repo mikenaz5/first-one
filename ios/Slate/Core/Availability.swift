@@ -207,6 +207,8 @@ struct CreatorSchedule: Codable, Equatable {
     var bookedRanges: [DateInterval]
     /// Busy time imported from the creator's Apple Calendar (raw, without buffer).
     var externalBusy: [DateInterval]
+    /// For a company: its people and when each is free. When present, times are offered by `TeamAvailability`.
+    var team: TeamSchedule? = nil
 }
 
 // MARK: - Interval helpers
@@ -253,6 +255,9 @@ enum AvailabilityEngine {
         schedule: CreatorSchedule,
         now: Date
     ) -> [TimeSlot] {
+        if let team = schedule.team {
+            return TeamAvailability.slots(on: day, durationMinutes: durationMinutes, team: team, now: now)
+        }
         let settings = schedule.settings
         let calendar = settings.calendar
         guard durationMinutes > 0, settings.slotIntervalMinutes > 0 else { return [] }

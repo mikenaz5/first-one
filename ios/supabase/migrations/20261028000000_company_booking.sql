@@ -1193,9 +1193,9 @@ begin
                         and (b.status = 'confirmed' or (b.status = 'held' and b.hold_expires_at > now()))
                         and tstzrange(b.start_at, b.blocked_until, '[)') && tstzrange(p_from, v_to, '[)')
                      union all
-                     select bb.starts_at, bb.ends_at from public.busy_blocks bb
+                     select bb.starts_at, bb.ends_at + make_interval(mins => v_settings.buffer_minutes) from public.busy_blocks bb
                       where bb.creator_id = c.user_id
-                        and tstzrange(bb.starts_at, bb.ends_at, '[)') && tstzrange(p_from, v_to, '[)')
+                        and tstzrange(bb.starts_at, bb.ends_at + make_interval(mins => v_settings.buffer_minutes), '[)') && tstzrange(p_from, v_to, '[)')
                    ) x), '[]'::jsonb)
              ) order by c.joined_at, c.user_id)
         from public.package_candidates(v_pkg.id, p_member_id) c
