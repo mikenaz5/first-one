@@ -326,7 +326,8 @@ final class MessagingBackendTests: XCTestCase {
         _ = try await say("again", in: id)
 
         let clock = self.clock!
-        let reopened = LocalBackend(root: backend.root, clock: { clock.now })
+        let root = await backend.root
+        let reopened = LocalBackend(root: root, clock: { clock.now })
         let list = try await reopened.loadConversations(for: creator.id)
         XCTAssertEqual(list.map(\.unreadCount), [1])
         XCTAssertEqual(list.first?.last.body, "again")
@@ -412,20 +413,23 @@ final class MessagingBackendTests: XCTestCase {
         XCTAssertEqual(theirs, NotificationPreferences(), "Settings belong to the person who set them")
 
         let clock = self.clock!
-        let reopened = LocalBackend(root: backend.root, clock: { clock.now })
+        let root = await backend.root
+        let reopened = LocalBackend(root: root, clock: { clock.now })
         let afterRestart = try await reopened.loadNotificationPreferences(for: client)
         XCTAssertEqual(afterRestart, changed)
     }
 
     func testOnDeviceNothingSendsPushFromAServer() async {
-        XCTAssertFalse(backend.sendsPushFromServer)
+        let sends = await backend.sendsPushFromServer
+        XCTAssertFalse(sends)
     }
 
     func testADeviceBelongsToWhoeverRegisteredItLast() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("slate-devices-\(UUID().uuidString)")
         roots.append(root)
         let server = LocalBackend(root: root, sendsPushFromServer: true)
-        XCTAssertTrue(server.sendsPushFromServer)
+        let sends = await server.sendsPushFromServer
+        XCTAssertTrue(sends)
 
         let first = UUID(), second = UUID()
         try await server.registerDevice(token: "abc123", environment: .sandbox, for: first)
