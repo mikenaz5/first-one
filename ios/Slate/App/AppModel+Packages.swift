@@ -8,6 +8,8 @@ extension AppModel {
         bookings = try await backend.loadBookings(for: userID)
         contractTemplates = try await backend.loadContractTemplates(for: userID)
         creatorSignature = try await backend.loadCreatorSignature(for: userID)
+        payments = try await backend.loadPayments(for: userID)
+        paymentAccount = try? await backend.loadPaymentAccount(for: userID)
     }
 
     /// Runs once the account has loaded and the person is in the app.
@@ -15,6 +17,7 @@ extension AppModel {
         calendarAccess = calendar.access
         Task { await syncCalendar() }
         Task { await openPendingBookingLinkIfNeeded() }
+        Task { await settlePendingRefunds() }
     }
 
     // MARK: - Packages

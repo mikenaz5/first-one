@@ -8,4 +8,13 @@ SUPABASE_URL =
 SUPABASE_ANON_KEY =
 DEVELOPMENT_TEAM =
 
+// Real payments need both of these (see Secrets.example.xcconfig). Without them the app still builds and runs,
+// and on-device mode uses pretend payments.
+STRIPE_PUBLISHABLE_KEY =
+APPLE_PAY_MERCHANT_ID =
+
+// Sign in with Apple only. Secrets.xcconfig switches this to Slate.ApplePay.entitlements when real payments are on,
+// because that entitlement needs a merchant ID registered in your Apple developer account.
+CODE_SIGN_ENTITLEMENTS = Config/Slate.entitlements
+
 #include? "Secrets.xcconfig"

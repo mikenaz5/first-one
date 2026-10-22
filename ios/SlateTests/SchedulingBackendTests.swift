@@ -312,7 +312,7 @@ final class SchedulingBackendTests: XCTestCase {
         await expectError(.slotTaken) { try await book(creator, at: at(day, 10)) }
 
         let cancelled = try await backend.cancelBooking(first.id, by: client)
-        XCTAssertEqual(cancelled.status, .cancelled)
+        XCTAssertEqual(cancelled.booking.status, .cancelled)
         let second = try await book(creator, at: at(day, 10))
         XCTAssertEqual(second.status, .confirmed)
     }

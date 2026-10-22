@@ -1,0 +1,151 @@
+{
+  "percent": [
+    {
+      "policy": "flexible",
+      "hours": -5,
+      "percent": 50
+    },
+    {
+      "policy": "flexible",
+      "hours": 0,
+      "percent": 50
+    },
+    {
+      "policy": "flexible",
+      "hours": 23.99,
+      "percent": 50
+    },
+    {
+      "policy": "flexible",
+      "hours": 24,
+      "percent": 100
+    },
+    {
+      "policy": "flexible",
+      "hours": 24.01,
+      "percent": 100
+    },
+    {
+      "policy": "flexible",
+      "hours": 1000,
+      "percent": 100
+    },
+    {
+      "policy": "moderate",
+      "hours": -1,
+      "percent": 0
+    },
+    {
+      "policy": "moderate",
+      "hours": 0,
+      "percent": 0
+    },
+    {
+      "policy": "moderate",
+      "hours": 47.99,
+      "percent": 0
+    },
+    {
+      "policy": "moderate",
+      "hours": 48,
+      "percent": 50
+    },
+    {
+      "policy": "moderate",
+      "hours": 100,
+      "percent": 50
+    },
+    {
+      "policy": "moderate",
+      "hours": 167.99,
+      "percent": 50
+    },
+    {
+      "policy": "moderate",
+      "hours": 168,
+      "percent": 100
+    },
+    {
+      "policy": "moderate",
+      "hours": 168.01,
+      "percent": 100
+    },
+    {
+      "policy": "moderate",
+      "hours": 1000,
+      "percent": 100
+    },
+    {
+      "policy": "strict",
+      "hours": 0,
+      "percent": 0
+    },
+    {
+      "policy": "strict",
+      "hours": 100,
+      "percent": 0
+    },
+    {
+      "policy": "strict",
+      "hours": 335.99,
+      "percent": 0
+    },
+    {
+      "policy": "strict",
+      "hours": 336,
+      "percent": 50
+    },
+    {
+      "policy": "strict",
+      "hours": 336.01,
+      "percent": 50
+    },
+    {
+      "policy": "strict",
+      "hours": 5000,
+      "percent": 50
+    }
+  ],
+  "refunds": [
+    {
+      "paid_cents": 50000,
+      "percent": 100,
+      "refund_cents": 50000
+    },
+    {
+      "paid_cents": 50000,
+      "percent": 50,
+      "refund_cents": 25000
+    },
+    {
+      "paid_cents": 50000,
+      "percent": 0,
+      "refund_cents": 0
+    },
+    {
+      "paid_cents": 33333,
+      "percent": 50,
+      "refund_cents": 16666
+    },
+    {
+      "paid_cents": 1,
+      "percent": 50,
+      "refund_cents": 0
+    },
+    {
+      "paid_cents": 10001,
+      "percent": 50,
+      "refund_cents": 5000
+    },
+    {
+      "paid_cents": 99999,
+      "percent": 100,
+      "refund_cents": 99999
+    },
+    {
+      "paid_cents": 0,
+      "percent": 100,
+      "refund_cents": 0
+    }
+  ]
+}

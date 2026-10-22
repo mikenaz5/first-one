@@ -1,7 +1,8 @@
 name: Database
 
-# Runs the booking rules against a real Postgres: no double-booking (including 30 clients racing
-# for one slot), working hours, blackouts, buffers, server-side pricing and row level security.
+# Runs the booking and payment rules against a real Postgres: no double-booking (including 30 clients racing
+# for one slot), working hours, blackouts, buffers, server-side pricing, contracts, payments, refunds and row
+# level security. A second job type-checks and tests the Edge Function logic with Node (no Stripe account needed).
 
 on:
   push:
@@ -49,3 +50,20 @@ jobs:
           python-version: "3.12"
       - run: pip install psycopg2-binary
       - run: python ios/supabase/tests/booking_rules.py
+
+  edge-functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ios/supabase/function-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ios/supabase/function-tests/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

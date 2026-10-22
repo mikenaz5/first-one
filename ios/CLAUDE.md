@@ -33,6 +33,11 @@ SwiftUI app for creators (photographers, videographers) to get booked with a con
 - Contract text is built in two places that must agree word for word: `ContractFormat` / `ContractContextBuilder` / `ContractRenderer` (Swift) and the `contract_*` functions in the contracts migration (SQL). `SlateTests/Fixtures/contract_golden.json` is checked by both test suites. Change the wording of a fixed text (cancellation policy, usage rights, formatting) in all three places. A change to what a signed contract says is a change to what people agreed to, so be deliberate.
 - Names, notes and anything else a person types must go through `ContractFormat.sanitize` before it reaches a contract.
 - The client signs the SHA-256 of the server-rendered text. Never compute that hash from anything the client supplied.
+- Money is recorded only from Stripe's signed webhook (`payment_record_success`), never from the app. The only app-side way to mark a payment paid is `LocalBackend.completeSimulatedPayment`, which exists for on-device mode and which `SupabaseBackend` refuses. Never add another.
+- Amounts are never taken from a request. `payment_prepare` works them out from the booking; the Edge Functions pass that on to Stripe.
+- Refund rules live in `CancellationPolicy.refundPercent` / `RefundQuote` (Swift) and `refund_percent()` / `booking_refund_figures()` (SQL); `SlateTests/Fixtures/refund_golden.json` is checked by both. The 15-minute hold is `PaymentRules.holdMinutes` and `app_hold_minutes()`.
+- Anything that can add to or revive a creator's active bookings must call `lock_creator_calendar()` first, before any row lock, so concurrent bookings queue instead of deadlocking on the exclusion constraint.
+- Payment logic for the Edge Functions goes in `supabase/functions/_shared/payments.ts` (pure, dependency-injected) with tests in `supabase/function-tests`; keep `_shared/runtime.ts` and the `index.ts` files thin. Run `cd supabase/function-tests && npm ci && npm test && npm run typecheck`.
 - Run the SQL rule tests with a local Postgres: `PGPORT=5432 python3 supabase/tests/booking_rules.py` (needs `psycopg2`).
 - Tests that depend on "now" must not depend on the time of day. Use fixed dates (see `TestClock`) or pick days a few days ahead.
 - Storage paths use lowercase UUIDs, because Postgres compares `auth.uid()::text` case-sensitively.

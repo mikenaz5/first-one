@@ -1,0 +1,14 @@
+{
+  "name": "slate-function-tests",
+  "private": true,
+  "type": "module",
+  "description": "Tests for the payment logic behind the Supabase Edge Functions. Runs with plain Node; no Deno, database or Stripe account needed.",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test-reporter=spec --test \"*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.0"
+  }
+}

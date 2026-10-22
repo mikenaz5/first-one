@@ -43,7 +43,13 @@ protocol SlateBackend {
     /// Throws `slotTaken` / `slotUnavailable`. Trusts nothing in `request` but ids and time.
     func createBooking(_ request: BookingRequest, clientID: UUID, clientName: String, signature: SignatureInput) async throws -> SignedBooking
     func loadBookings(for userID: UUID) async throws -> [Booking]
-    func cancelBooking(_ id: UUID, by userID: UUID) async throws -> Booking
+    /// Cancels, works out the refund from the cancellation policy the client agreed to, and records it.
+    /// Call `settleRefunds` afterwards to actually send the money back.
+    func cancelBooking(_ id: UUID, by userID: UUID) async throws -> CancellationResult
+    /// The creator says the work is delivered, which makes the balance payable.
+    func markDelivered(bookingID: UUID, by creatorID: UUID) async throws -> Booking
+    /// Gives up holds whose deposit wasn't paid in time, freeing their times.
+    func expireHolds() async throws
 
     // Contracts
     func loadContractTemplates(for creatorID: UUID) async throws -> [ContractTemplate]
@@ -57,6 +63,24 @@ protocol SlateBackend {
     func loadContractPDF(contractID: UUID) async throws -> Data?
     /// Stores the signed PDF for both parties. The first PDF stored wins; later ones are ignored.
     func attachContractPDF(_ data: Data, contractID: UUID) async throws
+
+    // Payments
+    /// True on-device: payments are pretend and no money moves. The app says so wherever it matters.
+    var paymentsAreSimulated: Bool { get }
+    /// Every payment and refund on the bookings this person is part of.
+    func loadPayments(for userID: UUID) async throws -> [Payment]
+    func loadPaymentAccount(for creatorID: UUID) async throws -> PaymentAccount
+    /// Asks Stripe where the creator's account stands and returns where to go to finish, when there is more to do.
+    func beginPaymentAccountSetup(for creatorID: UUID) async throws -> PaymentAccountSetup
+    func refreshPaymentAccount(for creatorID: UUID) async throws -> PaymentAccount
+    /// Opens the payment for a booking's deposit or balance. The amount comes from the booking, never from the caller.
+    func preparePayment(bookingID: UUID, kind: PaymentKind, by userID: UUID) async throws -> PaymentIntentInfo
+    /// On-device only: completes a payment the way Stripe's webhook would. Throws everywhere else.
+    func completeSimulatedPayment(_ paymentID: UUID) async throws
+    /// What cancelling now would refund, shown before the person confirms.
+    func refundQuote(bookingID: UUID, for userID: UUID) async throws -> RefundQuote
+    /// Sends any refunds owed on a booking to the card that paid.
+    func settleRefunds(bookingID: UUID) async throws
 
     /// Whether a creator may book their own packages. True on-device so the flow can be tested alone.
     var allowsSelfBooking: Bool { get }

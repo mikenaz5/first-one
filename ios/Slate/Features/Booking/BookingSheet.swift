@@ -17,30 +17,41 @@ struct BookingSheet: View {
 
     private var canBook: Bool { model.canBook(creatorID: booking.creator.id) }
 
+    private var title: String {
+        if booking.confirmed != nil { return "Booked" }
+        if booking.heldBooking != nil { return "Pay deposit" }
+        return booking.package.name
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if let confirmed = booking.confirmed {
                     BookingConfirmationView(booking: confirmed, contract: booking.signedContract, onDone: { dismiss() })
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                } else if let held = booking.heldBooking {
+                    HeldBookingView(booking: booking, held: held)
+                        .transition(.opacity)
                 } else {
                     form
                 }
             }
-            .navigationTitle(booking.confirmed == nil ? booking.package.name : "Booked")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if booking.confirmed == nil {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }.disabled(booking.isSubmitting)
+                        Button(booking.heldBooking == nil ? "Cancel" : "Close") { dismiss() }.disabled(booking.isSubmitting)
                     }
                 }
             }
             .motionSafe(.slateSmooth, value: booking.confirmed?.id)
+            .motionSafe(.slateSmooth, value: booking.heldBooking?.id)
             .navigationDestination(isPresented: $showReview) {
                 ContractReviewView(booking: booking)
             }
             .onChange(of: booking.confirmed?.id) { _, _ in showReview = false }
+            .onChange(of: booking.heldBooking?.id) { _, _ in showReview = false }
             .task {
                 if booking.capture.fullName.isEmpty { booking.capture.fullName = model.clientDisplayName }
                 await booking.load(using: model)
@@ -82,7 +93,7 @@ struct BookingSheet: View {
 
                 PriceSummaryCard(summary: booking.summary)
 
-                Text("Next you'll read and sign a short contract. Deposit payment isn't connected yet, so nothing is charged.")
+                Text(footnote)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -96,6 +107,15 @@ struct BookingSheet: View {
         .slatePageBackground()
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .motionSafe(.slateSmooth, value: booking.notice)
+    }
+
+    private var footnote: String {
+        if booking.summary.depositCents == 0 {
+            return "Next you'll read and sign a short contract. No deposit is needed; the full price is due after delivery."
+        }
+        return model.paymentsAreSimulated
+            ? "Next you'll read and sign a short contract, then pay the deposit. Demo mode: the payment is pretend and no card is charged."
+            : "Next you'll read and sign a short contract, then pay the deposit with Apple Pay."
     }
 
     private var header: some View {
@@ -427,6 +447,13 @@ struct BookingConfirmationView: View {
 
     private var formatter: SlotFormatter { SlotFormatter(timeZone: booking.timeZone) }
 
+    private var paymentLine: String {
+        let money = { Money.format($0, code: booking.currencyCode) }
+        if booking.depositCents == 0 { return "\(money(booking.totalCents)) due after delivery" }
+        if booking.balanceCents == 0 { return "\(money(booking.totalCents)) paid in full" }
+        return "\(money(booking.depositCents)) deposit paid · \(money(booking.balanceCents)) due after delivery"
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: Space.xl) {
@@ -448,12 +475,12 @@ struct BookingConfirmationView: View {
                     if !booking.addOns.isEmpty {
                         detail("plus.circle", booking.addOns.map(\.name).joined(separator: ", "))
                     }
-                    detail("creditcard", "\(Money.format(booking.totalCents, code: booking.currencyCode)) total · \(Money.format(booking.depositCents, code: booking.currencyCode)) deposit")
+                    detail("creditcard", paymentLine)
                     if let note = formatter.zoneNote { detail("globe", note) }
                 }
                 .card()
 
-                if contract != nil {
+                if contract?.status == .executed {
                     NavigationLink {
                         SignedContractView(booking: booking)
                     } label: {

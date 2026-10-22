@@ -112,7 +112,9 @@ struct ContractReviewView: View {
             VStack(alignment: .leading, spacing: Space.xl) {
                 VStack(alignment: .leading, spacing: Space.s) {
                     Text("Review and sign").font(SlateFont.display).accessibilityAddTraits(.isHeader)
-                    Text("Read the key terms, then sign to book. You'll both get a signed PDF.")
+                    Text(booking.summary.depositCents > 0
+                         ? "Read the key terms, then sign and pay the deposit to book. You'll both get a signed PDF once it's paid."
+                         : "Read the key terms, then sign to book. You'll both get a signed PDF.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -192,6 +194,12 @@ struct ContractReviewView: View {
         }
     }
 
+    private var signTitle: String {
+        let deposit = booking.summary.depositCents
+        guard deposit > 0 else { return "Sign & book" }
+        return "Sign & pay \(Money.format(deposit, code: booking.summary.currencyCode)) deposit"
+    }
+
     private var bottomBar: some View {
         VStack(spacing: Space.xs) {
             Button {
@@ -201,7 +209,7 @@ struct ContractReviewView: View {
                     if booking.isSubmitting {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Sign & book")
+                        Text(signTitle)
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 28)
@@ -212,10 +220,13 @@ struct ContractReviewView: View {
 
             if let blocker = booking.signBlocker {
                 Text(blocker).font(.footnote).foregroundStyle(.secondary)
-            } else {
-                Text("Deposit and payment aren't connected yet, so nothing is charged.")
+            } else if booking.summary.depositCents > 0 {
+                Text(model.paymentsAreSimulated
+                     ? "Demo mode: your time is held and the payment is pretend. No card is charged."
+                     : "Your time is held for \(PaymentRules.holdMinutes) minutes while you pay with Apple Pay.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .padding(.horizontal, Space.page)

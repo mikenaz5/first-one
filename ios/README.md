@@ -103,6 +103,39 @@ Every booking carries a contract that both people sign before the booking exists
 - **Signed PDF.** Real text across as many pages as needed, then a page with both signatures and a certificate (who, how, when in UTC, document IDs, and the hash). It is stored once at `contracts/<contract id>.pdf` in a private bucket that only the two people on the contract can read, and the first PDF stored wins, so both see the identical file. Either person's app creates it if it isn't there yet. *The PDF is made on the phone, so treat the stored contract text and its hash as the record and the PDF as a convenient copy of it.* Producing it on the server is the stronger design and a good next step.
 - **What e-signatures are worth** depends on where you work. The app records name, method, time, consent wording version, device and a best-effort IP address, but have a lawyer confirm this suits your jurisdiction before relying on it.
 
+## Payments
+
+The deposit is paid when the client signs, the balance after the work is delivered, and cancelling refunds by the policy the client agreed to.
+
+| Step | What happens |
+|---|---|
+| **Sign & pay** | The client signs the contract. If the package has a deposit, the booking is **held for 15 minutes** (its time is blocked, its contract is *pending* and carries only the client's signature) and Apple Pay opens for the deposit. |
+| **Deposit paid** | Stripe tells our webhook the money arrived. Only then does the booking become **confirmed**, the creator's saved signature is added and the contract becomes **executed**. A package with no deposit is confirmed and executed immediately. |
+| **Hold runs out** | The time is released, the pending contract is voided and the unpaid payment cancelled. Nothing was charged. If the money arrives just *after* the hold ended and the time is still free, the booking is confirmed anyway; if someone else has the time by then, the payment is refunded in full automatically. |
+| **Delivery** | After the shoot starts, the creator taps **Mark as delivered**. That makes the balance (total minus deposit) payable, and the client sees **Pay balance**. Paying it completes the booking. If the deposit already covered everything, delivery completes it. |
+| **Cancel** | The sheet shows **the exact refund before the final tap**. The client gets the share of what they paid that the package's policy gives for how far ahead they cancel (Flexible: all back from 24 hours out, else half. Moderate: all from 7 days, half from 48 hours, else none. Strict: half from 14 days, else none). If the **creator** cancels, the client always gets everything back. The refund is rounded down to the cent and returns to the card that paid. |
+
+Every booking shows its money in plain words (*Deposit due*, *Deposit paid*, *Balance due*, *Paid in full*, *Refund on the way*, *Refunded $250*…) in the list and on its detail screen, with the full payment history under it.
+
+**How it is built so a client can't fake a payment.** The app never decides an amount and never says "this was paid". The database computes what is owed from the booking (`payment_prepare`), Edge Functions create the Stripe PaymentIntent for exactly that amount, and the booking changes only when **Stripe's signed webhook** reports success (`payment_record_success`, which also refuses a payment whose amount doesn't match). Refunds work the other way round: cancelling records what is owed in the same database transaction (`cancel_booking`), and `process-refunds` then sends it to Stripe; if that call fails the refund simply stays owed and is retried (on the next app launch, refresh, or call), so a cancellation can never lose a refund.
+
+**Stripe Connect.** Creators connect a Stripe **Express** account from the Services tab (Stripe's own pages collect identity and bank details; Slate never sees them). Payments are **destination charges**: the money goes to the creator's account, with an optional platform fee (`PLATFORM_FEE_BPS`, default **0**, so Slate takes nothing). A creator whose account can't take charges yet can't take bookings that need a deposit, and the client is told before they sign. Stripe keeps its normal processing fee on refunds; the creator bears that, as with any refund through Stripe.
+
+**On-device mode is pretend.** With no server configured, "Pay" is instant and clearly labelled *Demo mode: no card is charged*, so the whole flow can be tried with no setup. It follows the same rules as the server (the same tests describe both), but no money exists.
+
+### Turning on real payments
+
+1. **Stripe:** create an account, enable Connect (Express), and note the secret key (`sk_…`) and publishable key (`pk_…`).
+2. **Database and functions**, from `ios/`:
+   ```sh
+   supabase db push
+   supabase secrets set STRIPE_SECRET_KEY=sk_test_… STRIPE_WEBHOOK_SECRET=whsec_… # PLATFORM_FEE_BPS=0 by default
+   supabase functions deploy create-payment-intent process-refunds connect-onboarding
+   supabase functions deploy stripe-webhook connect-redirect --no-verify-jwt
+   ```
+3. **Webhook:** in the Stripe dashboard add `https://<project>.supabase.co/functions/v1/stripe-webhook` for `payment_intent.succeeded`, `payment_intent.payment_failed`, `refund.created`, `refund.updated`, `refund.failed`, `charge.refund.updated` and `account.updated`, and copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+4. **Apple Pay:** register a merchant ID in your Apple developer account and its payment-processing certificate in the Stripe dashboard. In `Config/Secrets.xcconfig` set `STRIPE_PUBLISHABLE_KEY`, `APPLE_PAY_MERCHANT_ID` and `CODE_SIGN_ENTITLEMENTS = Config/Slate.ApplePay.entitlements` (see `Secrets.example.xcconfig`). Without these, a server-backed build tells the person that payments aren't set up rather than failing mysteriously, and on-device mode is unaffected.
+
 ## Layout
 
 ```
@@ -112,32 +145,43 @@ ios/
   Slate/
     App/                      Entry point, root state (AppModel), tabs
     Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
-    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF)
+    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments
     Resources/                Asset catalog (accent color, app icon)
-  SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF)
+  SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF, payments)
     Fixtures/contract_golden.json   Contract text both SQL and Swift must reproduce exactly
-  supabase/                   SQL migrations, Postgres rule tests, delete-account Edge Function
+    Fixtures/refund_golden.json     Refund amounts both SQL and Swift must agree on
+  supabase/
+    migrations/               Schema, security and the booking, contract and payment functions
+    tests/                    Postgres rule tests (booking_rules.py)
+    functions/                Edge Functions: delete-account, and the payment ones (logic in _shared/payments.ts)
+    function-tests/           Node tests and type-check for the payment logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.
 
 ## Status of verification
 
-Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth.
+Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth. When contracts landed it compiled and ran 233 tests with 0 failures, including the check that Swift renders the golden contracts word for word as Postgres does.
 
-The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, contract rendering and placeholder injection, signature rules, signed-PDF storage access, and 30 clients racing for one slot). The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
+The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, contract rendering and placeholder injection, signature rules, signed-PDF storage access, holds and their expiry, deposits, late and duplicate payments, balances, refunds by every policy, who may call which payment function, and many clients racing for one slot or reporting one payment at once). It once caught a real bug: two clients booking overlapping times at the same instant could get a deadlock error instead of "slot taken". Bookings for one creator are now serialised with an advisory lock, and the race tests passed ten runs in a row afterwards. The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
 
-**Never exercised** (needs a device, an Apple ID or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking and contract functions (including uploading and downloading the signed PDF), the Edge Function, EventKit permission prompts and event writing, the photo and video picking flows, and finger-drawing a signature on a real screen. The Swift side of the Supabase calls compiles but has not talked to a database.
+The payment logic in the Edge Functions (`_shared/payments.ts`) is type-checked and tested with Node against fake database and Stripe objects (`cd supabase/function-tests && npm ci && npm test`): amounts and destinations come from the database, a forged or repeated webhook changes nothing, refunds are idempotent and retry only when Stripe couldn't be reached, and so on. CI runs it too.
+
+**Never exercised** (needs a device, an Apple ID, Stripe or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking, contract and payment functions (including the signed PDF upload), **Stripe itself (PaymentIntents, Connect onboarding, the webhook, refunds)**, **Apple Pay on a real device**, the thin Deno wiring that connects the tested payment logic to the real Stripe and Supabase clients (`_shared/runtime.ts` and each function's `index.ts`), EventKit permission prompts and event writing, the photo and video picking flows, and finger-drawing a signature on a real screen. The Swift side of the Supabase calls compiles but has not talked to a database.
 
 ## Known gaps
 
-- **A booking doesn't collect a deposit yet.** The contract states the deposit and balance, but nothing is charged. Cancelling doesn't refund anything, even though the contract states the refund rules.
+- **Payments have never run against Stripe or Apple Pay** (see above). Expect to fix small things the first time they do.
 - **The creator can't approve bookings one by one**; their saved signature is applied automatically.
 - **Signed PDFs are produced by the app, not the server** (see above).
-- **Contracts can't be amended after signing**, and cancelling a booking doesn't mark its contract void.
-- **No holds.** The spec's 10-minute slot hold isn't needed until payment exists; bookings are confirmed immediately.
+- **Contracts can't be amended after signing.** Cancelling a booking voids its contract.
+- **Nothing runs on a schedule.** Expired holds are released whenever anyone books, pays or lists bookings, and owed refunds are retried when the app opens or refreshes. A scheduled job (for example `pg_cron` calling `expire_holds()` and `process-refunds`) would make both prompt even when nobody opens the app.
+- **No balance reminders or overdue handling yet.** The balance becomes payable when the creator marks the work delivered; nothing nudges the client (that arrives with notifications), and a client who never pays isn't chased.
+- **No disputes, chargebacks, payout screens or earnings summary.** Stripe's dashboard has them.
+- **Apple Pay's country comes from the device's region**, not the creator's. For creators outside that country it needs to come from their Stripe account.
+- **Delivery is the creator's word.** There is no proof-of-delivery step and no client confirmation.
 - **Calendar busy time is device-synced**, so it can be stale, and events written with write-only access can't be removed again on cancel.
 - **No push notifications or reminders** beyond the calendar alarms.
 - **Booking links don't resolve.** `slate.example` is a reserved placeholder host. The Home tab says so.

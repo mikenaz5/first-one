@@ -34,8 +34,13 @@ final class BookingModel {
     private(set) var soonest: [TimeSlot] = []
     private(set) var formatter = SlotFormatter(timeZone: .current)
     private(set) var isSubmitting = false
+    /// Set once the deposit (if any) is paid and the booking is confirmed.
     private(set) var confirmed: Booking?
     private(set) var signedContract: Contract?
+    /// Signed and booked, but the deposit isn't paid yet, so the time is only held.
+    private(set) var heldBooking: Booking?
+    /// Why the last payment attempt didn't finish, in plain words.
+    private(set) var payNotice: String?
 
     private(set) var contractPhase: ContractPhase = .idle
     private(set) var contractPreview: ContractPreview?
@@ -187,10 +192,11 @@ final class BookingModel {
 
     // MARK: Signing and booking
 
-    /// Signs the contract the person was shown and books. Returns true when the booking was made.
+    /// Signs the contract the person was shown and books. With a deposit the time is held and the payment sheet
+    /// follows straight away. Returns true when the booking is confirmed.
     @discardableResult
     func submit(using model: AppModel) async -> Bool {
-        guard let slot = selectedSlot, !isSubmitting else { return false }
+        guard let slot = selectedSlot, !isSubmitting, heldBooking == nil else { return false }
         isSubmitting = true
         defer { isSubmitting = false }
 
@@ -202,9 +208,14 @@ final class BookingModel {
                 makeRequest(for: slot),
                 signature: capture.input(documentHash: preview.documentHash)
             )
-            confirmed = signed.booking
             signedContract = signed.contract
-            return true
+            if signed.booking.status == .held {
+                heldBooking = signed.booking
+                await collectDeposit(using: model)
+            } else {
+                confirmed = signed.booking
+            }
+            return confirmed != nil
         } catch let error as SlateError where error == .slotTaken || error == .slotUnavailable {
             // Someone else got there first (or the creator's hours changed). Refresh and move on.
             selectedSlot = nil
@@ -220,6 +231,65 @@ final class BookingModel {
         } catch {
             model.show(error, title: "Couldn't book")
             return false
+        }
+    }
+
+    /// Pays the deposit for the held booking (again, if the first try didn't finish).
+    func payDeposit(using model: AppModel) async {
+        guard heldBooking != nil, !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        await collectDeposit(using: model)
+    }
+
+    private func collectDeposit(using model: AppModel) async {
+        guard let held = heldBooking else { return }
+        payNotice = nil
+        switch await model.pay(.deposit, for: held) {
+        case .confirmed:
+            let latest = model.bookings.first { $0.id == held.id } ?? held
+            signedContract = await model.contract(for: latest) ?? signedContract
+            heldBooking = nil
+            confirmed = latest
+        case .processing:
+            payNotice = "Your payment went through and is being confirmed. This usually takes a few seconds."
+            await refreshHeld(using: model)
+        case .cancelled:
+            payNotice = "The payment wasn't completed. Your time is still held; pay the deposit to confirm it."
+        case .failed(let reason):
+            payNotice = reason
+            await refreshHeld(using: model)
+        }
+    }
+
+    /// Looks again at whether the held booking has been paid, expired or cancelled.
+    func refreshHeld(using model: AppModel) async {
+        guard let held = heldBooking else { return }
+        await model.reloadMoney()
+        guard let latest = model.bookings.first(where: { $0.id == held.id }) else { return }
+        switch latest.status {
+        case .confirmed, .completed:
+            signedContract = await model.contract(for: latest) ?? signedContract
+            heldBooking = nil
+            confirmed = latest
+        case .held:
+            heldBooking = latest
+        case .expired, .cancelled:
+            heldBooking = latest
+        }
+    }
+
+    /// Lets go of a held time without paying.
+    func abandonHold(using model: AppModel) async {
+        guard let held = heldBooking, !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        if await model.cancel(held) != nil {
+            heldBooking = nil
+            payNotice = nil
+            selectedSlot = nil
+            invalidateContract()
+            await load(using: model, showSpinner: false)
         }
     }
 }

@@ -333,7 +333,9 @@ final class ContractBackendTests: XCTestCase {
         let req = request(creator, at: at(openDay(), 10))
         let preview = try await backend.previewContract(req, clientName: "Sam Client")
         let clientInk = ContractFixtures.drawnSignature(hash: preview.documentHash)
-        let signed = try await backend.createBooking(req, clientID: UUID(), clientName: "Sam Client", signature: clientInk)
+        let held = try await backend.createBooking(req, clientID: UUID(), clientName: "Sam Client", signature: clientInk)
+        XCTAssertNil(held.contract.signature(for: .creator), "The creator's side is added when the deposit is paid")
+        let signed = try await ContractFixtures.payDeposit(backend, held)
 
         XCTAssertEqual(signed.contract.signature(for: .client)?.method, .drawn)
         XCTAssertEqual(signed.contract.signature(for: .client)?.imagePNG, clientInk.imagePNG)
@@ -453,7 +455,8 @@ final class ContractBackendTests: XCTestCase {
         }
         try await assertNothingWasBooked(creator)
         let fine = try await backend.createBooking(req, clientID: UUID(), clientName: "Sam Client", signature: good)
-        XCTAssertEqual(fine.contract.status, .executed)
+        XCTAssertEqual(fine.contract.status, .pending, "Signed by the client; complete once the deposit is paid")
+        XCTAssertEqual(fine.booking.status, .held)
     }
 
     func testATakenTimeIsReportedBeforeAnythingElse() async throws {

@@ -20,12 +20,18 @@ struct BookingsView: View {
         return model.bookings.filter { $0.isUpcoming(at: now) }.sorted { $0.startAt < $1.startAt }
     }
 
-    private var past: [Booking] {
+    /// The shoot is over but the booking isn't: work to deliver, or a balance to pay.
+    private var followUp: [Booking] {
         let now = Date()
-        return model.bookings.filter { !$0.isUpcoming(at: now) }.sorted { $0.startAt > $1.startAt }
+        return model.bookings.filter { $0.needsFollowUp(at: now) }.sorted { $0.startAt < $1.startAt }
     }
 
-    private var visible: [Booking] { scope == .upcoming ? upcoming : past }
+    private var past: [Booking] {
+        let now = Date()
+        return model.bookings.filter { !$0.isOpen(at: now) }.sorted { $0.startAt > $1.startAt }
+    }
+
+    private var visible: [Booking] { scope == .upcoming ? followUp + upcoming : past }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -52,36 +58,19 @@ struct BookingsView: View {
                         .listRowBackground(Color.clear)
                     }
                 } else {
-                    Section {
-                        ForEach(visible) { booking in
-                            NavigationLink(value: booking.id) {
-                                BookingRow(booking: booking, isMine: model.isMine(booking))
-                            }
-                            .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                if booking.canCancel(at: Date()) {
-                                    Button("Cancel", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
-                                }
-                            }
-                            .swipeActions(edge: .leading) {
-                                if booking.status == .confirmed, !model.hasCalendarEvent(for: booking) {
-                                    Button("Add to Calendar", systemImage: "calendar.badge.plus") {
-                                        Task { await addToCalendar(booking) }
-                                    }
-                                    .tint(.indigo)
-                                }
-                            }
-                            .contextMenu {
-                                if booking.status == .confirmed, !model.hasCalendarEvent(for: booking) {
-                                    Button("Add to Calendar", systemImage: "calendar.badge.plus") {
-                                        Task { await addToCalendar(booking) }
-                                    }
-                                }
-                                if booking.canCancel(at: Date()) {
-                                    Button("Cancel booking", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
-                                }
+                    if scope == .upcoming {
+                        if !followUp.isEmpty {
+                            Section("Needs attention") { rows(followUp) }
+                        }
+                        if !upcoming.isEmpty {
+                            Section {
+                                rows(upcoming)
+                            } header: {
+                                if !followUp.isEmpty { Text("Upcoming") }
                             }
                         }
+                    } else {
+                        Section { rows(past) }
                     }
                 }
             }
@@ -93,23 +82,46 @@ struct BookingsView: View {
                 BookingDetailView(bookingID: id)
             }
             .refreshable { await model.refresh() }
-            .confirmationDialog(
-                "Cancel this booking?",
-                isPresented: Binding(get: { pendingCancel != nil }, set: { if !$0 { pendingCancel = nil } }),
-                titleVisibility: .visible,
-                presenting: pendingCancel
-            ) { booking in
-                Button("Cancel Booking", role: .destructive) { Task { await model.cancel(booking) } }
-                Button("Keep Booking", role: .cancel) {}
-            } message: { _ in
-                Text("The time opens up for other clients. Refunds aren't connected yet.")
-            }
+            .cancelFlow($pendingCancel)
             .alert("Couldn't add to Calendar", isPresented: Binding(get: { calendarMessage != nil }, set: { if !$0 { calendarMessage = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(calendarMessage ?? "")
             }
             .sensoryFeedback(.warning, trigger: model.bookings.filter { $0.status == .cancelled }.count)
+        }
+    }
+
+    @ViewBuilder
+    private func rows(_ items: [Booking]) -> some View {
+        ForEach(items) { booking in
+            NavigationLink(value: booking.id) {
+                BookingRow(booking: booking, isMine: model.isMine(booking), summary: model.paymentSummary(for: booking))
+            }
+            .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if booking.canCancel(at: Date()) {
+                    Button("Cancel", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
+                }
+            }
+            .swipeActions(edge: .leading) {
+                if booking.status == .confirmed, !model.hasCalendarEvent(for: booking) {
+                    Button("Add to Calendar", systemImage: "calendar.badge.plus") {
+                        Task { await addToCalendar(booking) }
+                    }
+                    .tint(.indigo)
+                }
+            }
+            .contextMenu {
+                if booking.status == .confirmed, !model.hasCalendarEvent(for: booking) {
+                    Button("Add to Calendar", systemImage: "calendar.badge.plus") {
+                        Task { await addToCalendar(booking) }
+                    }
+                }
+                if booking.canCancel(at: Date()) {
+                    Button("Cancel booking", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
+                }
+            }
         }
     }
 
@@ -127,6 +139,7 @@ struct BookingsView: View {
 struct BookingRow: View {
     let booking: Booking
     let isMine: Bool
+    var summary: PaymentSummary?
 
     private var formatter: SlotFormatter { SlotFormatter(timeZone: booking.timeZone) }
     private var startDay: CalendarDay { CalendarDay(booking.startAt, calendar: formatter.calendar) }
@@ -159,7 +172,10 @@ struct BookingRow: View {
                 Text(otherParty).font(.footnote).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            if booking.status != .confirmed {
+            if let summary {
+                PaymentStatusChip(summary: summary)
+                    .multilineTextAlignment(.trailing)
+            } else if booking.status != .confirmed {
                 Text(booking.status.title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(booking.status == .cancelled ? Color.slateDanger : Color.secondary)
@@ -167,7 +183,7 @@ struct BookingRow: View {
         }
         .frame(minHeight: Metrics.minTapTarget)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(booking.accessibilitySummary). \(otherParty)")
+        .accessibilityLabel("\(booking.accessibilitySummary). \(otherParty).\(summary.map { " \($0.headline)." } ?? "")")
     }
 }
 
@@ -179,7 +195,7 @@ struct BookingDetailView: View {
 
     let bookingID: UUID
 
-    @State private var confirmCancel = false
+    @State private var pendingCancel: Booking?
     @State private var calendarMessage: String?
     @State private var addedToCalendar = false
 
@@ -208,7 +224,12 @@ struct BookingDetailView: View {
                 if let note = formatter.zoneNote {
                     Label(note, systemImage: "globe").font(.footnote).foregroundStyle(.secondary)
                 }
-                LabeledContent("Status", value: booking.status.title)
+                LabeledContent("Status", value: booking.effectiveStatus(at: Date()).title)
+            }
+
+            Section("Payment") {
+                PaymentStatusCard(booking: booking)
+                    .padding(.vertical, Space.xs)
             }
 
             Section("Package") {
@@ -225,8 +246,10 @@ struct BookingDetailView: View {
             } header: {
                 Text("Price")
             } footer: {
-                Text("Payments and contracts aren't connected yet, so nothing has been charged.")
+                Text("The deposit confirms the booking. The balance is due once the work is delivered. \(booking.cancellationPolicy.summary).")
             }
+
+            PaymentHistorySection(booking: booking)
 
             Section("Contract") {
                 NavigationLink {
@@ -260,17 +283,12 @@ struct BookingDetailView: View {
                     .disabled(addedToCalendar || model.hasCalendarEvent(for: booking))
                 }
                 if booking.canCancel(at: Date()) {
-                    Button("Cancel booking", role: .destructive) { confirmCancel = true }
+                    Button("Cancel booking", role: .destructive) { pendingCancel = booking }
                         .frame(minHeight: Metrics.minTapTarget)
                 }
             }
         }
-        .confirmationDialog("Cancel this booking?", isPresented: $confirmCancel, titleVisibility: .visible) {
-            Button("Cancel Booking", role: .destructive) { Task { await model.cancel(booking) } }
-            Button("Keep Booking", role: .cancel) {}
-        } message: {
-            Text("The time opens up for other clients. Refunds aren't connected yet.")
-        }
+        .cancelFlow($pendingCancel)
         .alert("Couldn't add to Calendar", isPresented: Binding(get: { calendarMessage != nil }, set: { if !$0 { calendarMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {

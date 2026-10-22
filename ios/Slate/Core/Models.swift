@@ -226,6 +226,16 @@ enum SlateError: LocalizedError, Equatable {
     case invalidSignature
     case creatorNotReady
     case templateInUse
+    case holdExpired
+    case paymentsNotReady
+    case paymentNotDue
+    case alreadyPaid
+    case paymentProcessing
+    case paymentUnavailable
+    case paymentsNotConfigured
+    case applePayUnavailable
+    case notDeliverable
+    case bookingNotFound
     case backend(String)
 
     var errorDescription: String? {
@@ -270,6 +280,26 @@ enum SlateError: LocalizedError, Equatable {
             "This creator hasn't finished setting up their signature, so they can't take bookings yet."
         case .templateInUse:
             "A package still uses this contract. Switch those packages to another contract first."
+        case .holdExpired:
+            "Your hold on this time ran out before the deposit was paid. Please choose a time again."
+        case .paymentsNotReady:
+            "This creator hasn't finished setting up payments yet, so they can't take bookings that need a deposit."
+        case .paymentNotDue:
+            "There's nothing to pay for this booking right now."
+        case .alreadyPaid:
+            "This has already been paid."
+        case .paymentProcessing:
+            "Your payment is still being processed. Check back in a moment."
+        case .paymentUnavailable:
+            "Payments are unavailable right now. Please try again in a moment."
+        case .paymentsNotConfigured:
+            "This build isn't set up to take payments yet. It needs Stripe and Apple Pay keys; see the README."
+        case .applePayUnavailable:
+            "Apple Pay isn't set up on this device. Add a card to Wallet and try again."
+        case .notDeliverable:
+            "This booking can't be marked as delivered yet."
+        case .bookingNotFound:
+            "That booking couldn't be found."
         case .backend(let message):
             message
         }
@@ -300,6 +330,18 @@ enum AppConfig {
 
     static func bookingURL(handle: String) -> URL? {
         URL(string: "https://\(bookingLinkHost)/\(handle)")
+    }
+
+    /// Stripe's publishable key and the Apple Pay merchant ID, from Info.plist (set in Config/Secrets.xcconfig).
+    /// Nil means real payments aren't configured; on-device mode doesn't need them.
+    static var stripe: (publishableKey: String, merchantID: String)? {
+        let info = Bundle.main.infoDictionary
+        guard
+            let key = info?["StripePublishableKey"] as? String,
+            let merchant = info?["ApplePayMerchantID"] as? String,
+            !key.isEmpty, !merchant.isEmpty
+        else { return nil }
+        return (key, merchant)
     }
 
     /// Supabase credentials from Info.plist (set via Config/Secrets.xcconfig). Nil means "use LocalBackend".

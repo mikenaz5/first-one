@@ -23,6 +23,8 @@ final class AppModel {
     }
 
     let backend: any SlateBackend
+    /// Shows the payment sheet. Apple Pay with a real server; an instant pretend one on-device.
+    let authorizer: any PaymentAuthorizer
 
     private(set) var phase: Phase = .launching
     private(set) var loadErrorMessage: String?
@@ -40,6 +42,11 @@ final class AppModel {
     var creatorSignature: CreatorSignature?
     /// Signed contracts already fetched, by booking, so screens don't wait on the network twice.
     var contractsByBooking: [UUID: Contract] = [:]
+    /// Deposits, balances and refunds on this person's bookings, as the backend recorded them.
+    var payments: [Payment] = []
+    /// A creator's Stripe account, if they have one. Only meaningful for creators.
+    var paymentAccount: PaymentAccount?
+    var isPaying = false
     var calendarPrefs = CalendarPreferences.load()
     var calendarAccess: CalendarService.Access = .notDetermined
     /// Which tab is showing. Lives here so deep links can switch tabs.
@@ -49,8 +56,9 @@ final class AppModel {
     @ObservationIgnored var pendingBookingHandle: String?
     let calendar = CalendarService()
 
-    init(backend: any SlateBackend) {
+    init(backend: any SlateBackend, authorizer: (any PaymentAuthorizer)? = nil) {
         self.backend = backend
+        self.authorizer = authorizer ?? PaymentAuthorizerFactory.make(for: backend)
     }
 
     /// True when running on-device with no server configured (enables the demo sign-in in debug builds).
@@ -147,6 +155,8 @@ final class AppModel {
         contractTemplates = []
         creatorSignature = nil
         contractsByBooking = [:]
+        payments = []
+        paymentAccount = nil
         presentedPage = nil
         pendingBookingHandle = nil
         CalendarPreferences.clear()
@@ -183,6 +193,7 @@ final class AppModel {
             portfolio = try await backend.loadPortfolio(for: session.userID)
             try await loadScheduling(for: session.userID)
             Task { await syncCalendar() }
+            Task { await settlePendingRefunds() }
         } catch {
             show(error, title: "Couldn't refresh")
         }

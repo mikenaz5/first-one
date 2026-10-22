@@ -94,7 +94,8 @@ extension LocalBackend {
     }
 
     func loadSchedule(for creatorID: UUID, from: Date, to: Date) async throws -> CreatorSchedule {
-        makeSchedule(for: creatorID, from: from, to: to)
+        try expireLapsedHolds()
+        return makeSchedule(for: creatorID, from: from, to: to)
     }
 
     func makeSchedule(for creatorID: UUID, from: Date, to: Date) -> CreatorSchedule {
@@ -102,8 +103,9 @@ extension LocalBackend {
         let settings = read(AvailabilitySettings.self, from: availabilityURL(creatorID))
             ?? AvailabilitySettings.closed()
         let window = DateInterval(start: from, end: max(to, from))
+        let now = self.now
         let booked = readBookings()
-            .filter { $0.creatorID == creatorID && $0.status.blocksTime }
+            .filter { $0.creatorID == creatorID && $0.effectiveStatus(at: now).blocksTime }
             .map(\.blockedRange)
             .filter { IntervalMath.overlaps($0, window) }
         let external = (read([DateInterval].self, from: busyURL(creatorID)) ?? [])
@@ -164,10 +166,12 @@ extension LocalBackend {
     func createBooking(
         _ request: BookingRequest, clientID: UUID, clientName: String, signature: SignatureInput
     ) async throws -> SignedBooking {
+        // Holds that ran out stop blocking the calendar before anything else is looked at.
+        try expireLapsedHolds()
         let resolved = try await resolveBooking(request, clientName: clientName)
         let package = resolved.package
         // Stored dates are whole seconds, so use whole seconds here: what this returns then equals what is read back later.
-        let now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
+        let now = Date(timeIntervalSince1970: self.now.timeIntervalSince1970.rounded(.down))
         let duration = resolved.durationMinutes
 
         // Availability first, so someone who picked a taken time hears about that before anything else.
@@ -191,6 +195,8 @@ extension LocalBackend {
         let summary = PriceSummary.make(package: package, addOns: resolved.addOns)
         let end = request.startAt.addingTimeInterval(Double(duration) * 60)
         let bookingID = UUID()
+        // With a deposit the time is held until it is paid; with none the booking is confirmed straight away.
+        let isHeld = summary.depositCents > 0
 
         let booking = Booking(
             id: bookingID,
@@ -208,12 +214,20 @@ extension LocalBackend {
             currencyCode: package.currencyCode,
             totalCents: summary.totalCents,
             depositCents: summary.depositCents,
-            status: .confirmed,
+            status: isHeld ? .held : .confirmed,
             notes: String(request.notes.prefix(500)),
-            createdAt: now
+            createdAt: now,
+            holdExpiresAt: isHeld ? now.addingTimeInterval(Double(PaymentRules.holdMinutes) * 60) : nil,
+            cancellationPolicy: package.cancellationPolicy
         )
 
-        let contract = Contract(
+        let clientSignature = ContractSignature(
+            id: UUID(), role: .client, userID: clientID,
+            signedName: signature.signedName.trimmingCharacters(in: .whitespacesAndNewlines),
+            method: signature.method, imagePNG: signature.method == .drawn ? signature.imagePNG : nil,
+            signedAt: now, consentVersion: signature.consentVersion, device: signature.device
+        )
+        var contract = Contract(
             id: UUID(),
             bookingID: bookingID,
             creatorID: request.creatorID,
@@ -223,23 +237,14 @@ extension LocalBackend {
             title: resolved.contract.title,
             sections: resolved.contract.sections,
             documentHash: resolved.contract.documentHash,
-            status: .executed,
-            signatures: [
-                ContractSignature(
-                    id: UUID(), role: .client, userID: clientID,
-                    signedName: signature.signedName.trimmingCharacters(in: .whitespacesAndNewlines),
-                    method: signature.method, imagePNG: signature.method == .drawn ? signature.imagePNG : nil,
-                    signedAt: now, consentVersion: signature.consentVersion, device: signature.device
-                ),
-                ContractSignature(
-                    id: UUID(), role: .creator, userID: request.creatorID,
-                    signedName: creatorSignature.signedName, method: .onFile, imagePNG: creatorSignature.method == .drawn ? creatorSignature.imagePNG : nil,
-                    signedAt: now, consentVersion: SigningConsent.version, device: "Signature on file, applied at booking"
-                ),
-            ],
+            status: .pending,
+            signatures: [clientSignature],
             createdAt: now,
-            executedAt: now
+            executedAt: nil
         )
+        if !isHeld {
+            contract = Self.executed(contract, with: creatorSignature, at: now)
+        }
 
         // Both are written or neither is.
         let previousContracts = readContracts()
@@ -253,22 +258,28 @@ extension LocalBackend {
         return SignedBooking(booking: booking, contract: contract)
     }
 
-    func loadBookings(for userID: UUID) async throws -> [Booking] {
-        readBookings()
-            .filter { $0.creatorID == userID || $0.clientID == userID }
-            .sorted { $0.startAt < $1.startAt }
+    /// The contract with the creator's saved signature added and marked complete.
+    static func executed(_ contract: Contract, with creatorSignature: CreatorSignature, at date: Date) -> Contract {
+        var done = contract
+        if done.signature(for: .creator) == nil {
+            done.signatures.append(ContractSignature(
+                id: UUID(), role: .creator, userID: contract.creatorID,
+                signedName: creatorSignature.signedName, method: .onFile,
+                imagePNG: creatorSignature.method == .drawn ? creatorSignature.imagePNG : nil,
+                signedAt: date, consentVersion: SigningConsent.version,
+                device: "Signature on file, applied when the booking was confirmed"
+            ))
+        }
+        done.status = .executed
+        done.executedAt = date
+        return done
     }
 
-    func cancelBooking(_ id: UUID, by userID: UUID) async throws -> Booking {
-        var all = readBookings()
-        guard let index = all.firstIndex(where: { $0.id == id }),
-              all[index].creatorID == userID || all[index].clientID == userID,
-              all[index].canCancel(at: Date())
-        else { throw SlateError.notCancellable }
-
-        all[index].status = .cancelled
-        try write(all, to: bookingsURL)
-        return all[index]
+    func loadBookings(for userID: UUID) async throws -> [Booking] {
+        try expireLapsedHolds()
+        return readBookings()
+            .filter { $0.creatorID == userID || $0.clientID == userID }
+            .sorted { $0.startAt < $1.startAt }
     }
 
     func readBookings() -> [Booking] {

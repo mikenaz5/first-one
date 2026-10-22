@@ -12,6 +12,7 @@ struct ServicesView: View {
     @State private var editing: PackageEditorTarget?
     @State private var showAvailability = false
     @State private var showContracts = false
+    @State private var showPayments = false
     @State private var pendingDelete: ServicePackage?
 
     private let rowInsets = EdgeInsets(top: Space.s, leading: Space.page, bottom: Space.s, trailing: Space.page)
@@ -27,6 +28,12 @@ struct ServicesView: View {
                         .listRowBackground(Color.clear)
 
                     Button { showContracts = true } label: { ContractsCard() }
+                        .buttonStyle(PressableTileStyle())
+                        .listRowInsets(rowInsets)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+
+                    Button { showPayments = true } label: { PaymentsCard() }
                         .buttonStyle(PressableTileStyle())
                         .listRowInsets(rowInsets)
                         .listRowSeparator(.hidden)
@@ -101,6 +108,9 @@ struct ServicesView: View {
             }
             .navigationDestination(isPresented: $showContracts) {
                 ContractsListView()
+            }
+            .sheet(isPresented: $showPayments) {
+                PaymentSetupSheet()
             }
             .sheet(isPresented: $showAvailability) {
                 AvailabilitySheet(initial: model.availability ?? AvailabilitySettings.standard())

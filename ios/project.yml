@@ -19,6 +19,10 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.20.0
+  # Only Apple Pay is used, from Stripe's smaller "StripeApplePay" product.
+  Stripe:
+    url: https://github.com/stripe/stripe-ios-spm
+    from: 23.0.0
 
 targets:
   Slate:
@@ -28,6 +32,8 @@ targets:
       - path: Slate
     dependencies:
       - package: Supabase
+      - package: Stripe
+        product: StripeApplePay
     configFiles:
       Debug: Config/App.xcconfig
       Release: Config/App.xcconfig
@@ -35,7 +41,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.slate
         TARGETED_DEVICE_FAMILY: "1,2"
-        CODE_SIGN_ENTITLEMENTS: Config/Slate.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     info:
@@ -57,6 +62,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        StripePublishableKey: $(STRIPE_PUBLISHABLE_KEY)
+        ApplePayMerchantID: $(APPLE_PAY_MERCHANT_ID)
         NSCalendarsFullAccessUsageDescription: Slate reads your calendars so clients can't book times when you're busy. Only the start and end times of busy events are shared, never their titles or details.
         NSCalendarsWriteOnlyAccessUsageDescription: Slate adds your bookings to your calendar.
         CFBundleURLTypes:

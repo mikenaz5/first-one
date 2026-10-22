@@ -112,6 +112,11 @@ extension SupabaseBackend {
         var status: String
         var notes: String
         var createdAt: Date
+        var holdExpiresAt: Date?
+        var deliveredAt: Date?
+        var cancelledAt: Date?
+        var cancelledBy: String?
+        var cancellationPolicy: String?
 
         enum CodingKeys: String, CodingKey {
             case id, status, notes
@@ -130,6 +135,23 @@ extension SupabaseBackend {
             case totalCents = "total_cents"
             case depositCents = "deposit_cents"
             case createdAt = "created_at"
+            case holdExpiresAt = "hold_expires_at"
+            case deliveredAt = "delivered_at"
+            case cancelledAt = "cancelled_at"
+            case cancelledBy = "cancelled_by"
+            case cancellationPolicy = "cancellation_policy"
+        }
+    }
+
+    /// What `cancel_booking` returns.
+    private struct CancelRow: Decodable {
+        var booking: BookingRow
+        var refundCents: Int
+        var percent: Int
+
+        enum CodingKeys: String, CodingKey {
+            case booking, percent
+            case refundCents = "refund_cents"
         }
     }
 
@@ -378,6 +400,8 @@ extension SupabaseBackend {
     }
 
     func loadBookings(for userID: UUID) async throws -> [Booking] {
+        // Let go of holds that ran out first, so they don't show as held. Best effort.
+        try? await expireHolds()
         // Row Level Security already limits this to bookings the person is part of.
         let rows: [BookingRow] = try await client
             .from("bookings")
@@ -388,16 +412,32 @@ extension SupabaseBackend {
         return try rows.map(makeBooking)
     }
 
-    func cancelBooking(_ id: UUID, by userID: UUID) async throws -> Booking {
+    func cancelBooking(_ id: UUID, by userID: UUID) async throws -> CancellationResult {
+        do {
+            let row: CancelRow = try await client
+                .rpc("cancel_booking", params: CancelBookingParams(pBookingId: Self.key(id)))
+                .execute()
+                .value
+            return CancellationResult(booking: try makeBooking(row.booking), refundCents: row.refundCents, percent: row.percent)
+        } catch {
+            throw Self.mapBookingError(error)
+        }
+    }
+
+    func markDelivered(bookingID: UUID, by creatorID: UUID) async throws -> Booking {
         do {
             let row: BookingRow = try await client
-                .rpc("cancel_booking", params: CancelBookingParams(pBookingId: Self.key(id)))
+                .rpc("mark_delivered", params: CancelBookingParams(pBookingId: Self.key(bookingID)))
                 .execute()
                 .value
             return try makeBooking(row)
         } catch {
             throw Self.mapBookingError(error)
         }
+    }
+
+    func expireHolds() async throws {
+        try await client.rpc("expire_holds").execute()
     }
 
     private func makeBooking(_ row: BookingRow) throws -> Booking {
@@ -422,7 +462,12 @@ extension SupabaseBackend {
             depositCents: row.depositCents,
             status: BookingStatus(rawValue: row.status) ?? .confirmed,
             notes: row.notes,
-            createdAt: row.createdAt
+            createdAt: row.createdAt,
+            holdExpiresAt: row.holdExpiresAt,
+            deliveredAt: row.deliveredAt,
+            cancelledAt: row.cancelledAt,
+            cancelledByID: row.cancelledBy.flatMap(UUID.init(uuidString:)),
+            cancellationPolicy: row.cancellationPolicy.flatMap(CancellationPolicy.init(rawValue:)) ?? .moderate
         )
     }
 
@@ -441,6 +486,13 @@ extension SupabaseBackend {
             ("creator_not_ready", .creatorNotReady),
             ("invalid_signature", .invalidSignature),
             ("invalid_contract", .invalidContract),
+            ("hold_expired", .holdExpired),
+            ("payments_not_ready", .paymentsNotReady),
+            ("payment_not_due", .paymentNotDue),
+            ("balance_not_due", .paymentNotDue),
+            ("nothing_due", .paymentNotDue),
+            ("already_paid", .alreadyPaid),
+            ("not_deliverable", .notDeliverable),
         ]
         for entry in known where text.contains(entry.token) {
             return entry.error

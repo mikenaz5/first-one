@@ -10,11 +10,14 @@ actor LocalBackend: SlateBackend {
     let fileManager = FileManager.default
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    /// What "now" is. Tests move it forward to see holds run out.
+    let clock: @Sendable () -> Date
 
     /// Handles that pretend to belong to other people, so the "taken" state is easy to see.
     private let simulatedTakenHandles: Set<String> = ["maya", "demo", "studio", "photo", "video"]
 
-    init(root: URL? = nil) {
+    init(root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }) {
+        self.clock = clock
         let base: URL
         if let root {
             base = root
@@ -34,6 +37,8 @@ actor LocalBackend: SlateBackend {
 
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
     }
+
+    nonisolated var now: Date { clock() }
 
     // MARK: - Stored shapes
 

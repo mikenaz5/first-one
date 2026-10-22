@@ -49,15 +49,50 @@ enum ContractFixtures {
         return saved.first { $0.id == template.id } ?? template
     }
 
-    /// What a client does: read the contract as the backend fills it in, then sign what they read.
+    /// What a client does: read the contract as the backend fills it in, sign what they read, and (unless told
+    /// otherwise) pay the deposit, which is what confirms the booking. Returns the booking and contract as they stand after.
     static func signedBooking(
         _ backend: any SlateBackend, _ request: BookingRequest,
-        clientID: UUID = UUID(), name: String = "Sam Client"
+        clientID: UUID = UUID(), name: String = "Sam Client", pay: Bool = true
     ) async throws -> SignedBooking {
         let preview = try await backend.previewContract(request, clientName: name)
-        return try await backend.createBooking(
+        let signed = try await backend.createBooking(
             request, clientID: clientID, clientName: name,
             signature: typedSignature(hash: preview.documentHash, name: name)
         )
+        guard pay, signed.booking.status == .held else { return signed }
+        return try await payDeposit(backend, signed)
     }
+
+    /// Pays a held booking's deposit (pretend, on-device) and returns the booking and contract as they are afterwards.
+    static func payDeposit(_ backend: any SlateBackend, _ signed: SignedBooking) async throws -> SignedBooking {
+        guard let clientID = signed.booking.clientID else { return signed }
+        let info = try await backend.preparePayment(bookingID: signed.booking.id, kind: .deposit, by: clientID)
+        try await backend.completeSimulatedPayment(info.paymentID)
+        let booking = try await backend.loadBookings(for: clientID).first { $0.id == signed.booking.id } ?? signed.booking
+        let contract = try await backend.loadContract(bookingID: booking.id, for: clientID) ?? signed.contract
+        return SignedBooking(booking: booking, contract: contract)
+    }
+}
+
+/// A clock the test moves by hand, to watch holds run out and cancellations cross refund thresholds.
+final class ManualClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: Date
+
+    init(_ start: Date) { current = start }
+
+    var now: Date {
+        lock.lock()
+        defer { lock.unlock() }
+        return current
+    }
+
+    func set(_ date: Date) {
+        lock.lock()
+        current = date
+        lock.unlock()
+    }
+
+    func advance(by seconds: TimeInterval) { set(now.addingTimeInterval(seconds)) }
 }

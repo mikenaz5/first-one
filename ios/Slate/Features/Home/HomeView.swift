@@ -22,7 +22,8 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityAddTraits(.isHeader)
 
-                    if model.packages.isEmpty || model.needsAvailability || !model.hasCreatorSignature {
+                    if model.packages.isEmpty || model.needsAvailability || !model.hasCreatorSignature
+                        || (model.hasPackagesWithDeposit && !model.canTakePayments) {
                         SetupCard()
                     }
 
@@ -81,16 +82,30 @@ private struct SetupCard: View {
                 title: "Add your signature",
                 detail: "Applied to each contract so clients can book straight away."
             )
+            if model.hasPackagesWithDeposit {
+                step(
+                    done: model.canTakePayments,
+                    title: "Set up payments",
+                    detail: "So deposits and balances go straight to you."
+                )
+            }
             Button {
                 model.selectedTab = .services
             } label: {
-                Text(model.packages.isEmpty ? "Create a package" : model.needsAvailability ? "Set your hours" : "Add your signature")
+                Text(setupButtonTitle)
                     .frame(maxWidth: .infinity, minHeight: 28)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
         .card()
+    }
+
+    private var setupButtonTitle: String {
+        if model.packages.isEmpty { return "Create a package" }
+        if model.needsAvailability { return "Set your hours" }
+        if !model.hasCreatorSignature { return "Add your signature" }
+        return "Set up payments"
     }
 
     private func step(done: Bool, title: String, detail: String) -> some View {

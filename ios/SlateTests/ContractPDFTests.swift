@@ -154,7 +154,15 @@ final class SignedPDFFlowTests: XCTestCase {
             startAt: day.date(atMinute: 600, in: TestClock.calendar)!, notes: ""
         )
         let preview = try await model.previewContract(for: request)
-        return try await model.book(request, signature: ContractFixtures.typedSignature(hash: preview.documentHash))
+        let held = try await model.book(request, signature: ContractFixtures.typedSignature(hash: preview.documentHash))
+        XCTAssertEqual(held.booking.status, .held)
+        XCTAssertEqual(held.contract.status, .pending, "No PDF yet: the creator hasn't signed until the deposit is paid")
+        let outcome = await model.pay(.deposit, for: held.booking)
+        XCTAssertEqual(outcome, .confirmed)
+        let booking = try XCTUnwrap(model.bookings.first { $0.id == held.booking.id })
+        let loaded = await model.contract(for: booking)
+        let contract = try XCTUnwrap(loaded)
+        return SignedBooking(booking: booking, contract: contract)
     }
 
     func testThePDFIsMadeOnceAndEveryoneGetsTheSameFile() async throws {
