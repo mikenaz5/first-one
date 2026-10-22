@@ -78,14 +78,13 @@ struct PayButton: View {
 
 // MARK: - Payment card (booking detail)
 
-/// What has been paid, what is owed now, and the button to pay it. Creators get "Mark as delivered" here.
+/// What has been paid, what is owed now, and the button to pay it.
 struct PaymentStatusCard: View {
     @Environment(AppModel.self) private var model
 
     let booking: Booking
     @State private var message: String?
-    @State private var confirmDelivery = false
-
+    
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             content(now: context.date)
@@ -100,7 +99,6 @@ struct PaymentStatusCard: View {
     private func content(now: Date) -> some View {
         let summary = model.paymentSummary(for: booking, now: now)
         let kind = model.canPay(booking, now: now)
-        let money = { Money.format($0, code: booking.currencyCode) }
 
         return VStack(alignment: .leading, spacing: Space.m) {
             Label {
@@ -126,38 +124,12 @@ struct PaymentStatusCard: View {
                     Task { await pay(kind) }
                 }
             }
-
-            if booking.creatorID == model.session?.userID, booking.canMarkDelivered(at: now) {
-                Button {
-                    confirmDelivery = true
-                } label: {
-                    Label("Mark as delivered", systemImage: "shippingbox")
-                        .frame(maxWidth: .infinity, minHeight: 28)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-            }
-        }
-        .confirmationDialog("Is the work delivered?", isPresented: $confirmDelivery, titleVisibility: .visible) {
-            Button("Yes, it's delivered") { Task { await model.markDelivered(booking) } }
-            Button("Not yet", role: .cancel) {}
-        } message: {
-            Text(booking.balanceCents > 0
-                 ? "This asks the client to pay the remaining \(money(booking.balanceCents))."
-                 : "Everything is already paid, so this finishes the booking.")
         }
         .sensoryFeedback(.success, trigger: summary.phase == .paidInFull)
     }
 
     private func pay(_ kind: PaymentKind) async {
-        switch await model.pay(kind, for: booking) {
-        case .confirmed, .cancelled:
-            break
-        case .processing:
-            message = "Your payment went through and is being confirmed. This usually takes a few seconds. Pull to refresh in a moment."
-        case .failed(let reason):
-            message = reason
-        }
+        message = await model.pay(kind, for: booking).message
     }
 
     static func clock(_ interval: TimeInterval) -> String {
@@ -433,7 +405,7 @@ struct PaymentSetupSheet: View {
                 }
 
                 Section("How you get paid") {
-                    Label("The deposit is paid when a client books, the balance after you mark the work delivered.", systemImage: "arrow.left.arrow.right")
+                    Label("The deposit is paid when a client books, the balance after the client confirms they have your final files.", systemImage: "arrow.left.arrow.right")
                         .font(.subheadline)
                     Label("Cancellations refund by the policy on each package, and always in full if you cancel.", systemImage: "arrow.uturn.backward")
                         .font(.subheadline)

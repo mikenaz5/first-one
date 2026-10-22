@@ -121,7 +121,7 @@ final class PaymentSummaryTests: XCTestCase {
 
     private func booking(
         _ status: BookingStatus, deposit: Int = 50_000, total: Int = 200_000,
-        hold: Date? = nil, delivered: Date? = nil, startsIn hours: Double = 100
+        hold: Date? = nil, delivered: Date? = nil, received: Date? = nil, startsIn hours: Double = 100
     ) -> Booking {
         Booking(
             id: bookingID, creatorID: UUID(), clientID: UUID(), creatorName: "Dana Lens", clientName: "Sam Client",
@@ -129,7 +129,8 @@ final class PaymentSummaryTests: XCTestCase {
             startAt: now.addingTimeInterval(hours * 3600), endAt: now.addingTimeInterval(hours * 3600 + 3600),
             blockedUntil: now.addingTimeInterval(hours * 3600 + 5400), timeZoneID: "America/Chicago", currencyCode: "USD",
             totalCents: total, depositCents: deposit, status: status, notes: "", createdAt: now,
-            holdExpiresAt: hold, deliveredAt: delivered
+            holdExpiresAt: hold, deliveredAt: delivered,
+            deliveryURL: delivered == nil ? nil : "https://files.example.com/final", receiptConfirmedAt: received
         )
     }
 
@@ -176,13 +177,13 @@ final class PaymentSummaryTests: XCTestCase {
         XCTAssertEqual(summary(booking(.expired)).phase, .holdExpired)
     }
 
-    func testAfterTheDepositTheBalanceIsDueOnDelivery() {
+    func testAfterTheDepositTheBalanceIsDueOnceTheFilesAreConfirmed() {
         let confirmed = booking(.confirmed)
         let result = summary(confirmed, [payment(.deposit, .succeeded, 50_000)])
         XCTAssertEqual(result.phase, .depositPaid)
         XCTAssertEqual(result.tone, .success)
         XCTAssertTrue(result.detail?.contains("$1,500") == true)
-        XCTAssertEqual(result.dueNowCents, 0, "Nothing is due until it's delivered")
+        XCTAssertEqual(result.dueNowCents, 0, "Nothing is due until the client confirms they have the files")
     }
 
     func testNoDepositMeansEverythingIsDueAfterDelivery() {
@@ -197,16 +198,33 @@ final class PaymentSummaryTests: XCTestCase {
 
     // MARK: After the shoot
 
-    func testDeliveryMakesTheBalanceDue() {
-        let delivered = booking(.confirmed, delivered: now)
-        let client = summary(delivered, [payment(.deposit, .succeeded, 50_000)])
+    func testSharedFilesAloneDoNotMakeTheBalanceDue() {
+        let shared = booking(.confirmed, delivered: now)
+        let client = summary(shared, [payment(.deposit, .succeeded, 50_000)])
+        XCTAssertEqual(client.phase, .awaitingConfirmation)
+        XCTAssertEqual(client.dueNowCents, 0, "Not payable until the client confirms")
+        XCTAssertTrue(client.detail?.contains("Confirm you have your files, then pay the remaining $1,500") == true)
+
+        let creator = summary(shared, [payment(.deposit, .succeeded, 50_000)], as: .creator)
+        XCTAssertEqual(creator.phase, .awaitingConfirmation)
+        XCTAssertTrue(creator.detail?.contains("Waiting for the client to confirm") == true)
+    }
+
+    func testConfirmingReceiptMakesTheBalanceDue() {
+        let received = booking(.confirmed, delivered: now, received: now)
+        let client = summary(received, [payment(.deposit, .succeeded, 50_000)])
         XCTAssertEqual(client.phase, .balanceDue)
         XCTAssertEqual(client.dueNowCents, 150_000)
         XCTAssertTrue(client.detail?.contains("Pay the remaining $1,500") == true)
 
-        let creator = summary(delivered, [payment(.deposit, .succeeded, 50_000)], as: .creator)
+        let creator = summary(received, [payment(.deposit, .succeeded, 50_000)], as: .creator)
         XCTAssertEqual(creator.phase, .balanceDue)
-        XCTAssertTrue(creator.detail?.contains("Waiting for the client to pay $1,500") == true)
+        XCTAssertTrue(creator.detail?.contains("Waiting for them to pay $1,500") == true)
+    }
+
+    func testAFullyPaidBookingStaysPaidInFullThroughDelivery() {
+        let shared = booking(.confirmed, deposit: 200_000, delivered: now)
+        XCTAssertEqual(summary(shared, [payment(.deposit, .succeeded, 200_000)]).phase, .paidInFull)
     }
 
     func testCompletedMeansPaidInFull() {
@@ -291,12 +309,28 @@ final class PaymentSummaryTests: XCTestCase {
         XCTAssertFalse(booking(.completed).canCancel(at: now))
     }
 
-    func testDeliveryCanBeMarkedOnceTheShootHasStarted() {
-        XCTAssertFalse(booking(.confirmed).canMarkDelivered(at: now))
-        XCTAssertTrue(booking(.confirmed, startsIn: -2).canMarkDelivered(at: now))
-        XCTAssertFalse(booking(.confirmed, delivered: now, startsIn: -2).canMarkDelivered(at: now), "Only once")
-        XCTAssertFalse(booking(.held, hold: now.addingTimeInterval(60), startsIn: -2).canMarkDelivered(at: now))
-        XCTAssertFalse(booking(.cancelled, startsIn: -2).canMarkDelivered(at: now))
+    func testFilesCanBeSharedOnceTheShootHasStartedUntilTheClientConfirms() {
+        XCTAssertFalse(booking(.confirmed).canShareDelivery(at: now), "Not before the shoot")
+        XCTAssertTrue(booking(.confirmed, startsIn: -2).canShareDelivery(at: now))
+        XCTAssertTrue(booking(.confirmed, delivered: now, startsIn: -2).canShareDelivery(at: now), "The link can be replaced")
+        XCTAssertFalse(booking(.confirmed, delivered: now, received: now, startsIn: -2).canShareDelivery(at: now), "Not after the client confirmed")
+        XCTAssertFalse(booking(.held, hold: now.addingTimeInterval(60), startsIn: -2).canShareDelivery(at: now))
+        XCTAssertFalse(booking(.cancelled, startsIn: -2).canShareDelivery(at: now))
+        XCTAssertFalse(booking(.completed, delivered: now, received: now, startsIn: -2).canShareDelivery(at: now))
+    }
+
+    func testReceiptCanBeConfirmedOnceFilesAreShared() {
+        XCTAssertFalse(booking(.confirmed, startsIn: -2).canConfirmReceipt, "Nothing to confirm yet")
+        XCTAssertTrue(booking(.confirmed, delivered: now, startsIn: -2).canConfirmReceipt)
+        XCTAssertFalse(booking(.confirmed, delivered: now, received: now, startsIn: -2).canConfirmReceipt, "Only once")
+        XCTAssertFalse(booking(.cancelled, delivered: now, startsIn: -2).canConfirmReceipt)
+    }
+
+    func testAReviewNeedsACompletedBookingWithConfirmedFiles() {
+        XCTAssertFalse(booking(.confirmed, delivered: now, received: now).canReview, "The balance isn't paid yet")
+        XCTAssertTrue(booking(.completed, delivered: now, received: now).canReview)
+        XCTAssertFalse(booking(.completed).canReview)
+        XCTAssertFalse(booking(.cancelled, delivered: now, received: now).canReview)
     }
 
     func testBookingsSavedBeforePaymentsStillLoad() throws {
@@ -304,21 +338,44 @@ final class PaymentSummaryTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(original)) as? [String: Any])
-        for key in ["holdExpiresAt", "deliveredAt", "cancelledAt", "cancelledByID", "cancellationPolicy"] { object[key] = nil }
+        for key in ["holdExpiresAt", "deliveredAt", "deliveryURL", "deliveryNote", "receiptConfirmedAt", "cancelledAt", "cancelledByID", "cancellationPolicy"] { object[key] = nil }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let old = try decoder.decode(Booking.self, from: JSONSerialization.data(withJSONObject: object))
         XCTAssertNil(old.holdExpiresAt)
         XCTAssertNil(old.deliveredAt)
+        XCTAssertNil(old.receiptConfirmedAt)
         XCTAssertNil(old.cancelledByID)
         XCTAssertEqual(old.cancellationPolicy, .moderate)
         XCTAssertEqual(old.id, original.id)
         XCTAssertEqual(old.status, .confirmed)
     }
 
+    func testWorkDeliveredUnderTheOldButtonCountsAsConfirmed() throws {
+        // Saved before sharing links existed: delivered, with no link and no confirmation.
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.encoded(booking(.confirmed, delivered: now))) as? [String: Any])
+        for key in ["deliveryURL", "deliveryNote", "receiptConfirmedAt"] { object[key] = nil }
+        let old = try Self.decoder().decode(Booking.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(old.receiptConfirmedAt, old.deliveredAt, "So a balance that was already payable stays payable")
+        XCTAssertNil(old.deliveryURL)
+    }
+
+    private static func encoded(_ booking: Booking) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(booking)
+    }
+
+    private static func decoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
     func testTheNewFieldsSurviveSavingAndLoading() throws {
-        var original = booking(.cancelled, delivered: now)
+        var original = booking(.cancelled, delivered: now, received: now)
+        original.deliveryNote = "Password: lake"
         original.cancelledAt = now
         original.cancelledByID = UUID()
         original.cancellationPolicy = .strict

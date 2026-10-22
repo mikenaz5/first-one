@@ -50,8 +50,13 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
     var createdAt: Date
     /// While a deposit is owed, the time is held until this moment. Nil once the deposit is paid.
     var holdExpiresAt: Date? = nil
-    /// When the creator said the work was delivered, which is when the balance becomes due.
+    /// When the creator first shared the final files.
     var deliveredAt: Date? = nil
+    /// The link to the final files, and an optional note with it. Sharing again replaces them until the client confirms.
+    var deliveryURL: String? = nil
+    var deliveryNote: String? = nil
+    /// When the client confirmed they have the files. This is what makes the balance payable.
+    var receiptConfirmedAt: Date? = nil
     var cancelledAt: Date? = nil
     var cancelledByID: UUID? = nil
     /// The policy the client agreed to, kept with the booking so later package edits can't change a refund.
@@ -75,6 +80,7 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
     }
 
     var isDelivered: Bool { deliveredAt != nil }
+    var isReceived: Bool { receiptConfirmedAt != nil }
 
     /// Not finished yet: a held or confirmed booking, whether or not the shoot has happened.
     func isOpen(at now: Date) -> Bool {
@@ -84,13 +90,19 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
 
     func isUpcoming(at now: Date) -> Bool { isOpen(at: now) && endAt > now }
 
-    /// The shoot is over but the booking isn't: the creator still has to deliver, or the client still has to pay.
+    /// The shoot is over but the booking isn't: the creator still has to deliver, or the client still has to confirm or pay.
     func needsFollowUp(at now: Date) -> Bool { effectiveStatus(at: now) == .confirmed && endAt <= now }
 
     func canCancel(at now: Date) -> Bool { effectiveStatus(at: now).blocksTime && startAt > now }
 
-    /// A creator can mark the work delivered once the shoot has started, if they haven't already.
-    func canMarkDelivered(at now: Date) -> Bool { status == .confirmed && deliveredAt == nil && startAt <= now }
+    /// A creator can share the final files (or replace the link) once the shoot has started, until the client confirms.
+    func canShareDelivery(at now: Date) -> Bool { status == .confirmed && receiptConfirmedAt == nil && startAt <= now }
+
+    /// A client can confirm once files have been shared.
+    var canConfirmReceipt: Bool { status == .confirmed && deliveredAt != nil && receiptConfirmedAt == nil }
+
+    /// A client can review once the work is delivered, confirmed and paid for.
+    var canReview: Bool { status == .completed && receiptConfirmedAt != nil }
 
     var accessibilitySummary: String {
         "\(packageName), \(status.title), \(startAt.formatted(date: .complete, time: .shortened))"
@@ -98,8 +110,9 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
 }
 
 extension Booking {
-    /// Bookings saved before payments existed lack the newer fields; give them sensible values instead of
-    /// failing to load (which would make a creator's bookings disappear).
+    /// Bookings saved before payments or delivery existed lack the newer fields; give them sensible values instead
+    /// of failing to load (which would make a creator's bookings disappear). Work delivered under the old "mark as
+    /// delivered" button counts as confirmed, the same way the migration treats it.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -122,6 +135,10 @@ extension Booking {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         holdExpiresAt = try c.decodeIfPresent(Date.self, forKey: .holdExpiresAt)
         deliveredAt = try c.decodeIfPresent(Date.self, forKey: .deliveredAt)
+        deliveryURL = try c.decodeIfPresent(String.self, forKey: .deliveryURL)
+        deliveryNote = try c.decodeIfPresent(String.self, forKey: .deliveryNote)
+        receiptConfirmedAt = try c.decodeIfPresent(Date.self, forKey: .receiptConfirmedAt)
+        if receiptConfirmedAt == nil, deliveryURL == nil, let delivered = deliveredAt { receiptConfirmedAt = delivered }
         cancelledAt = try c.decodeIfPresent(Date.self, forKey: .cancelledAt)
         cancelledByID = try c.decodeIfPresent(UUID.self, forKey: .cancelledByID)
         cancellationPolicy = try c.decodeIfPresent(CancellationPolicy.self, forKey: .cancellationPolicy) ?? .moderate

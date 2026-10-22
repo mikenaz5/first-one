@@ -196,23 +196,96 @@ final class PaymentsFlowTests: XCTestCase {
         return try XCTUnwrap(screen.confirmed)
     }
 
-    func testAfterTheShootTheCreatorDeliversAndThePersonPaysTheBalance() async throws {
+    func testAfterTheShootTheFilesAreSharedConfirmedAndTheBalancePaid() async throws {
         let booking = try await ownBooking()
-        XCTAssertNil(model.canPay(booking), "Nothing is due until it's delivered")
+        XCTAssertNil(model.canPay(booking), "Nothing is due until the files are delivered and confirmed")
 
         clock.set(booking.endAt.addingTimeInterval(3600))
-        await model.markDelivered(booking)
+        let shared = await model.shareDelivery(booking, link: "https://files.example.com/final", note: "Password: lake")
+        XCTAssertTrue(shared)
         let delivered = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
         XCTAssertNotNil(delivered.deliveredAt)
-        XCTAssertEqual(model.paymentSummary(for: delivered, now: clock.now).phase, .balanceDue)
-        XCTAssertEqual(model.canPay(delivered, now: clock.now), .balance)
+        XCTAssertEqual(model.paymentSummary(for: delivered, now: clock.now).phase, .awaitingConfirmation)
+        XCTAssertNil(model.canPay(delivered, now: clock.now), "Sharing alone doesn't make it payable")
 
-        let outcome = await model.pay(.balance, for: delivered)
+        let confirmed = await model.confirmReceipt(delivered)
+        XCTAssertTrue(confirmed)
+        let received = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertNotNil(received.receiptConfirmedAt)
+        XCTAssertEqual(model.paymentSummary(for: received, now: clock.now).phase, .balanceDue)
+        XCTAssertEqual(model.canPay(received, now: clock.now), .balance)
+
+        let outcome = await model.pay(.balance, for: received)
         XCTAssertEqual(outcome, .confirmed)
         let done = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
         XCTAssertEqual(done.status, .completed)
         XCTAssertEqual(model.paymentSummary(for: done, now: clock.now).phase, .paidInFull)
         XCTAssertEqual(authorizer.requests.last?.info.amountCents, 150_000)
+    }
+
+    func testAFileLinkThatIsNotSecureIsRefusedWithAnExplanation() async throws {
+        let booking = try await ownBooking()
+        clock.set(booking.endAt.addingTimeInterval(3600))
+        let shared = await model.shareDelivery(booking, link: "http://files.example.com/final", note: "")
+        XCTAssertFalse(shared)
+        XCTAssertEqual(model.alert?.title, "Couldn't share the files")
+        XCTAssertEqual(model.alert?.message, SlateError.invalidDeliveryLink.errorDescription)
+        let unchanged = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertNil(unchanged.deliveredAt)
+    }
+
+    func testTheDeliveryCardFollowsTheStageOfTheBooking() async throws {
+        let booking = try await ownBooking()
+        XCTAssertNil(model.deliverySummary(for: booking, now: clock.now), "Nothing to say before the shoot")
+
+        clock.set(booking.endAt.addingTimeInterval(3600))
+        XCTAssertEqual(model.deliverySummary(for: booking, now: clock.now)?.stage, .readyToShare)
+        await model.shareDelivery(booking, link: "https://files.example.com/final", note: "")
+        let shared = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertEqual(model.deliverySummary(for: shared, now: clock.now)?.stage, .awaitingConfirmation)
+        XCTAssertEqual(model.deliverySummary(for: shared, now: clock.now)?.canConfirm, true)
+        await model.confirmReceipt(shared)
+        let received = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertEqual(model.deliverySummary(for: received, now: clock.now)?.stage, .received)
+        XCTAssertEqual(model.deliverySummary(for: received, now: clock.now)?.canConfirm, false)
+    }
+
+    func testAfterPayingTheBalanceThePersonCanReviewAndItShowsOnTheCreatorsPage() async throws {
+        let booking = try await ownBooking()
+        clock.set(booking.endAt.addingTimeInterval(3600))
+        await model.shareDelivery(booking, link: "https://files.example.com/final", note: "")
+        let shared = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertFalse(model.canReview(shared), "Not before the files are confirmed and paid for")
+
+        await model.confirmReceipt(shared)
+        let received = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertFalse(model.canReview(received), "The balance is still owed")
+        _ = await model.pay(.balance, for: received)
+        let done = try XCTUnwrap(model.bookings.first { $0.id == booking.id })
+        XCTAssertTrue(model.canReview(done))
+
+        let posted = await model.submitReview(for: done, rating: 5, body: "  Wonderful  ")
+        XCTAssertTrue(posted)
+        XCTAssertFalse(model.canReview(done), "One review per booking")
+        let mine = try XCTUnwrap(model.review(for: done))
+        XCTAssertEqual(mine.rating, 5)
+        XCTAssertEqual(mine.body, "Wonderful")
+
+        await model.loadReviews(for: done.creatorID)
+        XCTAssertEqual(model.reviews(for: done.creatorID).map(\.body), ["Wonderful"])
+        XCTAssertEqual(model.reviewSummary(for: done.creatorID), ReviewSummary(count: 1, ratingSum: 5))
+
+        let again = await model.submitReview(for: done, rating: 1, body: "Changed my mind")
+        XCTAssertFalse(again)
+        XCTAssertEqual(model.alert?.message, SlateError.alreadyReviewed.errorDescription)
+        XCTAssertEqual(model.review(for: done)?.rating, 5)
+    }
+
+    func testPaymentOutcomesSaySomethingOnlyWhenThereIsSomethingToSay() {
+        XCTAssertNil(AppModel.PaymentOutcome.confirmed.message)
+        XCTAssertNil(AppModel.PaymentOutcome.cancelled.message)
+        XCTAssertNotNil(AppModel.PaymentOutcome.processing.message)
+        XCTAssertEqual(AppModel.PaymentOutcome.failed("Declined").message, "Declined")
     }
 
     // MARK: Cancelling

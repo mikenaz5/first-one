@@ -1,0 +1,377 @@
+{
+  "urlMaxLength": 2048,
+  "noteMaxLength": 500,
+  "reviewMaxLength": 1000,
+  "urls": [
+    {
+      "input": "https://example.com",
+      "clean": "https://example.com"
+    },
+    {
+      "input": "https://example.com/final-files",
+      "clean": "https://example.com/final-files"
+    },
+    {
+      "input": "https://dropbox.com/scl/fo/abc123/xyz?rlkey=k&dl=0",
+      "clean": "https://dropbox.com/scl/fo/abc123/xyz?rlkey=k&dl=0"
+    },
+    {
+      "input": "https://www.dropbox.com/s/abc/file.zip?dl=0#frag",
+      "clean": "https://www.dropbox.com/s/abc/file.zip?dl=0#frag"
+    },
+    {
+      "input": "https://drive.google.com/drive/folders/1AbC_dEf-GhI?usp=sharing",
+      "clean": "https://drive.google.com/drive/folders/1AbC_dEf-GhI?usp=sharing"
+    },
+    {
+      "input": "https://we.tl/t-AbCdEf1234",
+      "clean": "https://we.tl/t-AbCdEf1234"
+    },
+    {
+      "input": "https://example.com:8443/files",
+      "clean": "https://example.com:8443/files"
+    },
+    {
+      "input": "https://sub.domain.example.co.uk/a%20b/c",
+      "clean": "https://sub.domain.example.co.uk/a%20b/c"
+    },
+    {
+      "input": "https://xn--bcher-kva.example/x",
+      "clean": "https://xn--bcher-kva.example/x"
+    },
+    {
+      "input": "https://example.xn--p1ai/",
+      "clean": "https://example.xn--p1ai/"
+    },
+    {
+      "input": "HTTPS://Example.COM/Path",
+      "clean": "HTTPS://Example.COM/Path"
+    },
+    {
+      "input": "hTTps://example.com",
+      "clean": "hTTps://example.com"
+    },
+    {
+      "input": "https://example.com?x=1",
+      "clean": "https://example.com?x=1"
+    },
+    {
+      "input": "https://example.com#top",
+      "clean": "https://example.com#top"
+    },
+    {
+      "input": "https://1.example.com/",
+      "clean": "https://1.example.com/"
+    },
+    {
+      "input": "https://a.bc",
+      "clean": "https://a.bc"
+    },
+    {
+      "input": "https://example.com/%E2%9C%93",
+      "clean": "https://example.com/%E2%9C%93"
+    },
+    {
+      "input": "https://example.com/a@b",
+      "clean": "https://example.com/a@b"
+    },
+    {
+      "input": "https://example.com/p?e=a@b.c&x=(1)*+,;='!$~",
+      "clean": "https://example.com/p?e=a@b.c&x=(1)*+,;='!$~"
+    },
+    {
+      "input": "https://example.com/a_b.c-d~e",
+      "clean": "https://example.com/a_b.c-d~e"
+    },
+    {
+      "input": "https://example.com/[x]",
+      "clean": "https://example.com/[x]"
+    },
+    {
+      "input": "  https://example.com/x  \n",
+      "clean": "https://example.com/x"
+    },
+    {
+      "input": "\thttps://example.com/x\r\n",
+      "clean": "https://example.com/x"
+    },
+    {
+      "input": "",
+      "clean": null
+    },
+    {
+      "input": "   ",
+      "clean": null
+    },
+    {
+      "input": "\n",
+      "clean": null
+    },
+    {
+      "input": "http://example.com",
+      "clean": null
+    },
+    {
+      "input": "example.com/files",
+      "clean": null
+    },
+    {
+      "input": "ftp://example.com/x",
+      "clean": null
+    },
+    {
+      "input": "javascript:alert(1)",
+      "clean": null
+    },
+    {
+      "input": "https:/example.com",
+      "clean": null
+    },
+    {
+      "input": "https:example.com",
+      "clean": null
+    },
+    {
+      "input": "//example.com/x",
+      "clean": null
+    },
+    {
+      "input": "https://",
+      "clean": null
+    },
+    {
+      "input": "https:///path",
+      "clean": null
+    },
+    {
+      "input": "https://localhost/x",
+      "clean": null
+    },
+    {
+      "input": "https://192.168.0.1/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.123/",
+      "clean": null
+    },
+    {
+      "input": "https://[::1]/x",
+      "clean": null
+    },
+    {
+      "input": "https://user:pass@example.com/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com@evil.com/x",
+      "clean": null
+    },
+    {
+      "input": "https://@example.com/",
+      "clean": null
+    },
+    {
+      "input": "https://exa mple.com",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/a b",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/\"x\"",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/<x>",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/>x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/`x`",
+      "clean": null
+    },
+    {
+      "input": "https://example.com\\@evil.com",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/a\\b",
+      "clean": null
+    },
+    {
+      "input": "https://exämple.com/",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/café",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/🎬",
+      "clean": null
+    },
+    {
+      "input": " https://example.com",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/x ",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/​",
+      "clean": null
+    },
+    {
+      "input": "https://-example.com/",
+      "clean": null
+    },
+    {
+      "input": "https://example-.com/",
+      "clean": null
+    },
+    {
+      "input": "https://example..com/",
+      "clean": null
+    },
+    {
+      "input": "https://.example.com/",
+      "clean": null
+    },
+    {
+      "input": "https://example.c/",
+      "clean": null
+    },
+    {
+      "input": "https://a.b",
+      "clean": null
+    },
+    {
+      "input": "https://example.com./x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com:/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com:123456/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com:80a/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com:8:9/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com\n/x",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/\tx",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/{x}",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/a|b",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/a^b",
+      "clean": null
+    },
+    {
+      "input": "https://exam_ple.com/",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/%",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/%2",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/%zz",
+      "clean": null
+    },
+    {
+      "input": "https://example.com/100%",
+      "clean": null
+    }
+  ],
+  "names": [
+    {
+      "input": "Alex Rivera",
+      "display": "Alex R."
+    },
+    {
+      "input": "Alex",
+      "display": "Alex"
+    },
+    {
+      "input": "  alex   rivera  ",
+      "display": "alex r."
+    },
+    {
+      "input": "Mary Jane van Dyke",
+      "display": "Mary D."
+    },
+    {
+      "input": "",
+      "display": "Client"
+    },
+    {
+      "input": "   ",
+      "display": "Client"
+    },
+    {
+      "input": "\n\t",
+      "display": "Client"
+    },
+    {
+      "input": "Émile Zola",
+      "display": "Émile Z."
+    },
+    {
+      "input": "李 雷",
+      "display": "李 雷."
+    },
+    {
+      "input": "A B C",
+      "display": "A C."
+    },
+    {
+      "input": "Alex\tRivera",
+      "display": "Alex R."
+    },
+    {
+      "input": "Alex\nRivera",
+      "display": "Alex R."
+    },
+    {
+      "input": "Jean-Luc Picard",
+      "display": "Jean-Luc P."
+    },
+    {
+      "input": "Sam 👩‍🚀",
+      "display": "Sam 👩."
+    },
+    {
+      "input": "Test Client",
+      "display": "Test C."
+    }
+  ]
+}

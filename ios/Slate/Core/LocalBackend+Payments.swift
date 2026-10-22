@@ -86,7 +86,7 @@ extension LocalBackend {
             guard booking.status == .held else { throw SlateError.paymentNotDue }
             amount = booking.depositCents
         case .balance:
-            guard booking.status == .confirmed, booking.deliveredAt != nil else { throw SlateError.paymentNotDue }
+            guard booking.status == .confirmed, booking.receiptConfirmedAt != nil else { throw SlateError.paymentNotDue }
             if booking.depositCents > 0, !mine.contains(where: { $0.kind == .deposit && $0.status == .succeeded }) {
                 throw SlateError.paymentNotDue
             }
@@ -272,26 +272,5 @@ extension LocalBackend {
             changed = true
         }
         if changed { try writePayments(payments) }
-    }
-
-    // MARK: - After the shoot
-
-    func markDelivered(bookingID: UUID, by creatorID: UUID) async throws -> Booking {
-        let now = Date(timeIntervalSince1970: self.now.timeIntervalSince1970.rounded(.down))
-        var bookings = readBookings()
-        guard let index = bookings.firstIndex(where: { $0.id == bookingID }), bookings[index].creatorID == creatorID else {
-            throw SlateError.bookingNotFound
-        }
-        guard bookings[index].canMarkDelivered(at: now) else { throw SlateError.notDeliverable }
-
-        bookings[index].deliveredAt = now
-        // With nothing left to pay, delivery finishes the booking.
-        if bookings[index].balanceCents == 0 { bookings[index].status = .completed }
-        try write(bookings, to: bookingsURL)
-        try? appendSystemMessage(
-            .delivered, bookingID: bookingID,
-            data: MessageEventData(balanceCents: bookings[index].balanceCents, currency: bookings[index].currencyCode), at: now
-        )
-        return bookings[index]
     }
 }

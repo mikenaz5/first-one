@@ -312,7 +312,9 @@ private struct SystemLine: View {
         case .booked: "calendar.badge.plus"
         case .contractSigned: "signature"
         case .depositPaid, .balancePaid: "creditcard"
-        case .delivered: "shippingbox"
+        case .deliveryShared: "shippingbox"
+        case .receiptConfirmed: "checkmark.seal"
+        case .reviewed: "star.fill"
         case .cancelled: "xmark.circle"
         case nil: "info.circle"
         }

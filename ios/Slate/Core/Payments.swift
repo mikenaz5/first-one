@@ -244,9 +244,11 @@ struct PaymentSummary: Equatable {
         case depositDue
         case depositFailed
         case holdExpired
-        /// Deposit paid; the balance is due once the work is delivered.
+        /// Deposit paid; the balance is due once the client has confirmed they have the final files.
         case depositPaid
         case noDepositRequired
+        /// The files are shared; the balance becomes payable when the client confirms.
+        case awaitingConfirmation
         case balanceDue
         case paidInFull
         case cancelledUnpaid
@@ -303,18 +305,23 @@ struct PaymentSummary: Equatable {
             return result(.holdExpired, "Hold expired", "The deposit wasn't paid in time, so nothing was charged and the time was released.", "clock.badge.xmark", .neutral)
 
         case .confirmed:
-            if booking.deliveredAt != nil, booking.balanceCents > 0 {
+            if booking.receiptConfirmedAt != nil, booking.balanceCents > 0 {
                 return result(.balanceDue, "Balance due",
-                              viewer == .client ? "The work is delivered. Pay the remaining \(money(booking.balanceCents))." : "Delivered. Waiting for the client to pay \(money(booking.balanceCents)).",
+                              viewer == .client ? "You have the files. Pay the remaining \(money(booking.balanceCents))." : "The client has the files. Waiting for them to pay \(money(booking.balanceCents)).",
                               "creditcard", .warning, due: booking.balanceCents)
+            }
+            if booking.deliveredAt != nil, booking.balanceCents > 0 {
+                return result(.awaitingConfirmation, "Awaiting confirmation",
+                              viewer == .client ? "Confirm you have your files, then pay the remaining \(money(booking.balanceCents))." : "Waiting for the client to confirm they have the files. Then they can pay the remaining \(money(booking.balanceCents)).",
+                              "shippingbox", .neutral)
             }
             if booking.balanceCents == 0 {
                 return result(.paidInFull, "Paid in full", "Deposit \(money(booking.depositCents)) paid.", "checkmark.circle.fill", .success)
             }
             if depositPaid {
-                return result(.depositPaid, "Deposit paid", "\(money(booking.balanceCents)) is due once the work is delivered.", "checkmark.circle.fill", .success)
+                return result(.depositPaid, "Deposit paid", "\(money(booking.balanceCents)) is due once the final files are delivered and confirmed.", "checkmark.circle.fill", .success)
             }
-            return result(.noDepositRequired, "No deposit", "\(money(booking.balanceCents)) is due once the work is delivered.", "creditcard", .neutral)
+            return result(.noDepositRequired, "No deposit", "\(money(booking.balanceCents)) is due once the final files are delivered and confirmed.", "creditcard", .neutral)
 
         case .completed:
             return result(.paidInFull, "Paid in full", "\(money(paid)) paid.", "checkmark.circle.fill", .success)

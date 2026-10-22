@@ -114,6 +114,8 @@ struct CreatorPageView: View {
                 }
 
                 PortfolioSection(items: portfolio, isOwner: mode == .owner)
+
+                ReviewsSection(creatorID: profile.id, isOwner: mode == .owner)
             }
             .padding(.horizontal, Space.page)
             .padding(.top, Space.s)
@@ -121,7 +123,10 @@ struct CreatorPageView: View {
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
-        .refreshable { await model.refresh() }
+        .refreshable {
+            await model.refresh()
+            await model.loadReviews(for: profile.id)
+        }
         .slatePageBackground()
         .sheet(item: $bookingTarget) { package in
             BookingSheet(creator: profile, package: package)

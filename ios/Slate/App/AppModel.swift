@@ -44,6 +44,11 @@ final class AppModel {
     var creatorSignature: CreatorSignature?
     /// Signed contracts already fetched, by booking, so screens don't wait on the network twice.
     var contractsByBooking: [UUID: Contract] = [:]
+    /// The review on a booking, by booking, for the two people on it.
+    var reviewsByBooking: [UUID: Review] = [:]
+    /// A creator's public reviews (newest first) and how they add up, by creator.
+    var reviewsByCreator: [UUID: [Review]] = [:]
+    var reviewSummaryByCreator: [UUID: ReviewSummary] = [:]
     /// Deposits, balances and refunds on this person's bookings, as the backend recorded them.
     var payments: [Payment] = []
     /// A creator's Stripe account, if they have one. Only meaningful for creators.
@@ -186,6 +191,9 @@ final class AppModel {
         contractTemplates = []
         creatorSignature = nil
         contractsByBooking = [:]
+        reviewsByBooking = [:]
+        reviewsByCreator = [:]
+        reviewSummaryByCreator = [:]
         payments = []
         paymentAccount = nil
         presentedPage = nil
@@ -226,6 +234,7 @@ final class AppModel {
             try await loadScheduling(for: session.userID)
             Task { await syncCalendar() }
             Task { await settlePendingRefunds() }
+            Task { await loadReviews(for: session.userID) }
             bookingsChanged()
         } catch {
             show(error, title: "Couldn't refresh")

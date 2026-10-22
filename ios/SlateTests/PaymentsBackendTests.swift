@@ -269,20 +269,31 @@ final class PaymentsBackendTests: XCTestCase {
 
     // MARK: After the shoot
 
-    func testDeliveryMakesTheBalancePayableAndPayingItCompletesTheBooking() async throws {
+    private static let files = "https://files.example.com/final"
+
+    func testConfirmedFilesMakeTheBalancePayableAndPayingItCompletesTheBooking() async throws {
         let creator = try await makeCreator()
         let signed = try await ContractFixtures.signedBooking(backend, request(creator, at: friday), clientID: client)
         XCTAssertEqual(signed.booking.status, .confirmed)
 
         await expectError(.paymentNotDue) { try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client) }
-        await expectError(.notDeliverable) { try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id) }
-        await expectError(.bookingNotFound) { try await backend.markDelivered(bookingID: signed.booking.id, by: client) }
+        await expectError(.notDeliverable) { try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "", by: creator.id) }
+        await expectError(.bookingNotFound) { try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "", by: client) }
 
         clock.set(friday.addingTimeInterval(2 * 3600)) // The shoot is over.
-        let delivered = try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id)
-        XCTAssertEqual(delivered.status, .confirmed, "Still open until the balance is paid")
-        XCTAssertEqual(delivered.deliveredAt, clock.now)
-        await expectError(.notDeliverable) { try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id) }
+        let shared = try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "Password: lake", by: creator.id)
+        XCTAssertEqual(shared.status, .confirmed, "Still open until the balance is paid")
+        XCTAssertEqual(shared.deliveredAt, clock.now)
+        XCTAssertEqual(shared.deliveryURL, Self.files)
+        XCTAssertEqual(shared.deliveryNote, "Password: lake")
+        XCTAssertNil(shared.receiptConfirmedAt)
+        await expectError(.paymentNotDue) { try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client) }
+        await expectError(.bookingNotFound) { try await backend.confirmReceipt(bookingID: signed.booking.id, by: creator.id) }
+
+        let confirmed = try await backend.confirmReceipt(bookingID: signed.booking.id, by: client)
+        XCTAssertEqual(confirmed.status, .confirmed, "Still open until the balance is paid")
+        XCTAssertEqual(confirmed.receiptConfirmedAt, clock.now)
+        await expectError(.notDeliverable) { try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "", by: creator.id) }
 
         let info = try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client)
         XCTAssertEqual(info.amountCents, 150_000, "The total less the deposit")
@@ -297,12 +308,14 @@ final class PaymentsBackendTests: XCTestCase {
         await expectError(.notCancellable) { try await backend.cancelBooking(signed.booking.id, by: client) }
     }
 
-    func testWhenTheDepositCoversEverythingDeliveryCompletesTheBooking() async throws {
+    func testWhenTheDepositCoversEverythingConfirmingTheFilesCompletesTheBooking() async throws {
         let creator = try await makeCreator(deposit: 200_000)
         let signed = try await ContractFixtures.signedBooking(backend, request(creator, at: friday), clientID: client)
         clock.set(friday.addingTimeInterval(3600))
-        let delivered = try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id)
-        XCTAssertEqual(delivered.status, .completed)
+        let shared = try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "", by: creator.id)
+        XCTAssertEqual(shared.status, .confirmed, "Sharing alone doesn't finish it")
+        let confirmed = try await backend.confirmReceipt(bookingID: signed.booking.id, by: client)
+        XCTAssertEqual(confirmed.status, .completed)
         await expectError(.paymentNotDue) { try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client) }
     }
 
@@ -310,7 +323,8 @@ final class PaymentsBackendTests: XCTestCase {
         let creator = try await makeCreator(deposit: 0)
         let signed = try await hold(creator)
         clock.set(friday.addingTimeInterval(3600))
-        _ = try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id)
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: Self.files, note: "", by: creator.id)
+        _ = try await backend.confirmReceipt(bookingID: signed.booking.id, by: client)
         let info = try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client)
         XCTAssertEqual(info.amountCents, 200_000)
     }

@@ -49,9 +49,9 @@ enum NotificationCategory: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .bookings: "New bookings and cancellations."
+        case .bookings: "New bookings, cancellations, final files shared or received, and reviews."
         case .contracts: "When a contract is signed by both of you."
-        case .payments: "Deposits and balances received, and balances that fall due."
+        case .payments: "Deposits and balances received."
         case .messages: "New messages in a booking's conversation."
         case .reminders: "A day before and two hours before each shoot."
         }

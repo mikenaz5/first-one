@@ -189,13 +189,34 @@ final class ConversationTextTests: XCTestCase {
         XCTAssertEqual(text(.contractSigned, as: clientID), "The contract is signed by both of you.")
     }
 
-    func testDeliveryTellsEachSideWhatIsDue() {
+    func testSharingFilesIsWordedForEachSide() {
+        XCTAssertEqual(text(.deliveryShared, MessageEventData(revised: false), as: creatorID), "You shared the final files with Sam Client.")
+        XCTAssertEqual(text(.deliveryShared, MessageEventData(revised: false), as: clientID), "Dana Lens shared the final files. Open the booking to confirm you have them.")
+        XCTAssertEqual(text(.deliveryShared, MessageEventData(revised: true), as: creatorID), "You updated the link to the final files.")
+        XCTAssertEqual(text(.deliveryShared, MessageEventData(revised: true), as: clientID), "Dana Lens updated the link to the final files.")
+        XCTAssertEqual(text(.deliveryShared, as: clientID), "Dana Lens shared the final files. Open the booking to confirm you have them.", "Older lines carry no flag")
+    }
+
+    func testConfirmingReceiptTellsEachSideWhatIsDue() {
         let owed = MessageEventData(balanceCents: 150_000, currency: "USD")
-        XCTAssertEqual(text(.delivered, owed, as: creatorID), "You marked the work as delivered. Sam Client owes $1,500.")
-        XCTAssertEqual(text(.delivered, owed, as: clientID), "Dana Lens marked the work as delivered. The balance of $1,500 is due.")
+        XCTAssertEqual(text(.receiptConfirmed, owed, as: clientID), "You confirmed you have the final files. The balance of $1,500 is now due.")
+        XCTAssertEqual(text(.receiptConfirmed, owed, as: creatorID), "Sam Client confirmed they have the final files. The balance of $1,500 is now due.")
         let settled = MessageEventData(balanceCents: 0, currency: "USD")
-        XCTAssertEqual(text(.delivered, settled, as: creatorID), "You marked the work as delivered.")
-        XCTAssertEqual(text(.delivered, settled, as: clientID), "Dana Lens marked the work as delivered. Nothing more is due.")
+        XCTAssertEqual(text(.receiptConfirmed, settled, as: clientID), "You confirmed you have the final files. All done.")
+        XCTAssertEqual(text(.receiptConfirmed, settled, as: creatorID), "Sam Client confirmed they have the final files. All done.")
+    }
+
+    func testAReviewNamesItsStars() {
+        XCTAssertEqual(text(.reviewed, MessageEventData(rating: 4), as: clientID), "You left a 4-star review.")
+        XCTAssertEqual(text(.reviewed, MessageEventData(rating: 5), as: creatorID), "Sam Client left a 5-star review.")
+        XCTAssertEqual(text(.reviewed, as: creatorID), "Sam Client left a review.")
+    }
+
+    func testTheOldDeliveredLineNoLongerExists() {
+        XCTAssertNil(Message.Event(rawValue: "delivered"), "The migration renames it to delivery_shared")
+        XCTAssertEqual(Message.Event(rawValue: "delivery_shared"), .deliveryShared)
+        XCTAssertEqual(Message.Event(rawValue: "receipt_confirmed"), .receiptConfirmed)
+        XCTAssertEqual(Message.Event(rawValue: "reviewed"), .reviewed)
     }
 
     func testCancellationSaysWhoAndWhatComesBack() {

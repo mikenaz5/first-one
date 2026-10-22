@@ -147,6 +147,41 @@ describe("wording each kind of notification", () => {
     assert.equal(n.url, `slate://booking/${BOOKING}`);
   });
 
+  it("tells a client their files are ready, and when the link has been replaced", () => {
+    const first = compose(row("delivery_shared", { ...base, role: "client", creatorName: "Maya Chen", revised: false, balanceCents: 150000 }), NOW);
+    assert.equal(first.title, "Your files are ready");
+    assert.equal(first.body, "Maya Chen shared the final files for Wedding day. Open Slate to confirm you have them.");
+    assert.equal(first.url, `slate://booking/${BOOKING}`);
+    const again = compose(row("delivery_shared", { ...base, role: "client", creatorName: "Maya Chen", revised: true }), NOW);
+    assert.equal(again.title, "Link to your files updated");
+    assert.equal(again.body, "Maya Chen replaced the link to the final files for Wedding day.");
+  });
+
+  it("tells a creator the client has the files, and whether a balance is now payable", () => {
+    const owed = compose(row("receipt_confirmed", { ...base, clientName: "Alex", balanceCents: 150050 }), NOW);
+    assert.equal(owed.title, "Alex confirmed receipt");
+    assert.equal(owed.body, "Wedding day · $1,500.50 balance is now payable");
+    const done = compose(row("receipt_confirmed", { ...base, clientName: "Alex", balanceCents: 0 }), NOW);
+    assert.equal(done.body, "Wedding day · Nothing more to pay");
+  });
+
+  it("tells a creator about a review without quoting it", () => {
+    const n = compose(row("review_received", { ...base, reviewerName: "Zed A.", rating: 4, packageName: "Wedding day" }), NOW);
+    assert.equal(n.title, "Zed A. left a 4-star review");
+    assert.equal(n.body, "Wedding day");
+    assert.equal(n.url, `slate://booking/${BOOKING}`);
+  });
+
+  it("keeps a review's rating between one and five stars", () => {
+    assert.equal(compose(row("review_received", { ...base, rating: 9 }), NOW).title, "A client left a 5-star review");
+    assert.equal(compose(row("review_received", { ...base }), NOW).title, "A client left a 1-star review");
+  });
+
+  it("falls back to plain names when the facts lack them", () => {
+    assert.equal(compose(row("delivery_shared", { ...base }), NOW).body, "Your creator shared the final files for Wedding day. Open Slate to confirm you have them.");
+    assert.equal(compose(row("receipt_confirmed", { ...base, balanceCents: 100 }), NOW).title, "Your client confirmed receipt");
+  });
+
   it("shows a message as its sender and words, and opens the conversation", () => {
     const n = compose(row("message", { ...base, senderName: "Alex Rivera", preview: "Could we move the start to 11?" }), NOW);
     assert.equal(n.title, "Alex Rivera");

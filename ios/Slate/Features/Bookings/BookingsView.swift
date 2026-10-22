@@ -199,6 +199,8 @@ struct BookingDetailView: View {
     @State private var pendingCancel: Booking?
     @State private var calendarMessage: String?
     @State private var addedToCalendar = false
+    /// Bumped when the shoot starts, so the delivery section appears without the person leaving the screen.
+    @State private var shootStarted = 0
 
     private var booking: Booking? { model.bookings.first { $0.id == bookingID } }
 
@@ -233,6 +235,10 @@ struct BookingDetailView: View {
                     .padding(.vertical, Space.xs)
             }
 
+            DeliverySection(booking: booking, tick: shootStarted)
+
+            ReviewSection(booking: booking)
+
             Section("Package") {
                 LabeledContent("Package", value: booking.packageName)
                 ForEach(booking.addOns) { addOn in
@@ -247,7 +253,7 @@ struct BookingDetailView: View {
             } header: {
                 Text("Price")
             } footer: {
-                Text("The deposit confirms the booking. The balance is due once the work is delivered. \(booking.cancellationPolicy.summary).")
+                Text("The deposit confirms the booking. The balance is due once the final files are delivered and confirmed. \(booking.cancellationPolicy.summary).")
             }
 
             PaymentHistorySection(booking: booking)
@@ -310,12 +316,22 @@ struct BookingDetailView: View {
             }
         }
         .cancelFlow($pendingCancel)
+        .task(id: booking.status) { await model.loadReview(for: booking) }
+        .task(id: booking.startAt) { await waitForShootToStart(booking) }
         .alert("Couldn't add to Calendar", isPresented: Binding(get: { calendarMessage != nil }, set: { if !$0 { calendarMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(calendarMessage ?? "")
         }
         .sensoryFeedback(.success, trigger: addedToCalendar)
+    }
+
+    /// Sleeps until the shoot begins (if it hasn't), then asks the screen to look again.
+    private func waitForShootToStart(_ booking: Booking) async {
+        let wait = booking.startAt.timeIntervalSince(model.clock())
+        guard wait > 0 else { return }
+        try? await Task.sleep(for: .seconds(wait + 1))
+        if !Task.isCancelled { shootStarted += 1 }
     }
 
     private func addToCalendar(_ booking: Booking) async {

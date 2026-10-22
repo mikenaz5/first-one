@@ -31,6 +31,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 MIG = HERE.parent / "migrations"
 GOLDEN = HERE.parents[1] / "SlateTests" / "Fixtures" / "contract_golden.json"
 GOLDEN_REFUNDS = HERE.parents[1] / "SlateTests" / "Fixtures" / "refund_golden.json"
+GOLDEN_DELIVERY = HERE.parents[1] / "SlateTests" / "Fixtures" / "delivery_rules.json"
 TZ = "America/Chicago"
 Json = psycopg2.extras.Json
 
@@ -253,9 +254,32 @@ def pay(booking_id, kind="deposit", fee_bps=0, method="apple_pay"):
 
 
 def booking_row(booking_id):
-    a.execute("select status, hold_expires_at, delivered_at, cancelled_by, cancellation_policy from bookings where id = %s", (booking_id,))
-    status, hold, delivered, cancelled_by, policy = a.fetchone()
-    return dict(status=status, hold=hold, delivered=delivered, cancelled_by=cancelled_by, policy=policy)
+    a.execute("""select status, hold_expires_at, delivered_at, cancelled_by, cancellation_policy,
+                        delivery_url, delivery_note, receipt_confirmed_at from bookings where id = %s""", (booking_id,))
+    status, hold, delivered, cancelled_by, policy, url, note, received = a.fetchone()
+    return dict(status=status, hold=hold, delivered=delivered, cancelled_by=cancelled_by, policy=policy,
+                url=url, note=note, received=received)
+
+
+FILES = "https://files.example.com/final"
+
+
+def share(uid, booking_id, url=FILES, note=None, role="authenticated"):
+    """The creator shares the final files. Returns (status, delivered?, url, note) or the error text."""
+    res = sql_as(uid, "select status, delivered_at is not null, delivery_url, delivery_note from share_delivery(%s, %s, %s)", (booking_id, url, note), role=role)
+    return res if isinstance(res, str) else res[0][0]
+
+
+def confirm(uid, booking_id, role="authenticated"):
+    """The client confirms they have everything. Returns (status, received?) or the error text."""
+    res = sql_as(uid, "select status, receipt_confirmed_at is not null from confirm_receipt(%s)", (booking_id,), role=role)
+    return res if isinstance(res, str) else res[0][0]
+
+
+def mark_received(booking_id):
+    """Admin shortcut for tests that only need the balance to be payable: the files were shared and received."""
+    a.execute("""update bookings set delivery_url = %s, delivered_at = coalesce(delivered_at, now()),
+                                      receipt_confirmed_at = coalesce(receipt_confirmed_at, now()) where id = %s""", (FILES, booking_id))
 
 
 def contract_row(booking_id):
@@ -760,16 +784,17 @@ check("saving a second account for a creator keeps the first", svc_call("connect
 
 print("\n[payments: after delivery]")
 dv = book(alice, at(D[8], 10), pkg=PAYEE_PKG)
-check("a held booking can't be delivered", err(sql_as(PAYEE, "select mark_delivered(%s)", (dv["id"],)), "not_deliverable"))
+check("a held booking can't be delivered", err(share(PAYEE, dv["id"]), "not_deliverable"))
 pay(dv["id"])
-check("only the creator can mark it delivered", err(sql_as(alice, "select mark_delivered(%s)", (dv["id"],)), "not_found")
-      and err(sql_as(bob, "select mark_delivered(%s)", (dv["id"],)), "not_found"))
-check("not before the shoot has started", err(sql_as(PAYEE, "select mark_delivered(%s)", (dv["id"],)), "not_deliverable"))
+check("only the creator can share the files", err(share(alice, dv["id"]), "not_found") and err(share(bob, dv["id"]), "not_found"))
+check("not before the shoot has started", err(share(PAYEE, dv["id"]), "not_deliverable"))
 check("the balance isn't due before delivery", err(svc_call("payment_prepare", alice, dv["id"], "balance", 0), "balance_not_due"))
 move_to(dv["id"], -48)
-delivered = sql_as(PAYEE, "select status, delivered_at is not null from mark_delivered(%s)", (dv["id"],))
-check("after the shoot the creator can mark it delivered", delivered[0][0] == ("confirmed", True), delivered)
-check("...once", err(sql_as(PAYEE, "select mark_delivered(%s)", (dv["id"],)), "not_deliverable"))
+check("the balance isn't due once files are shared but not yet confirmed",
+      share(PAYEE, dv["id"]) == ("confirmed", True, FILES, None) and err(svc_call("payment_prepare", alice, dv["id"], "balance", 0), "balance_not_due"))
+check("only the client can confirm", err(confirm(PAYEE, dv["id"]), "not_found") and err(confirm(bob, dv["id"]), "not_found"))
+check("the client's confirmation keeps the booking confirmed while a balance is owed", confirm(alice, dv["id"]) == ("confirmed", True))
+check("the creator can't share again once the client has confirmed", err(share(PAYEE, dv["id"], "https://files.example.com/other"), "not_deliverable"))
 bal_prep = svc_call("payment_prepare", alice, dv["id"], "balance", 0)
 check("the balance is the total less the deposit", isinstance(bal_prep, dict) and bal_prep["amount_cents"] == 150000 and bal_prep["kind"] == "balance", bal_prep)
 bal_intent = "pi_bal_" + uuid.uuid4().hex[:8]
@@ -784,16 +809,18 @@ paid_up_creator, paid_up_pkg = make_creator("paidup", deposit=200000)
 pu = book(alice, at(D[0], 10), pkg=paid_up_pkg)
 pay(pu["id"])
 move_to(pu["id"], -24)
-sql_as(paid_up_creator, "select mark_delivered(%s)", (pu["id"],))
-check("when the deposit covers everything, delivery completes the booking", booking_row(pu["id"])["status"] == "completed")
-check("...and there is no balance to pay", True)
+check("(set-up) sharing the files of a fully paid booking leaves it open for the client's confirmation",
+      share(paid_up_creator, pu["id"])[0] == "confirmed" and booking_row(pu["id"])["status"] == "confirmed")
+check("when the deposit covers everything, confirming receipt completes the booking", confirm(alice, pu["id"]) == ("completed", True) and booking_row(pu["id"])["status"] == "completed")
+check("...and there is no balance to pay", err(svc_call("payment_prepare", alice, pu["id"], "balance", 0), "balance_not_due")
+      or err(svc_call("payment_prepare", alice, pu["id"], "balance", 0), "nothing_due"))
 
 zero_dep_creator, zero_dep_pkg = make_creator("zerodep", deposit=0)
-a.execute("update creator_payment_accounts set charges_enabled = true where creator_id = %s", (zero_dep_creator,)) if False else None
 zd = book(alice, at(D[0], 11), pkg=zero_dep_pkg)
 check("a package with no deposit is confirmed at once", isinstance(zd, dict) and zd["status"] == "confirmed", zd)
 move_to(zd["id"], -24)
-sql_as(zero_dep_creator, "select mark_delivered(%s)", (zd["id"],))
+share(zero_dep_creator, zd["id"])
+confirm(alice, zd["id"])
 zd_prep = svc_call("payment_prepare", alice, zd["id"], "balance", 0)
 check("with no deposit, the whole price is the balance", isinstance(zd_prep, dict) and zd_prep["amount_cents"] == 200000, zd_prep)
 
@@ -840,7 +867,7 @@ check("a booking that has started has no quote", err(sql_as(alice, "select refun
 # Money that was paid in two parts is returned newest first, and never more than each part.
 split = book(alice, at(D[11], 10), pkg=policies["flexible"])
 pay(split["id"])
-a.execute("update bookings set delivered_at = now() where id = %s", (split["id"],))
+mark_received(split["id"])
 pay(split["id"], kind="balance")
 a.execute("update bookings set status = 'confirmed' where id = %s", (split["id"],))
 move_to(split["id"], 100)
@@ -853,7 +880,7 @@ check("...the balance first, then the deposit", sorted(r[3] for r in parts) == [
 # Partial refund spanning payments.
 split2 = book(bob, at(D[11], 13), pkg=policies["flexible"])
 pay(split2["id"])
-a.execute("update bookings set delivered_at = now() where id = %s", (split2["id"],))
+mark_received(split2["id"])
 pay(split2["id"], kind="balance")
 a.execute("update bookings set status = 'confirmed' where id = %s", (split2["id"],))
 move_to(split2["id"], 5)
@@ -1209,11 +1236,24 @@ svc_call("payment_record_success", payments_of(life["id"], "deposit")[0][5], 500
 check("Stripe repeating itself says nothing new", len(outbox(booking=life["id"])) == n_before and events_of(life["id"]) == ["booked", "deposit_paid", "contract_signed"])
 
 move_to(life["id"], -3)
-check("(set-up) the creator marks it delivered", isinstance(sql_as(LC, "select mark_delivered(%s)", (life["id"],)), tuple))
-check("delivery adds a line with the balance due", events_of(life["id"])[-1] == "delivered" and messages_of(life["id"])[-1][4] == {"balanceCents": 150000, "currency": "USD"}, messages_of(life["id"])[-1])
-bd = outbox(ivy, "balance_due", life["id"])
-check("the client is told the balance is due", len(bd) == 1 and bd[0][1] == dict(bookingId=life["id"], role="client", creatorName="Lifeco", packageName="Session", balanceCents=150000, currency="USD"), bd)
-check("the creator isn't told about their own action", len(outbox(LC, "balance_due")) == 0)
+check("(set-up) the creator shares the final files", isinstance(share(LC, life["id"], FILES, "Gallery password: lake"), tuple))
+check("sharing adds a line, without the link in it", events_of(life["id"])[-1] == "delivery_shared" and messages_of(life["id"])[-1][4] == {"revised": False}, messages_of(life["id"])[-1])
+ds = outbox(ivy, "delivery_shared", life["id"])
+check("the client is told the files are ready, and what is still to pay", len(ds) == 1 and ds[0][1] == dict(
+    bookingId=life["id"], role="client", creatorName="Lifeco", packageName="Session", revised=False, balanceCents=150000, currency="USD"), ds)
+check("the creator isn't told about their own action", len(outbox(LC, "delivery_shared")) == 0)
+check("no balance notification yet: the client hasn't confirmed", len(outbox(ivy, "balance_due", life["id"])) == 0)
+share(LC, life["id"], FILES)
+check("sharing the same link again says nothing new", events_of(life["id"]).count("delivery_shared") == 1 and len(outbox(ivy, "delivery_shared", life["id"])) == 1)
+check("(set-up) the creator corrects the link", isinstance(share(LC, life["id"], "https://files.example.com/corrected"), tuple))
+check("a new link is announced as an update", events_of(life["id"]).count("delivery_shared") == 2 and messages_of(life["id"])[-1][4] == {"revised": True}
+      and sorted(r[1]["revised"] for r in outbox(ivy, "delivery_shared", life["id"])) == [False, True])
+check("(set-up) the client confirms", confirm(ivy, life["id"]) == ("confirmed", True))
+check("confirming adds a line with the balance now payable", events_of(life["id"])[-1] == "receipt_confirmed" and messages_of(life["id"])[-1][4] == {"balanceCents": 150000, "currency": "USD"}, messages_of(life["id"])[-1])
+rc = outbox(LC, "receipt_confirmed", life["id"])
+check("the creator is told, with the client's name and the balance", len(rc) == 1 and rc[0][1] == dict(
+    bookingId=life["id"], role="creator", clientName="Ivy Park", packageName="Session", balanceCents=150000, currency="USD"), rc)
+check("confirming twice says nothing new", confirm(ivy, life["id"]) == ("confirmed", True) and events_of(life["id"]).count("receipt_confirmed") == 1 and len(outbox(LC, "receipt_confirmed")) == 1)
 pay(life["id"], kind="balance")
 check("paying the balance adds its line", events_of(life["id"])[-1] == "balance_paid" and messages_of(life["id"])[-1][4]["amountCents"] == 150000)
 check("...and notifies both", sorted((r[2], r[1]["paymentKind"]) for r in outbox(booking=life["id"]) if r[0] == "payment_received" and r[1]["paymentKind"] == "balance")
@@ -1226,8 +1266,12 @@ jon = new_user()
 fp = book(jon, at(D[25], 10), pkg=FC_PKG, client_name="Jon")
 pay(fp["id"])
 move_to(fp["id"], -3)
-sql_as(FC, "select mark_delivered(%s)", (fp["id"],))
-check("delivering a fully paid booking adds the line but asks for no money", events_of(fp["id"])[-1] == "delivered" and len(outbox(jon, "balance_due")) == 0 and booking_row(fp["id"])["status"] == "completed")
+share(FC, fp["id"])
+check("sharing the files of a fully paid booking asks for no money", events_of(fp["id"])[-1] == "delivery_shared" and outbox(jon, "delivery_shared", fp["id"])[0][1]["balanceCents"] == 0
+      and booking_row(fp["id"])["status"] == "confirmed")
+confirm(jon, fp["id"])
+check("confirming completes it, and the creator is told there is nothing more to come", booking_row(fp["id"])["status"] == "completed" and events_of(fp["id"])[-1] == "receipt_confirmed"
+      and outbox(FC, "receipt_confirmed", fp["id"])[0][1]["balanceCents"] == 0 and len(outbox(jon, "balance_due")) == 0)
 
 # No deposit.
 NC, NC_PKG = make_creator("freeco", deposit=0, account=False)
@@ -1567,6 +1611,222 @@ check("the other person keeps what was said, now from nobody in particular", a.f
 check("...but can't write to someone who is gone", err(send(GC, gb["id"], "Are you there?"), "conversation_closed"))
 a.execute("select count(*) from device_tokens where user_id = %s", (gone_user,))
 check("their devices and settings are removed", a.fetchone()[0] == 0)
+
+
+# ---- 11b. delivery and reviews -------------------------------------------------
+print("\n[delivery: the rules shared with the app]")
+drules = json.loads(GOLDEN_DELIVERY.read_text())
+a.execute("select delivery_note_max_length(), review_max_length()")
+check("the note and review limits match the app's", a.fetchone() == (drules["noteMaxLength"], drules["reviewMaxLength"]))
+url_misses = []
+for case in drules["urls"]:
+    a.execute("select delivery_url_clean(%s)", (case["input"],))
+    got = a.fetchone()[0]
+    if got != case["clean"]:
+        url_misses.append((case["input"], case["clean"], got))
+check(f"all {len(drules['urls'])} shared-link cases are cleaned the way the app cleans them", not url_misses, url_misses)
+name_misses = []
+for case in drules["names"]:
+    a.execute("select review_display_name(%s)", (case["input"],))
+    got = a.fetchone()[0]
+    if got != case["display"]:
+        name_misses.append((case["input"], case["display"], got))
+check(f"all {len(drules['names'])} reviewer-name cases read the way the app reads them", not name_misses, name_misses)
+stem = "https://example.com/"
+a.execute("select delivery_url_clean(%s), delivery_url_clean(%s), delivery_url_clean(%s)",
+          (stem + "a" * (drules["urlMaxLength"] - len(stem)), stem + "a" * (drules["urlMaxLength"] - len(stem) + 1), "  " + stem + "a" * (drules["urlMaxLength"] - len(stem)) + "  "))
+long_ok, long_bad, long_trim = a.fetchone()
+check("a link of exactly the maximum length is fine, one more is not, and trimming happens first", long_ok is not None and long_bad is None and long_trim == long_ok)
+
+print("\n[delivery: sharing the files and confirming receipt]")
+DC, DC_PKG = make_creator("deliverco", price=200000, deposit=50000)
+zed, yara = new_user(), new_user()
+dl = book(zed, at(D[2], 10), pkg=DC_PKG, client_name="Zed Adams")
+check("a held booking has no files to share", err(share(DC, dl["id"]), "not_deliverable"))
+check("...or to confirm", err(confirm(zed, dl["id"]), "not_delivered"))
+pay(dl["id"])
+check("before the shoot there is nothing to deliver", err(share(DC, dl["id"]), "not_deliverable"))
+move_to(dl["id"], -5)
+check("signed-out callers can neither share nor confirm", isinstance(share(None, dl["id"], role="anon"), str) and isinstance(confirm(None, dl["id"], role="anon"), str))
+check("a client can't share files", err(share(zed, dl["id"]), "not_found"))
+check("a stranger can't share or confirm", err(share(yara, dl["id"]), "not_found") and err(confirm(yara, dl["id"]), "not_found") and err(confirm(DC, dl["id"]), "not_found"))
+check("the client can't confirm before there is anything to confirm", err(confirm(zed, dl["id"]), "not_delivered"))
+bad_links = {"http://files.example.com/x": "http", "files.example.com/x": "no scheme", "https://localhost/x": "localhost",
+             "https://user:pw@files.example.com/x": "credentials", "https://files.example.com/a b": "space", "": "empty", None: "missing"}
+check("a link that isn't a plain https address is refused", all(err(share(DC, dl["id"], u), "invalid_delivery_url") for u in bad_links), bad_links)
+check("a note over the limit is refused", err(share(DC, dl["id"], FILES, "x" * (drules["noteMaxLength"] + 1)), "note_too_long"))
+check("a refused attempt changes nothing", booking_row(dl["id"])["url"] is None and booking_row(dl["id"])["delivered"] is None and events_of(dl["id"]) == ["booked", "deposit_paid", "contract_signed"])
+check("clients can't write the delivery themselves", sql_as(zed, "update bookings set delivery_url = 'https://evil.example.com/x', delivered_at = now() where id = %s", (dl["id"],))[1] == 0
+      and sql_as(zed, "update bookings set receipt_confirmed_at = now() where id = %s", (dl["id"],))[1] == 0)
+check("...nor the creator", sql_as(DC, "update bookings set receipt_confirmed_at = now() where id = %s", (dl["id"],))[1] == 0)
+
+check("the creator shares a link and a note (tidied)", share(DC, dl["id"], "  https://files.example.com/zed  ", "  Password:\r\nlake  ") == ("confirmed", True, "https://files.example.com/zed", "Password:\nlake"))
+check("a blank note is stored as no note", share(DC, dl["id"], "https://files.example.com/zed", "  \n ")[3] is None)
+check("a note of exactly the limit is accepted", share(DC, dl["id"], "https://files.example.com/zed", "n" * drules["noteMaxLength"])[3] == "n" * drules["noteMaxLength"])
+check("the client sees the link and note on their booking", sql_as(zed, "select delivery_url, delivery_note is not null from bookings where id = %s", (dl["id"],))[0][0] == ("https://files.example.com/zed", True))
+check("a stranger doesn't", sql_as(yara, "select count(*) from bookings where id = %s", (dl["id"],))[0][0][0] == 0)
+check("the booking stays confirmed after sharing", booking_row(dl["id"])["status"] == "confirmed" and booking_row(dl["id"])["received"] is None)
+check("the balance isn't payable until the client confirms", err(svc_call("payment_prepare", zed, dl["id"], "balance", 0), "balance_not_due"))
+check("the client confirms", confirm(zed, dl["id"]) == ("confirmed", True) and booking_row(dl["id"])["received"] is not None)
+first_confirmed = booking_row(dl["id"])["received"]
+check("confirming again changes nothing", confirm(zed, dl["id"]) == ("confirmed", True) and booking_row(dl["id"])["received"] == first_confirmed)
+check("the link can't be replaced after that", err(share(DC, dl["id"], "https://files.example.com/other"), "not_deliverable") and booking_row(dl["id"])["url"] == "https://files.example.com/zed")
+check("now the balance is payable", isinstance(svc_call("payment_prepare", zed, dl["id"], "balance", 0), dict))
+
+print("\n[delivery: what the database itself guarantees]")
+
+
+def admin_error(query, args=None):
+    try:
+        a.execute(query, args)
+        return "no error"
+    except psycopg2.Error as e:
+        return first_line(e)
+
+
+gd = book(zed, at(D[3], 10), pkg=DC_PKG, client_name="Zed Adams")
+pay(gd["id"])
+check("a booking can't be marked received without being delivered", "bookings_receipt_needs_delivery" in admin_error("update bookings set receipt_confirmed_at = now() where id = %s", (gd["id"],)))
+check("a delivery has to carry a link", "bookings_delivered_has_link" in admin_error("update bookings set delivered_at = now() where id = %s", (gd["id"],)))
+check("a stored link has to be a clean one", "bookings_delivery_url_valid" in admin_error("update bookings set delivery_url = 'http://example.com/x' where id = %s", (gd["id"],)))
+check("...and so does a note's length", "bookings_delivery_note_length" in admin_error("update bookings set delivery_note = %s where id = %s", ("n" * 501, gd["id"])))
+check("...and an empty note is not a note", "bookings_delivery_note_length" in admin_error("update bookings set delivery_note = '' where id = %s", (gd["id"],)))
+
+print("\n[delivery: a booking with nothing left to pay, and one with no deposit]")
+paid_creator, paid_pkg = make_creator("prepaidco", price=80000, deposit=80000)
+pp = book(yara, at(D[4], 10), pkg=paid_pkg, client_name="Yara Ng")
+pay(pp["id"])
+move_to(pp["id"], -2)
+check("not reviewable before anything is delivered", err(sql_as(yara, "select submit_review(%s, 5, 'x')", (pp["id"],)), "not_reviewable"))
+share(paid_creator, pp["id"])
+check("shared files don't complete the booking; the client's confirmation does", booking_row(pp["id"])["status"] == "confirmed" and err(sql_as(yara, "select submit_review(%s, 5, 'x')", (pp["id"],)), "not_reviewable"))
+check("confirming completes it", confirm(yara, pp["id"]) == ("completed", True))
+check("...and nothing is left to pay", not isinstance(svc_call("payment_prepare", yara, pp["id"], "balance", 0), dict))
+check("a completed booking can't have files shared again", err(share(paid_creator, pp["id"], "https://files.example.com/again"), "not_deliverable"))
+
+print("\n[reviews: who may leave one, and when]")
+rv = book(zed, at(D[5], 10), pkg=DC_PKG, client_name="Zed Adams")
+pay(rv["id"])
+move_to(rv["id"], -30)
+share(DC, rv["id"])
+check("not before the client has confirmed", err(sql_as(zed, "select submit_review(%s, 5, 'Lovely')", (rv["id"],)), "not_reviewable"))
+confirm(zed, rv["id"])
+check("not while the balance is still unpaid", err(sql_as(zed, "select submit_review(%s, 5, 'Lovely')", (rv["id"],)), "not_reviewable"))
+pay(rv["id"], kind="balance")
+check("(set-up) the booking is now complete", booking_row(rv["id"])["status"] == "completed")
+check("the creator can't review their own work", err(sql_as(DC, "select submit_review(%s, 5, 'I am great')", (rv["id"],)), "not_found"))
+check("a stranger can't review it", err(sql_as(yara, "select submit_review(%s, 5, 'x')", (rv["id"],)), "not_found"))
+check("signed-out callers can't review", isinstance(sql_as(None, "select submit_review(%s, 5, 'x')", (rv["id"],), role="anon"), str))
+check("a rating has to be 1 to 5", all(err(sql_as(zed, "select submit_review(%s, %s, 'x')", (rv["id"], r)), "invalid_rating") for r in (0, 6, -1, None)))
+check("a review can be at most the limit long (counted in characters, not bytes)", err(sql_as(zed, "select submit_review(%s, 5, %s)", (rv["id"], "é" * (drules["reviewMaxLength"] + 1))), "review_too_long"))
+check("refused attempts leave no review", sql_as(DC, "select count(*) from get_booking_review(%s)", (rv["id"],))[0][0][0] == 0)
+check("the creator has no reviews yet", sql_as(None, "select review_count, rating_sum from creator_review_summary(%s)", (DC,), role="anon")[0][0] == (0, 0))
+
+res = sql_as(zed, "select id, creator_id, reviewer_id, reviewer_name, package_name, rating, body from submit_review(%s, 4, %s)", (rv["id"], "  Great work,\r\nfast turnaround.  "))
+check("a review is saved with a tidied body and the reviewer's short name", not isinstance(res, str) and res[0][0][1:] == (DC, zed, "Zed A.", "Session", 4, "Great work,\nfast turnaround."), res)
+check("one review per booking", err(sql_as(zed, "select submit_review(%s, 1, 'Changed my mind')", (rv["id"],)), "already_reviewed"))
+check("...and the first one stands", sql_as(zed, "select rating, body from get_booking_review(%s)", (rv["id"],))[0][0] == (4, "Great work,\nfast turnaround."))
+check("the creator can read the review on their booking", sql_as(DC, "select rating from get_booking_review(%s)", (rv["id"],))[0][0] == (4,))
+check("a stranger can't", sql_as(yara, "select count(*) from get_booking_review(%s)", (rv["id"],))[0][0][0] == 0)
+
+print("\n[reviews: what the conversation and the creator hear]")
+check("the conversation gets a 'reviewed' line carrying the rating", events_of(rv["id"])[-1] == "reviewed" and messages_of(rv["id"])[-1][4] == {"rating": 4}, messages_of(rv["id"])[-1])
+rn = outbox(DC, "review_received", rv["id"])
+check("the creator is told, with the reviewer's short name and the rating, but not the text", len(rn) == 1 and rn[0][1] == dict(
+    bookingId=rv["id"], role="creator", reviewerName="Zed A.", packageName="Session", rating=4), rn)
+check("the client isn't told about their own review", len(outbox(zed, "review_received")) == 0)
+check("the whole delivery story reads in order", events_of(rv["id"]) == ["booked", "deposit_paid", "contract_signed", "delivery_shared", "receipt_confirmed", "balance_paid", "reviewed"], events_of(rv["id"]))
+
+quiet_creator, quiet_pkg = make_creator("quietreviewco", deposit=0, account=False)
+prefs(quiet_creator, bookings=False)
+qr = book(yara, at(D[6], 10), pkg=quiet_pkg, client_name="Yara Ng")
+move_to(qr["id"], -30)
+a.execute("update bookings set total_cents = 0 where id = %s", (qr["id"],))
+share(quiet_creator, qr["id"])
+confirm(yara, qr["id"])
+check("(set-up) a free booking is complete once confirmed", booking_row(qr["id"])["status"] == "completed")
+sql_as(yara, "select submit_review(%s, 5)", (qr["id"],))
+check("a review needs no text", sql_as(yara, "select body from get_booking_review(%s)", (qr["id"],))[0][0] == ("",))
+check("a creator who muted 'bookings' hears of no review, but the line is there", len(outbox(quiet_creator, "review_received")) == 0 and events_of(qr["id"])[-1] == "reviewed")
+
+print("\n[reviews: on the creator's page]")
+r2 = book(yara, at(D[7], 10), pkg=DC_PKG, client_name="Yara Ng")
+pay(r2["id"])
+move_to(r2["id"], -30)
+share(DC, r2["id"])
+confirm(yara, r2["id"])
+pay(r2["id"], kind="balance")
+sql_as(yara, "select submit_review(%s, 5, %s)", (r2["id"], "Wonderful to work with."))
+r3 = book(zed, at(D[8], 10), pkg=DC_PKG, client_name="Zed Adams")
+pay(r3["id"])
+move_to(r3["id"], -30)
+share(DC, r3["id"])
+confirm(zed, r3["id"])
+pay(r3["id"], kind="balance")
+sql_as(zed, "select submit_review(%s, 2, %s)", (r3["id"], "Late delivery."))
+a.execute("update reviews set created_at = now() - interval '3 days' where booking_id = %s", (rv["id"],))
+a.execute("update reviews set created_at = now() - interval '2 days' where booking_id = %s", (r2["id"],))
+a.execute("update reviews set created_at = now() - interval '1 days' where booking_id = %s", (r3["id"],))
+listing = sql_as(None, "select rating, body, reviewer_name, package_name from list_reviews(%s)", (DC,), role="anon")[0]
+check("anyone can read a creator's reviews, newest first", listing == [(2, "Late delivery.", "Zed A.", "Session"), (5, "Wonderful to work with.", "Yara N.", "Session"),
+                                                                       (4, "Great work,\nfast turnaround.", "Zed A.", "Session")], listing)
+c, k = as_user(None, role="anon")
+k.execute("select * from list_reviews(%s)", (DC,))
+list_cols = [d[0] for d in k.description]
+c.close()
+check("the public list carries no booking, reviewer id or other private detail", list_cols == ["id", "creator_id", "rating", "body", "reviewer_name", "package_name", "created_at"], list_cols)
+check("the summary counts them and adds up their ratings", sql_as(None, "select review_count, rating_sum from creator_review_summary(%s)", (DC,), role="anon")[0][0] == (3, 11))
+check("a limit and a cursor page through them", [r[0] for r in sql_as(None, "select rating from list_reviews(%s, 1)", (DC,), role="anon")[0]] == [2]
+      and [r[0] for r in sql_as(None, "select rating from list_reviews(%s, 5, now() - interval '36 hours')", (DC,), role="anon")[0]] == [5, 4])
+check("the limit is kept within bounds", len(sql_as(None, "select * from list_reviews(%s, 0)", (DC,), role="anon")[0]) == 1 and len(sql_as(None, "select * from list_reviews(%s, 10000)", (DC,), role="anon")[0]) == 3)
+check("another creator's reviews are separate", sql_as(None, "select count(*) from list_reviews(%s)", (paid_creator,), role="anon")[0][0][0] == 0)
+check("the reviews table itself is closed to the API", all(isinstance(sql_as(u, "select * from reviews", role=r), str) for u, r in ((zed, "authenticated"), (None, "anon")))
+      and isinstance(sql_as(zed, "insert into reviews (booking_id, creator_id, reviewer_name, rating) values (%s, %s, 'X', 5)", (r3["id"], DC)), str)
+      and isinstance(sql_as(zed, "update reviews set rating = 5", ), str) and isinstance(sql_as(DC, "delete from reviews"), str))
+check("the new trigger functions can't be called", isinstance(sql_as(zed, "select bookings_notify_receipt()"), str) and isinstance(sql_as(zed, "select reviews_notify_created()"), str))
+check("a reviewer who deletes their account leaves the review in place", (a.execute("delete from auth.users where id = %s", (yara,)) or True)
+      and sql_as(None, "select review_count from creator_review_summary(%s)", (DC,), role="anon")[0][0] == (3,)
+      and sql_as(None, "select count(*) from list_reviews(%s)", (DC,), role="anon")[0][0][0] == 3)
+check("deleting a creator takes their reviews with them", (a.execute("delete from auth.users where id = %s", (quiet_creator,)) or True)
+      and (a.execute("select count(*) from reviews where creator_id = %s", (quiet_creator,)) or a.fetchone()[0] == 0))
+
+print("\n[delivery: simultaneous callers]")
+cr_creator, cr_pkg = make_creator("raceco", price=100000, deposit=100000)
+cr_client = new_user()
+cr = book(cr_client, at(D[9], 10), pkg=cr_pkg, client_name="Race Client")
+pay(cr["id"])
+move_to(cr["id"], -4)
+share(cr_creator, cr["id"])
+outcomes = []
+barrier = threading.Barrier(8)
+
+
+def confirm_race(i):
+    barrier.wait()
+    outcomes.append(confirm(cr_client, cr["id"]))
+
+
+threads = [threading.Thread(target=confirm_race, args=(i,)) for i in range(8)]
+[t.start() for t in threads]
+[t.join() for t in threads]
+check("eight simultaneous confirmations all succeed", outcomes == [("completed", True)] * 8, outcomes)
+check("...and are recorded and announced once", events_of(cr["id"]).count("receipt_confirmed") == 1 and len(outbox(cr_creator, "receipt_confirmed", cr["id"])) == 1)
+rev_outcomes = []
+rev_barrier = threading.Barrier(6)
+
+
+def review_race(i):
+    rev_barrier.wait()
+    rev_outcomes.append(sql_as(cr_client, "select id from submit_review(%s, %s, %s)", (cr["id"], 1 + i % 5, f"race {i}")))
+
+
+threads = [threading.Thread(target=review_race, args=(i,)) for i in range(6)]
+[t.start() for t in threads]
+[t.join() for t in threads]
+check("six simultaneous reviews of one booking: one is kept, the rest are told it exists",
+      sum(1 for r in rev_outcomes if not isinstance(r, str)) == 1 and sum(1 for r in rev_outcomes if err(r, "already_reviewed")) == 5, rev_outcomes)
+a.execute("select count(*) from reviews where booking_id = %s", (cr["id"],))
+check("...and only one is stored, with one announcement", a.fetchone()[0] == 1 and events_of(cr["id"]).count("reviewed") == 1 and len(outbox(cr_creator, "review_received", cr["id"])) == 1)
 
 
 # ---- 12. concurrency -----------------------------------------------------------

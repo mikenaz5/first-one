@@ -9,6 +9,10 @@ struct MessageEventData: Codable, Equatable, Hashable {
     var refundCents: Int?
     var currency: String?
     var byCreator: Bool?
+    /// A delivery line: the link was replaced rather than shared for the first time.
+    var revised: Bool?
+    /// A review line: the stars given.
+    var rating: Int?
     var packageName: String?
     var startAt: Date?
     var timeZone: String?
@@ -26,8 +30,10 @@ struct Message: Identifiable, Codable, Equatable, Hashable {
         case booked
         case contractSigned = "contract_signed"
         case depositPaid = "deposit_paid"
-        case delivered
+        case deliveryShared = "delivery_shared"
+        case receiptConfirmed = "receipt_confirmed"
         case balancePaid = "balance_paid"
+        case reviewed
         case cancelled
     }
 
@@ -187,14 +193,27 @@ enum ConversationText {
         case .balancePaid:
             let amount = money(message.data.amountCents)
             return viewerIsClient ? "You paid the \(amount) balance. All done." : "\(client) paid the \(amount) balance. All done."
-        case .delivered:
-            let balance = message.data.balanceCents ?? 0
+        case .deliveryShared:
+            let revised = message.data.revised ?? false
             if viewerIsCreator {
-                return balance > 0 ? "You marked the work as delivered. \(client) owes \(money(balance))." : "You marked the work as delivered."
+                return revised ? "You updated the link to the final files." : "You shared the final files with \(client)."
+            }
+            return revised
+                ? "\(creator) updated the link to the final files."
+                : "\(creator) shared the final files. Open the booking to confirm you have them."
+        case .receiptConfirmed:
+            let balance = message.data.balanceCents ?? 0
+            if viewerIsClient {
+                return balance > 0
+                    ? "You confirmed you have the final files. The balance of \(money(balance)) is now due."
+                    : "You confirmed you have the final files. All done."
             }
             return balance > 0
-                ? "\(creator) marked the work as delivered. The balance of \(money(balance)) is due."
-                : "\(creator) marked the work as delivered. Nothing more is due."
+                ? "\(client) confirmed they have the final files. The balance of \(money(balance)) is now due."
+                : "\(client) confirmed they have the final files. All done."
+        case .reviewed:
+            let stars = message.data.rating.map { "\($0)-star " } ?? ""
+            return viewerIsClient ? "You left a \(stars)review." : "\(client) left a \(stars)review."
         case .cancelled:
             let refund = message.data.refundCents ?? 0
             let byCreator = message.data.byCreator ?? false

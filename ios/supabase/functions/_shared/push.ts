@@ -23,6 +23,9 @@ export type PushKind =
   | "contract_signed"
   | "payment_received"
   | "balance_due"
+  | "delivery_shared"
+  | "receipt_confirmed"
+  | "review_received"
   | "message"
   | "shoot_reminder";
 
@@ -244,6 +247,26 @@ export function compose(row: Pick<QueuedPush, "kind" | "booking_id" | "data">, n
     case "balance_due": {
       const creator = tidy(d.creatorName, 60, "Your creator");
       return notice("Balance due", `${creator} delivered ${pkg}. ${money(whole(d.balanceCents), currency)} is due.`);
+    }
+    case "delivery_shared": {
+      const creator = tidy(d.creatorName, 60, "Your creator");
+      if (d.revised === true) {
+        return notice("Link to your files updated", `${creator} replaced the link to the final files for ${pkg}.`);
+      }
+      return notice("Your files are ready", `${creator} shared the final files for ${pkg}. Open Slate to confirm you have them.`);
+    }
+    case "receipt_confirmed": {
+      const client = tidy(d.clientName, 60, "Your client");
+      const balance = whole(d.balanceCents);
+      return notice(
+        `${client} confirmed receipt`,
+        dotted(pkg, balance > 0 ? `${money(balance, currency)} balance is now payable` : "Nothing more to pay"),
+      );
+    }
+    case "review_received": {
+      const reviewer = tidy(d.reviewerName, 60, "A client");
+      const stars = Math.min(5, Math.max(1, whole(d.rating)));
+      return notice(`${reviewer} left a ${stars}-star review`, pkg);
     }
     case "message": {
       return notice(tidy(d.senderName, 60, "New message"), tidy(d.preview, 160, "Sent you a message"), {

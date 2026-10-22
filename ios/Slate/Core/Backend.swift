@@ -46,10 +46,23 @@ protocol SlateBackend {
     /// Cancels, works out the refund from the cancellation policy the client agreed to, and records it.
     /// Call `settleRefunds` afterwards to actually send the money back.
     func cancelBooking(_ id: UUID, by userID: UUID) async throws -> CancellationResult
-    /// The creator says the work is delivered, which makes the balance payable.
-    func markDelivered(bookingID: UUID, by creatorID: UUID) async throws -> Booking
     /// Gives up holds whose deposit wasn't paid in time, freeing their times.
     func expireHolds() async throws
+
+    // Delivery and reviews
+    /// The creator shares a link to the final files (and an optional note). Sharing again replaces them until the
+    /// client confirms. Throws `invalidDeliveryLink`, `deliveryNoteTooLong`, `notDeliverable`.
+    func shareDelivery(bookingID: UUID, link: String, note: String, by creatorID: UUID) async throws -> Booking
+    /// The client says they have the files. This is what makes the balance payable, and it completes a booking with
+    /// nothing left to pay. Confirming twice changes nothing. Throws `notDelivered`.
+    func confirmReceipt(bookingID: UUID, by clientID: UUID) async throws -> Booking
+    /// Leaves the one review a booking can have. Throws `notReviewable`, `invalidRating`, `reviewTooLong`, `alreadyReviewed`.
+    func submitReview(bookingID: UUID, rating: Int, body: String, by clientID: UUID) async throws -> Review
+    /// The review on a booking, for the two people on it.
+    func loadReview(bookingID: UUID, for userID: UUID) async throws -> Review?
+    /// A creator's reviews, newest first. With `before`, only those older than that moment.
+    func loadReviews(creatorID: UUID, limit: Int, before: Date?) async throws -> [Review]
+    func loadReviewSummary(creatorID: UUID) async throws -> ReviewSummary
 
     // Contracts
     func loadContractTemplates(for creatorID: UUID) async throws -> [ContractTemplate]

@@ -114,6 +114,9 @@ extension SupabaseBackend {
         var createdAt: Date
         var holdExpiresAt: Date?
         var deliveredAt: Date?
+        var deliveryUrl: String?
+        var deliveryNote: String?
+        var receiptConfirmedAt: Date?
         var cancelledAt: Date?
         var cancelledBy: String?
         var cancellationPolicy: String?
@@ -137,6 +140,9 @@ extension SupabaseBackend {
             case createdAt = "created_at"
             case holdExpiresAt = "hold_expires_at"
             case deliveredAt = "delivered_at"
+            case deliveryUrl = "delivery_url"
+            case deliveryNote = "delivery_note"
+            case receiptConfirmedAt = "receipt_confirmed_at"
             case cancelledAt = "cancelled_at"
             case cancelledBy = "cancelled_by"
             case cancellationPolicy = "cancellation_policy"
@@ -193,6 +199,18 @@ extension SupabaseBackend {
     private struct CancelBookingParams: Encodable {
         var pBookingId: String
         enum CodingKeys: String, CodingKey { case pBookingId = "p_booking_id" }
+    }
+
+    private struct ShareDeliveryParams: Encodable {
+        var pBookingId: String
+        var pUrl: String
+        var pNote: String
+
+        enum CodingKeys: String, CodingKey {
+            case pBookingId = "p_booking_id"
+            case pUrl = "p_url"
+            case pNote = "p_note"
+        }
     }
 
     private struct BusyIntervalParams: Encodable {
@@ -424,10 +442,22 @@ extension SupabaseBackend {
         }
     }
 
-    func markDelivered(bookingID: UUID, by creatorID: UUID) async throws -> Booking {
+    func shareDelivery(bookingID: UUID, link: String, note: String, by creatorID: UUID) async throws -> Booking {
         do {
             let row: BookingRow = try await client
-                .rpc("mark_delivered", params: CancelBookingParams(pBookingId: Self.key(bookingID)))
+                .rpc("share_delivery", params: ShareDeliveryParams(pBookingId: Self.key(bookingID), pUrl: link, pNote: note))
+                .execute()
+                .value
+            return try makeBooking(row)
+        } catch {
+            throw Self.mapBookingError(error)
+        }
+    }
+
+    func confirmReceipt(bookingID: UUID, by clientID: UUID) async throws -> Booking {
+        do {
+            let row: BookingRow = try await client
+                .rpc("confirm_receipt", params: CancelBookingParams(pBookingId: Self.key(bookingID)))
                 .execute()
                 .value
             return try makeBooking(row)
@@ -465,6 +495,9 @@ extension SupabaseBackend {
             createdAt: row.createdAt,
             holdExpiresAt: row.holdExpiresAt,
             deliveredAt: row.deliveredAt,
+            deliveryURL: row.deliveryUrl,
+            deliveryNote: row.deliveryNote,
+            receiptConfirmedAt: row.receiptConfirmedAt,
             cancelledAt: row.cancelledAt,
             cancelledByID: row.cancelledBy.flatMap(UUID.init(uuidString:)),
             cancellationPolicy: row.cancellationPolicy.flatMap(CancellationPolicy.init(rawValue:)) ?? .moderate
@@ -493,10 +526,18 @@ extension SupabaseBackend {
             ("nothing_due", .paymentNotDue),
             ("already_paid", .alreadyPaid),
             ("not_deliverable", .notDeliverable),
+            ("invalid_delivery_url", .invalidDeliveryLink),
+            ("note_too_long", .deliveryNoteTooLong),
+            ("not_delivered", .notDelivered),
+            ("not_reviewable", .notReviewable),
+            ("invalid_rating", .invalidRating),
+            ("review_too_long", .reviewTooLong),
+            ("already_reviewed", .alreadyReviewed),
             ("conversation_closed", .conversationClosed),
             ("message_too_long", .messageTooLong),
             ("invalid_message", .invalidMessage),
             ("rate_limited", .rateLimited),
+            ("not_found", .bookingNotFound),
         ]
         for entry in known where text.contains(entry.token) {
             return entry.error

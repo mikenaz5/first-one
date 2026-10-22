@@ -105,19 +105,6 @@ extension AppModel {
         return false
     }
 
-    // MARK: - Delivery
-
-    func markDelivered(_ booking: Booking) async {
-        guard let session else { return }
-        do {
-            let updated = try await backend.markDelivered(bookingID: booking.id, by: session.userID)
-            if let index = bookings.firstIndex(where: { $0.id == updated.id }) { bookings[index] = updated }
-            await reloadMoney()
-        } catch {
-            show(error, title: "Couldn't mark as delivered")
-        }
-    }
-
     // MARK: - Refunds
 
     func refundQuote(for booking: Booking) async -> RefundQuote? {
@@ -170,6 +157,20 @@ extension AppModel {
         guard let session else { return }
         if let account = try? await backend.refreshPaymentAccount(for: session.userID) {
             paymentAccount = account
+        }
+    }
+}
+
+extension AppModel.PaymentOutcome {
+    /// What to tell the person about how paying went, or nil when there is nothing to add.
+    var message: String? {
+        switch self {
+        case .confirmed, .cancelled:
+            nil
+        case .processing:
+            "Your payment went through and is being confirmed. This usually takes a few seconds. Pull to refresh in a moment."
+        case .failed(let reason):
+            reason
         }
     }
 }

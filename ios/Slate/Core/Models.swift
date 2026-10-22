@@ -235,6 +235,13 @@ enum SlateError: LocalizedError, Equatable {
     case paymentsNotConfigured
     case applePayUnavailable
     case notDeliverable
+    case invalidDeliveryLink
+    case deliveryNoteTooLong
+    case notDelivered
+    case notReviewable
+    case invalidRating
+    case reviewTooLong
+    case alreadyReviewed
     case bookingNotFound
     case conversationClosed
     case invalidMessage
@@ -301,7 +308,21 @@ enum SlateError: LocalizedError, Equatable {
         case .applePayUnavailable:
             "Apple Pay isn't set up on this device. Add a card to Wallet and try again."
         case .notDeliverable:
-            "This booking can't be marked as delivered yet."
+            "Final files can be shared once the shoot has started, and until the client confirms they have them."
+        case .invalidDeliveryLink:
+            "Paste a link that starts with https:// (for example a Dropbox, Google Drive or WeTransfer share link)."
+        case .deliveryNoteTooLong:
+            "Notes can be up to \(DeliveryRules.noteMaxLength) characters."
+        case .notDelivered:
+            "There are no final files to confirm yet."
+        case .notReviewable:
+            "You can review a booking once the work is delivered, confirmed and paid for."
+        case .invalidRating:
+            "Choose between one and five stars."
+        case .reviewTooLong:
+            "Reviews can be up to \(ReviewRules.maxLength.formatted()) characters."
+        case .alreadyReviewed:
+            "You've already reviewed this booking."
         case .bookingNotFound:
             "That booking couldn't be found."
         case .conversationClosed:
@@ -324,6 +345,8 @@ enum AppConfig {
     /// Placeholder host for public booking links (`.example` is reserved and never resolves).
     static let bookingLinkHost = "slate.example"
     static let portfolioLimit = 12
+    /// How many reviews a creator's page loads at a time.
+    static let reviewsPageSize = 20
     static let maxVideoSeconds = 120
     static let bioLimit = 280
     static let maxSpecialties = 5

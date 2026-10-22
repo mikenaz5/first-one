@@ -61,6 +61,8 @@ extension ShapeStyle where Self == Color {
     static var slateSuccess: Color { .green }
     static var slateWarning: Color { .orange }
     static var slateDanger: Color { .red }
+    /// Filled rating stars.
+    static var slateStar: Color { .orange }
 }
 
 // MARK: - Typography

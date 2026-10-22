@@ -157,15 +157,21 @@ final class MessagingBackendTests: XCTestCase {
         XCTAssertEqual(last.data.byCreator, true)
     }
 
-    func testDeliveryAndTheBalanceAddTheirLines() async throws {
+    func testDeliveryReceiptAndTheBalanceAddTheirLines() async throws {
         let signed = try await book()
         clock.set(friday.addingTimeInterval(3 * 3600))
-        _ = try await backend.markDelivered(bookingID: signed.booking.id, by: creator.id)
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: "https://files.example.com/final", note: "", by: creator.id)
 
         let afterDelivery = try await lines(signed.booking.id)
-        let delivered = try XCTUnwrap(afterDelivery.last)
-        XCTAssertEqual(delivered.event, .delivered)
-        XCTAssertEqual(delivered.data.balanceCents, 150_000)
+        let shared = try XCTUnwrap(afterDelivery.last)
+        XCTAssertEqual(shared.event, .deliveryShared)
+        XCTAssertEqual(shared.data.revised, false)
+
+        _ = try await backend.confirmReceipt(bookingID: signed.booking.id, by: client)
+        let afterReceipt = try await lines(signed.booking.id)
+        let received = try XCTUnwrap(afterReceipt.last)
+        XCTAssertEqual(received.event, .receiptConfirmed)
+        XCTAssertEqual(received.data.balanceCents, 150_000)
 
         let info = try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client)
         try await backend.completeSimulatedPayment(info.paymentID)
@@ -176,6 +182,37 @@ final class MessagingBackendTests: XCTestCase {
 
         let done = try await say("Thank you, the photos are great!", in: signed.booking.id)
         XCTAssertEqual(done.kind, .text, "A finished booking's conversation stays open")
+    }
+
+    func testSharingTheSameLinkAgainSaysNothingButANewLinkIsAnUpdate() async throws {
+        let signed = try await book()
+        clock.set(friday.addingTimeInterval(3 * 3600))
+        let link = "https://files.example.com/final"
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: link, note: "", by: creator.id)
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: link, note: "Now with a password", by: creator.id)
+        let sameLink = try await events(signed.booking.id)
+        XCTAssertEqual(sameLink.filter { $0 == .deliveryShared }.count, 1, "The database's trigger only fires when the link changes")
+
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: "https://files.example.com/corrected", note: "", by: creator.id)
+        let history = try await lines(signed.booking.id)
+        let last = try XCTUnwrap(history.last)
+        XCTAssertEqual(last.event, .deliveryShared)
+        XCTAssertEqual(last.data.revised, true)
+    }
+
+    func testReviewingAddsALine() async throws {
+        let signed = try await book()
+        clock.set(friday.addingTimeInterval(3 * 3600))
+        _ = try await backend.shareDelivery(bookingID: signed.booking.id, link: "https://files.example.com/final", note: "", by: creator.id)
+        _ = try await backend.confirmReceipt(bookingID: signed.booking.id, by: client)
+        let info = try await backend.preparePayment(bookingID: signed.booking.id, kind: .balance, by: client)
+        try await backend.completeSimulatedPayment(info.paymentID)
+        _ = try await backend.submitReview(bookingID: signed.booking.id, rating: 5, body: "Wonderful", by: client)
+
+        let history = try await lines(signed.booking.id)
+        let last = try XCTUnwrap(history.last)
+        XCTAssertEqual(last.event, .reviewed)
+        XCTAssertEqual(last.data.rating, 5)
     }
 
     func testAPaymentThatCameToNothingAddsNoLine() async throws {
