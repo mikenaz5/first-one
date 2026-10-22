@@ -28,6 +28,9 @@ final class PackageDraft {
     var deliverables: [DeliverableRow]
     var addOns: [AddOn]
     var isPublished: Bool
+    var contractTemplateID: UUID?
+    var cancellationPolicy: CancellationPolicy
+    var usageRights: UsageRights
 
     init(package: ServicePackage) {
         original = package
@@ -41,6 +44,9 @@ final class PackageDraft {
         deliverables = package.deliverables.map { DeliverableRow(text: $0) }
         addOns = package.addOns
         isPublished = package.isPublished
+        contractTemplateID = package.contractTemplateID
+        cancellationPolicy = package.cancellationPolicy
+        usageRights = package.usageRights
     }
 
     var currencyCode: String { original.currencyCode }
@@ -112,6 +118,9 @@ final class PackageDraft {
             return cleaned
         }
         package.isPublished = isPublished
+        package.contractTemplateID = contractTemplateID
+        package.cancellationPolicy = cancellationPolicy
+        package.usageRights = usageRights
         return package
     }
 

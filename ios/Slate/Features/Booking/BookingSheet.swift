@@ -9,6 +9,7 @@ struct BookingSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var booking: BookingModel
+    @State private var showReview = false
 
     init(creator: CreatorProfile, package: ServicePackage) {
         _booking = State(initialValue: BookingModel(creator: creator, package: package))
@@ -20,7 +21,7 @@ struct BookingSheet: View {
         NavigationStack {
             Group {
                 if let confirmed = booking.confirmed {
-                    BookingConfirmationView(booking: confirmed, onDone: { dismiss() })
+                    BookingConfirmationView(booking: confirmed, contract: booking.signedContract, onDone: { dismiss() })
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 } else {
                     form
@@ -36,7 +37,14 @@ struct BookingSheet: View {
                 }
             }
             .motionSafe(.slateSmooth, value: booking.confirmed?.id)
-            .task { await booking.load(using: model) }
+            .navigationDestination(isPresented: $showReview) {
+                ContractReviewView(booking: booking)
+            }
+            .onChange(of: booking.confirmed?.id) { _, _ in showReview = false }
+            .task {
+                if booking.capture.fullName.isEmpty { booking.capture.fullName = model.clientDisplayName }
+                await booking.load(using: model)
+            }
             .sensoryFeedback(.selection, trigger: booking.selectedSlot?.start)
             .sensoryFeedback(.success, trigger: booking.confirmed?.id)
             .sensoryFeedback(.warning, trigger: booking.notice)
@@ -74,7 +82,7 @@ struct BookingSheet: View {
 
                 PriceSummaryCard(summary: booking.summary)
 
-                Text("Contract signing and deposit payment aren't connected yet, so nothing is charged. Booking reserves the time.")
+                Text("Next you'll read and sign a short contract. Deposit payment isn't connected yet, so nothing is charged.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -273,26 +281,20 @@ struct BookingSheet: View {
 
     private var buttonTitle: String {
         guard let slot = booking.selectedSlot else { return "Choose a time" }
-        return "Book \(booking.formatter.chipLabel(for: slot.start, relativeTo: booking.referenceDate))"
+        return "Review & sign · \(booking.formatter.chipLabel(for: slot.start, relativeTo: booking.referenceDate))"
     }
 
     private var bottomBar: some View {
         VStack(spacing: Space.xs) {
             Button {
-                Task { await booking.submit(using: model) }
+                showReview = true
             } label: {
-                Group {
-                    if booking.isSubmitting {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(buttonTitle)
-                    }
-                }
-                .frame(maxWidth: .infinity, minHeight: 28)
+                Text(buttonTitle)
+                    .frame(maxWidth: .infinity, minHeight: 28)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(booking.selectedSlot == nil || booking.isSubmitting || !canBook || booking.phase != .ready)
+            .disabled(booking.selectedSlot == nil || !canBook || booking.phase != .ready)
 
             Text("\(Money.format(booking.summary.totalCents, code: booking.summary.currencyCode)) total · \(Money.format(booking.summary.depositCents, code: booking.summary.currencyCode)) deposit")
                 .font(.footnote)
@@ -413,6 +415,7 @@ struct BookingConfirmationView: View {
     @Environment(AppModel.self) private var model
 
     let booking: Booking
+    let contract: Contract?
     let onDone: () -> Void
 
     @State private var appeared = false
@@ -449,6 +452,26 @@ struct BookingConfirmationView: View {
                     if let note = formatter.zoneNote { detail("globe", note) }
                 }
                 .card()
+
+                if contract != nil {
+                    NavigationLink {
+                        SignedContractView(booking: booking)
+                    } label: {
+                        HStack(spacing: Space.m) {
+                            Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.slateSuccess).accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text("Contract signed by both of you").font(.subheadline.weight(.semibold))
+                                Text("View it or share the signed PDF").font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        }
+                        .foregroundStyle(.primary)
+                        .frame(minHeight: Metrics.minTapTarget)
+                        .card()
+                    }
+                    .buttonStyle(PressableTileStyle())
+                }
 
                 VStack(spacing: Space.m) {
                     Button {

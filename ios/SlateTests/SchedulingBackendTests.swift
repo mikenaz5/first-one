@@ -36,6 +36,9 @@ final class SchedulingBackendTests: XCTestCase {
         AppleCredential(userID: id, identityToken: "t", rawNonce: "n", fullName: nil, email: nil)
     }
 
+    /// Each creator's contract, so every package built for them can be sold.
+    private var contracts: [UUID: UUID] = [:]
+
     private func package(for creatorID: UUID, name: String = "Portrait session", duration: Int = 60, published: Bool = true) -> ServicePackage {
         ServicePackage(
             id: UUID(), creatorID: creatorID, name: name, summary: "", category: .portraits,
@@ -45,7 +48,8 @@ final class SchedulingBackendTests: XCTestCase {
                 AddOn(kind: .extraTime, name: "Extra hour", priceCents: 15_000, extraMinutes: 60),
                 AddOn(kind: .drone, name: "Drone", priceCents: 25_000),
             ],
-            isPublished: published, position: 0, createdAt: Date(), updatedAt: Date()
+            isPublished: published, position: 0, createdAt: Date(), updatedAt: Date(),
+            contractTemplateID: contracts[creatorID]
         )
     }
 
@@ -68,6 +72,7 @@ final class SchedulingBackendTests: XCTestCase {
             settings.bufferMinutes = buffer
             _ = try await backend.saveAvailability(settings, for: session.userID)
         }
+        contracts[session.userID] = try await ContractFixtures.equip(backend, creatorID: session.userID).id
         let saved = try await backend.savePackage(package(for: session.userID, duration: duration))
         return Creator(id: session.userID, package: saved[0])
     }
@@ -76,8 +81,11 @@ final class SchedulingBackendTests: XCTestCase {
         BookingRequest(creatorID: creator.id, packageID: creator.package.id, addOnIDs: addOns, startAt: start, notes: "")
     }
 
+    /// Reads the contract and signs it, as a client would.
     private func book(_ creator: Creator, at start: Date, addOns: [UUID] = [], client: UUID = UUID()) async throws -> Booking {
-        try await backend.createBooking(request(creator, at: start, addOns: addOns), clientID: client, clientName: "Client")
+        try await ContractFixtures.signedBooking(
+            backend, request(creator, at: start, addOns: addOns), clientID: client, name: "Client"
+        ).booking
     }
 
     private func expectError<T>(_ expected: SlateError, file: StaticString = #filePath, line: UInt = #line, _ work: () async throws -> T) async {
@@ -216,9 +224,9 @@ final class SchedulingBackendTests: XCTestCase {
         let hidden = draft.first { $0.name == "Draft" }!
         let day = openDay()
         await expectError(.packageUnavailable) {
-            try await backend.createBooking(
-                BookingRequest(creatorID: creator.id, packageID: hidden.id, addOnIDs: [], startAt: at(day, 10), notes: ""),
-                clientID: UUID(), clientName: "C"
+            try await ContractFixtures.signedBooking(
+                backend,
+                BookingRequest(creatorID: creator.id, packageID: hidden.id, addOnIDs: [], startAt: at(day, 10), notes: "")
             )
         }
         await expectError(.packageUnavailable) { try await book(creator, at: at(day, 10), addOns: [UUID()]) }
@@ -272,7 +280,8 @@ final class SchedulingBackendTests: XCTestCase {
                 let request = self.request(creator, at: start)
                 group.addTask {
                     do {
-                        return .success(try await backend.createBooking(request, clientID: UUID(), clientName: "Client \(index)"))
+                        let signed = try await ContractFixtures.signedBooking(backend, request, name: "Client \(index)")
+                        return .success(signed.booking)
                     } catch {
                         return .failure(error)
                     }

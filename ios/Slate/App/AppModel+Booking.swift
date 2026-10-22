@@ -27,18 +27,30 @@ extension AppModel {
         creatorID != session?.userID || backend.allowsSelfBooking
     }
 
-    func book(_ request: BookingRequest) async throws -> Booking {
+    /// The name that appears in the contract for this person.
+    var clientDisplayName: String {
+        let name = profile?.displayName ?? session?.fullName ?? ""
+        return name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Client" : name
+    }
+
+    /// Books and signs in one step. The backend decides everything that matters; this just refreshes our lists.
+    func book(_ request: BookingRequest, signature: SignatureInput) async throws -> SignedBooking {
         guard let session else { throw SlateError.notSignedIn }
-        let name = profile?.displayName ?? session.fullName ?? "Client"
-        let booking = try await backend.createBooking(request, clientID: session.userID, clientName: name)
+        let signed = try await backend.createBooking(
+            request, clientID: session.userID, clientName: clientDisplayName, signature: signature
+        )
         // Refresh the list; the booking itself already succeeded, so a failure here isn't fatal.
         if let latest = try? await backend.loadBookings(for: session.userID) {
             bookings = latest
         } else {
-            bookings.append(booking)
+            bookings.append(signed.booking)
         }
-        Task { await syncBookingEvents() }
-        return booking
+        contractsByBooking[signed.booking.id] = signed.contract
+        Task {
+            _ = await signedPDF(for: signed.contract, booking: signed.booking)
+            await syncBookingEvents()
+        }
+        return signed
     }
 
     // MARK: - Bookings list

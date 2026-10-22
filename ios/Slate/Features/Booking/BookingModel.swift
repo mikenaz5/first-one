@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// State for one booking sheet: which add-ons are chosen, which time is selected, and the
-/// open times worked out from the creator's schedule.
+/// State for one booking sheet: which add-ons are chosen, which time is selected, the open times
+/// worked out from the creator's schedule, and the contract being reviewed and signed.
 @MainActor
 @Observable
 final class BookingModel {
@@ -10,6 +10,13 @@ final class BookingModel {
         case loading
         case ready
         case noAvailability
+        case failed(String)
+    }
+
+    enum ContractPhase: Equatable {
+        case idle
+        case loading
+        case ready
         case failed(String)
     }
 
@@ -28,6 +35,11 @@ final class BookingModel {
     private(set) var formatter = SlotFormatter(timeZone: .current)
     private(set) var isSubmitting = false
     private(set) var confirmed: Booking?
+    private(set) var signedContract: Contract?
+
+    private(set) var contractPhase: ContractPhase = .idle
+    private(set) var contractPreview: ContractPreview?
+    let capture: SignatureCapture
 
     var selectedAddOnIDs: Set<UUID> = []
     var selectedSlot: TimeSlot?
@@ -38,9 +50,10 @@ final class BookingModel {
     private var schedule: CreatorSchedule?
     private var now = Date()
 
-    init(creator: CreatorProfile, package: ServicePackage) {
+    init(creator: CreatorProfile, package: ServicePackage, signerName: String = "") {
         self.creator = creator
         self.package = package
+        capture = SignatureCapture(fullName: signerName)
     }
 
     // MARK: Derived
@@ -60,7 +73,19 @@ final class BookingModel {
 
     var referenceDate: Date { now }
 
-    // MARK: Loading
+    /// Whatever has to change before the person can sign, in plain words. Nil when they can.
+    var signBlocker: String? {
+        if selectedSlot == nil { return "Choose a time first." }
+        if contractPreview == nil { return "The contract hasn't loaded yet." }
+        if !capture.isReady {
+            return capture.method == .drawn && capture.trimmedName.count >= SignatureRules.nameLength.lowerBound
+                ? "Draw your signature to continue."
+                : "Add your full name to sign."
+        }
+        return nil
+    }
+
+    // MARK: Loading times
 
     func load(using model: AppModel, showSpinner: Bool = true) async {
         if showSpinner { phase = .loading }
@@ -105,6 +130,12 @@ final class BookingModel {
 
     // MARK: Choices
 
+    /// Anything the contract was filled in from has changed, so what was shown is stale.
+    private func invalidateContract() {
+        contractPreview = nil
+        contractPhase = .idle
+    }
+
     func toggle(_ addOn: AddOn) {
         if selectedAddOnIDs.contains(addOn.id) {
             selectedAddOnIDs.remove(addOn.id)
@@ -112,43 +143,78 @@ final class BookingModel {
             selectedAddOnIDs.insert(addOn.id)
         }
         notice = nil
+        invalidateContract()
         recompute()
         if phase == .ready, days.isEmpty { phase = .noAvailability }
     }
 
     func selectDay(_ day: CalendarDay) {
         notice = nil
+        invalidateContract()
         selectedSlot = days.first { $0.day == day }?.slots.first
     }
 
     func select(_ slot: TimeSlot) {
         notice = nil
+        invalidateContract()
         selectedSlot = slot
     }
 
-    // MARK: Booking
+    // MARK: Contract
 
-    /// Returns true when the booking was created.
-    @discardableResult
-    func submit(using model: AppModel) async -> Bool {
-        guard let slot = selectedSlot, !isSubmitting else { return false }
-        isSubmitting = true
-        defer { isSubmitting = false }
-
-        let request = BookingRequest(
+    private func makeRequest(for slot: TimeSlot) -> BookingRequest {
+        BookingRequest(
             creatorID: creator.id,
             packageID: package.id,
             addOnIDs: Array(selectedAddOnIDs),
             startAt: slot.start,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    /// Fetches the contract as the backend fills it in for the current choices.
+    func loadContract(using model: AppModel) async {
+        guard let slot = selectedSlot else { return }
+        contractPhase = .loading
         do {
-            confirmed = try await model.book(request)
+            contractPreview = try await model.previewContract(for: makeRequest(for: slot))
+            contractPhase = .ready
+        } catch {
+            contractPreview = nil
+            contractPhase = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: Signing and booking
+
+    /// Signs the contract the person was shown and books. Returns true when the booking was made.
+    @discardableResult
+    func submit(using model: AppModel) async -> Bool {
+        guard let slot = selectedSlot, !isSubmitting else { return false }
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        do {
+            if contractPreview == nil { await loadContract(using: model) }
+            guard let preview = contractPreview, capture.isReady else { throw SlateError.invalidSignature }
+
+            let signed = try await model.book(
+                makeRequest(for: slot),
+                signature: capture.input(documentHash: preview.documentHash)
+            )
+            confirmed = signed.booking
+            signedContract = signed.contract
             return true
         } catch let error as SlateError where error == .slotTaken || error == .slotUnavailable {
             // Someone else got there first (or the creator's hours changed). Refresh and move on.
             selectedSlot = nil
+            invalidateContract()
             await load(using: model, showSpinner: false)
+            notice = error.localizedDescription
+            return false
+        } catch let error as SlateError where error == .contractChanged {
+            // The wording changed after it was shown. Show the new version and make them read it again.
+            await loadContract(using: model)
             notice = error.localizedDescription
             return false
         } catch {

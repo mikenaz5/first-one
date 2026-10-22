@@ -11,6 +11,7 @@ struct ServicesView: View {
 
     @State private var editing: PackageEditorTarget?
     @State private var showAvailability = false
+    @State private var showContracts = false
     @State private var pendingDelete: ServicePackage?
 
     private let rowInsets = EdgeInsets(top: Space.s, leading: Space.page, bottom: Space.s, trailing: Space.page)
@@ -20,6 +21,12 @@ struct ServicesView: View {
             List {
                 Section {
                     Button { showAvailability = true } label: { AvailabilityCard() }
+                        .buttonStyle(PressableTileStyle())
+                        .listRowInsets(rowInsets)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+
+                    Button { showContracts = true } label: { ContractsCard() }
                         .buttonStyle(PressableTileStyle())
                         .listRowInsets(rowInsets)
                         .listRowSeparator(.hidden)
@@ -91,6 +98,9 @@ struct ServicesView: View {
             .refreshable { await model.refresh() }
             .sheet(item: $editing) { target in
                 PackageEditorSheet(package: target.package)
+            }
+            .navigationDestination(isPresented: $showContracts) {
+                ContractsListView()
             }
             .sheet(isPresented: $showAvailability) {
                 AvailabilitySheet(initial: model.availability ?? AvailabilitySettings.standard())
@@ -193,5 +203,47 @@ enum AvailabilityText {
     static func minute(_ minuteOfDay: Int, calendar: Calendar = .current) -> String {
         let date = calendar.date(from: DateComponents(hour: (minuteOfDay / 60) % 24, minute: minuteOfDay % 60)) ?? Date()
         return date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+// MARK: - Contracts summary card
+
+struct ContractsCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Space.m) {
+            Image(systemName: "doc.text")
+                .font(.title2)
+                .foregroundStyle(model.hasCreatorSignature && !model.contractTemplates.isEmpty ? Color.accentColor : Color.slateWarning)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text("Contracts").font(.headline)
+                if model.contractTemplates.isEmpty {
+                    Text("Every booking comes with a contract. Start from a ready-made one.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(model.contractTemplates.count == 1 ? "1 contract" : "\(model.contractTemplates.count) contracts")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                if !model.hasCreatorSignature {
+                    Text("Add your signature so clients can sign and book you.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.slateWarning)
+                }
+            }
+            Spacer(minLength: Space.s)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .card()
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens your contracts and signature")
     }
 }

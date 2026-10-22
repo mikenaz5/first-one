@@ -6,6 +6,8 @@ extension AppModel {
         packages = try await backend.loadPackages(for: userID)
         availability = try await backend.loadAvailability(for: userID)
         bookings = try await backend.loadBookings(for: userID)
+        contractTemplates = try await backend.loadContractTemplates(for: userID)
+        creatorSignature = try await backend.loadCreatorSignature(for: userID)
     }
 
     /// Runs once the account has loaded and the person is in the app.
@@ -79,6 +81,9 @@ extension AppModel {
         copy.deliverables = package.deliverables
         copy.turnaroundDays = package.turnaroundDays
         copy.depositCents = package.depositCents
+        copy.contractTemplateID = package.contractTemplateID
+        copy.cancellationPolicy = package.cancellationPolicy
+        copy.usageRights = package.usageRights
         copy.addOns = package.addOns.map { addOn in
             var fresh = addOn
             fresh.id = UUID()

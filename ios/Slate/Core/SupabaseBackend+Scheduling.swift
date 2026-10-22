@@ -24,6 +24,9 @@ extension SupabaseBackend {
         var addOns: [AddOn]
         var isPublished: Bool
         var position: Int
+        var contractTemplateId: String?
+        var cancellationPolicy: String
+        var usageRights: String
         var createdAt: Date?
         var updatedAt: Date?
 
@@ -37,6 +40,9 @@ extension SupabaseBackend {
             case depositCents = "deposit_cents"
             case addOns = "add_ons"
             case isPublished = "is_published"
+            case contractTemplateId = "contract_template_id"
+            case cancellationPolicy = "cancellation_policy"
+            case usageRights = "usage_rights"
             case createdAt = "created_at"
             case updatedAt = "updated_at"
         }
@@ -127,12 +133,29 @@ extension SupabaseBackend {
         }
     }
 
+    /// The signature as `create_booking` reads it (`p_signature ->> 'signedName'` and so on).
+    private struct SignaturePayload: Encodable {
+        var signedName: String
+        var method: String
+        var imagePng: String?
+        var consentVersion: Int
+        var device: String
+    }
+
+    /// What `create_booking` returns: the booking and its contract with both signatures.
+    private struct SignedBookingRow: Decodable {
+        var booking: BookingRow
+        var contract: ContractRow
+    }
+
     private struct CreateBookingParams: Encodable {
         var pPackageId: String
         var pAddOnIds: [String]
         var pStartAt: Date
         var pClientName: String
         var pNotes: String
+        var pDocumentHash: String
+        var pSignature: SignaturePayload
 
         enum CodingKeys: String, CodingKey {
             case pPackageId = "p_package_id"
@@ -140,6 +163,8 @@ extension SupabaseBackend {
             case pStartAt = "p_start_at"
             case pClientName = "p_client_name"
             case pNotes = "p_notes"
+            case pDocumentHash = "p_document_hash"
+            case pSignature = "p_signature"
         }
     }
 
@@ -190,6 +215,9 @@ extension SupabaseBackend {
             addOns: package.addOns,
             isPublished: package.isPublished,
             position: package.position,
+            contractTemplateId: package.contractTemplateID.map(Self.key),
+            cancellationPolicy: package.cancellationPolicy.rawValue,
+            usageRights: package.usageRights.rawValue,
             createdAt: nil,
             updatedAt: nil
         )
@@ -227,7 +255,10 @@ extension SupabaseBackend {
             isPublished: row.isPublished,
             position: row.position,
             createdAt: row.createdAt ?? Date(),
-            updatedAt: row.updatedAt ?? Date()
+            updatedAt: row.updatedAt ?? Date(),
+            contractTemplateID: row.contractTemplateId.flatMap(UUID.init(uuidString:)),
+            cancellationPolicy: CancellationPolicy(rawValue: row.cancellationPolicy) ?? .moderate,
+            usageRights: UsageRights(rawValue: row.usageRights) ?? .personal
         )
     }
 
@@ -316,17 +347,31 @@ extension SupabaseBackend {
 
     // MARK: - Bookings
 
-    func createBooking(_ request: BookingRequest, clientID: UUID, clientName: String) async throws -> Booking {
+    /// Books and signs in one database call, so there is never a booking without its contract.
+    /// The server re-renders the contract and refuses (`contract_changed`) if it no longer matches
+    /// the hash the client signed; the creator's signature on file is applied there too.
+    func createBooking(
+        _ request: BookingRequest, clientID: UUID, clientName: String, signature: SignatureInput
+    ) async throws -> SignedBooking {
+        guard SignatureRules.isValid(signature) else { throw SlateError.invalidSignature }
         let params = CreateBookingParams(
             pPackageId: Self.key(request.packageID),
             pAddOnIds: request.addOnIDs.map(Self.key),
             pStartAt: request.startAt,
             pClientName: clientName,
-            pNotes: request.notes
+            pNotes: request.notes,
+            pDocumentHash: signature.documentHash,
+            pSignature: SignaturePayload(
+                signedName: signature.signedName.trimmingCharacters(in: .whitespacesAndNewlines),
+                method: signature.method.rawValue,
+                imagePng: signature.method == .drawn ? signature.imagePNG?.base64EncodedString() : nil,
+                consentVersion: signature.consentVersion,
+                device: signature.device
+            )
         )
         do {
-            let row: BookingRow = try await client.rpc("create_booking", params: params).execute().value
-            return try makeBooking(row)
+            let row: SignedBookingRow = try await client.rpc("create_booking", params: params).execute().value
+            return SignedBooking(booking: try makeBooking(row.booking), contract: try makeContract(row.contract))
         } catch {
             throw Self.mapBookingError(error)
         }
@@ -391,6 +436,11 @@ extension SupabaseBackend {
             ("cannot_book_yourself", .cannotBookYourself),
             ("not_cancellable", .notCancellable),
             ("not_signed_in", .notSignedIn),
+            ("contract_changed", .contractChanged),
+            ("contract_missing", .contractMissing),
+            ("creator_not_ready", .creatorNotReady),
+            ("invalid_signature", .invalidSignature),
+            ("invalid_contract", .invalidContract),
         ]
         for entry in known where text.contains(entry.token) {
             return entry.error

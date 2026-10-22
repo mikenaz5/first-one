@@ -22,7 +22,7 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityAddTraits(.isHeader)
 
-                    if model.packages.isEmpty || model.needsAvailability {
+                    if model.packages.isEmpty || model.needsAvailability || !model.hasCreatorSignature {
                         SetupCard()
                     }
 
@@ -76,10 +76,15 @@ private struct SetupCard: View {
                 title: "Set your working hours",
                 detail: "Clients can only book times you're free."
             )
+            step(
+                done: model.hasCreatorSignature,
+                title: "Add your signature",
+                detail: "Applied to each contract so clients can book straight away."
+            )
             Button {
                 model.selectedTab = .services
             } label: {
-                Text(model.packages.isEmpty ? "Create a package" : "Set your hours")
+                Text(model.packages.isEmpty ? "Create a package" : model.needsAvailability ? "Set your hours" : "Add your signature")
                     .frame(maxWidth: .infinity, minHeight: 28)
             }
             .buttonStyle(.borderedProminent)

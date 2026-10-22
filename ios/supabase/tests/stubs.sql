@@ -8,6 +8,9 @@ create table auth.users (id uuid primary key default gen_random_uuid(), email te
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 
+create schema extensions;
+create extension pgcrypto with schema extensions;
+
 create schema storage;
 create table storage.buckets (
   id text primary key, name text not null, public boolean default false,
@@ -29,3 +32,6 @@ grant execute on function auth.uid() to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
+-- Storage tables are open to the API roles in Supabase; row level security is what restricts them.
+grant all on all tables in schema storage to anon, authenticated, service_role;

@@ -15,12 +15,21 @@ final class PackageRulesTests: XCTestCase {
             id: UUID(), creatorID: UUID(), name: name, summary: "", category: nil,
             priceCents: price, currencyCode: "USD", durationMinutes: duration,
             deliverables: deliverables, turnaroundDays: turnaround, depositCents: deposit,
-            addOns: addOns, isPublished: true, position: 0, createdAt: Date(), updatedAt: Date()
+            addOns: addOns, isPublished: true, position: 0, createdAt: Date(), updatedAt: Date(),
+            contractTemplateID: UUID()
         )
     }
 
     func testAValidPackageHasNoProblems() {
         XCTAssertEqual(PackageRules.problems(in: package()), [])
+    }
+
+    func testAVisiblePackageNeedsAContractButADraftDoesNot() {
+        var visible = package()
+        visible.contractTemplateID = nil
+        XCTAssertEqual(PackageRules.problems(in: visible), [.contractMissing])
+        visible.isPublished = false
+        XCTAssertEqual(PackageRules.problems(in: visible), [])
     }
 
     func testNameLength() {

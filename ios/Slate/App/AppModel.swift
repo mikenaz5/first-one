@@ -36,6 +36,10 @@ final class AppModel {
     var packages: [ServicePackage] = []
     var availability: AvailabilitySettings?
     var bookings: [Booking] = []
+    var contractTemplates: [ContractTemplate] = []
+    var creatorSignature: CreatorSignature?
+    /// Signed contracts already fetched, by booking, so screens don't wait on the network twice.
+    var contractsByBooking: [UUID: Contract] = [:]
     var calendarPrefs = CalendarPreferences.load()
     var calendarAccess: CalendarService.Access = .notDetermined
     /// Which tab is showing. Lives here so deep links can switch tabs.
@@ -140,6 +144,9 @@ final class AppModel {
         packages = []
         availability = nil
         bookings = []
+        contractTemplates = []
+        creatorSignature = nil
+        contractsByBooking = [:]
         presentedPage = nil
         pendingBookingHandle = nil
         CalendarPreferences.clear()

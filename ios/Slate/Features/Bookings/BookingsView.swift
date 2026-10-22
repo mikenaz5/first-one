@@ -228,6 +228,15 @@ struct BookingDetailView: View {
                 Text("Payments and contracts aren't connected yet, so nothing has been charged.")
             }
 
+            Section("Contract") {
+                NavigationLink {
+                    SignedContractView(booking: booking)
+                } label: {
+                    Label("Signed contract and PDF", systemImage: "doc.text")
+                        .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                }
+            }
+
             Section("People") {
                 LabeledContent("Creator", value: booking.creatorName)
                 LabeledContent("Client", value: booking.clientName.isEmpty ? "Client" : booking.clientName)

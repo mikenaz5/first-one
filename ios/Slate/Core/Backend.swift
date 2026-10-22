@@ -38,11 +38,25 @@ protocol SlateBackend {
     func loadSchedule(for creatorID: UUID, from: Date, to: Date) async throws -> CreatorSchedule
 
     // Bookings
-    /// Creates a confirmed booking, or throws `slotTaken` / `slotUnavailable`. The backend
-    /// re-checks availability and recomputes the price itself; it trusts nothing in `request` but ids and time.
-    func createBooking(_ request: BookingRequest, clientID: UUID, clientName: String) async throws -> Booking
+    /// Books and signs in one step: re-checks availability, re-renders the contract itself, checks it matches
+    /// what the client signed (`contractChanged` if not), and applies the creator's signature on file.
+    /// Throws `slotTaken` / `slotUnavailable`. Trusts nothing in `request` but ids and time.
+    func createBooking(_ request: BookingRequest, clientID: UUID, clientName: String, signature: SignatureInput) async throws -> SignedBooking
     func loadBookings(for userID: UUID) async throws -> [Booking]
     func cancelBooking(_ id: UUID, by userID: UUID) async throws -> Booking
+
+    // Contracts
+    func loadContractTemplates(for creatorID: UUID) async throws -> [ContractTemplate]
+    func saveContractTemplate(_ template: ContractTemplate) async throws -> [ContractTemplate]
+    func deleteContractTemplate(_ id: UUID, for creatorID: UUID) async throws -> [ContractTemplate]
+    func loadCreatorSignature(for creatorID: UUID) async throws -> CreatorSignature?
+    func saveCreatorSignature(_ signature: CreatorSignature, for creatorID: UUID) async throws
+    /// The contract exactly as it will be signed: filled in by the backend, never by the client.
+    func previewContract(_ request: BookingRequest, clientName: String) async throws -> ContractPreview
+    func loadContract(bookingID: UUID, for userID: UUID) async throws -> Contract?
+    func loadContractPDF(contractID: UUID) async throws -> Data?
+    /// Stores the signed PDF for both parties. The first PDF stored wins; later ones are ignored.
+    func attachContractPDF(_ data: Data, contractID: UUID) async throws
 
     /// Whether a creator may book their own packages. True on-device so the flow can be tested alone.
     var allowsSelfBooking: Bool { get }

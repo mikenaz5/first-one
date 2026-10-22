@@ -65,7 +65,7 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         }
     }
 
-    private struct IDRow: Decodable {
+    struct IDRow: Decodable {
         var id: String
     }
 

@@ -87,6 +87,10 @@ struct ServicePackage: Identifiable, Codable, Equatable, Hashable {
     var position: Int
     var createdAt: Date
     var updatedAt: Date
+    /// The contract a client signs when they book. A package can't be published without one.
+    var contractTemplateID: UUID? = nil
+    var cancellationPolicy: CancellationPolicy = .moderate
+    var usageRights: UsageRights = .personal
 
     var balanceCents: Int { max(0, priceCents - depositCents) }
 
@@ -117,6 +121,33 @@ struct ServicePackage: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
+extension ServicePackage {
+    /// Packages saved before contracts existed have no contract fields; give them sensible defaults
+    /// instead of failing to load (which would make a creator's packages disappear).
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        creatorID = try container.decode(UUID.self, forKey: .creatorID)
+        name = try container.decode(String.self, forKey: .name)
+        summary = try container.decode(String.self, forKey: .summary)
+        category = try container.decodeIfPresent(Specialty.self, forKey: .category)
+        priceCents = try container.decode(Int.self, forKey: .priceCents)
+        currencyCode = try container.decode(String.self, forKey: .currencyCode)
+        durationMinutes = try container.decode(Int.self, forKey: .durationMinutes)
+        deliverables = try container.decode([String].self, forKey: .deliverables)
+        turnaroundDays = try container.decode(Int.self, forKey: .turnaroundDays)
+        depositCents = try container.decode(Int.self, forKey: .depositCents)
+        addOns = try container.decode([AddOn].self, forKey: .addOns)
+        isPublished = try container.decode(Bool.self, forKey: .isPublished)
+        position = try container.decode(Int.self, forKey: .position)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        contractTemplateID = try container.decodeIfPresent(UUID.self, forKey: .contractTemplateID)
+        cancellationPolicy = try container.decodeIfPresent(CancellationPolicy.self, forKey: .cancellationPolicy) ?? .moderate
+        usageRights = try container.decodeIfPresent(UsageRights.self, forKey: .usageRights) ?? .personal
+    }
+}
+
 // MARK: - Rules
 
 enum PackageRules {
@@ -144,6 +175,7 @@ enum PackageRules {
         case addOnNameMissing
         case addOnPriceInvalid
         case addOnTimeInvalid
+        case contractMissing
 
         var message: String {
             switch self {
@@ -159,6 +191,7 @@ enum PackageRules {
             case .addOnNameMissing: "Give every add-on a name."
             case .addOnPriceInvalid: "Add-on prices can't be negative."
             case .addOnTimeInvalid: "Extra time must be between 0 and \(PackageRules.maxAddOnMinutes / 60) hours."
+            case .contractMissing: "Choose a contract so clients can sign when they book, or hide this package."
             }
         }
     }
@@ -177,6 +210,7 @@ enum PackageRules {
         if package.deliverables.count > deliverableLimit { found.append(.tooManyDeliverables) }
         if package.deliverables.contains(where: { $0.count > deliverableLength }) { found.append(.deliverableTooLong) }
         if package.addOns.count > addOnLimit { found.append(.tooManyAddOns) }
+        if package.isPublished && package.contractTemplateID == nil { found.append(.contractMissing) }
         for addOn in package.addOns {
             for problem in problems(in: addOn) where !found.contains(problem) { found.append(problem) }
         }

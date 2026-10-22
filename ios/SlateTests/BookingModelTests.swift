@@ -10,6 +10,7 @@ final class BookingModelTests: XCTestCase {
     private var model: AppModel!
     private var creator: CreatorProfile!
     private var package: ServicePackage!
+    private var template: ContractTemplate!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -30,7 +31,7 @@ final class BookingModelTests: XCTestCase {
             AppleCredential(userID: "creator-apple", identityToken: "t", rawNonce: "n", fullName: nil, email: nil)
         )
         creator = try await backend.saveProfile(CreatorProfile(
-            id: session.userID, handle: "maya-chen", displayName: "Maya Chen", bio: "", specialties: [.portraits],
+            id: session.userID, handle: "dana-lens", displayName: "Dana Lens", bio: "", specialties: [.portraits],
             location: nil, avatarURL: nil, createdAt: Date(), updatedAt: Date()
         ), avatarJPEG: nil)
         if withAvailability {
@@ -38,18 +39,20 @@ final class BookingModelTests: XCTestCase {
             settings.bufferMinutes = 30
             _ = try await backend.saveAvailability(settings, for: session.userID)
         }
+        template = try await ContractFixtures.equip(backend, creatorID: session.userID)
         let saved = try await backend.savePackage(ServicePackage(
             id: UUID(), creatorID: session.userID, name: "Half day", summary: "", category: nil,
             priceCents: 200_000, currencyCode: "USD", durationMinutes: 120, deliverables: [], turnaroundDays: 14,
             depositCents: 50_000,
             addOns: [AddOn(kind: .extraTime, name: "Extra hour", priceCents: 15_000, extraMinutes: 60)],
-            isPublished: true, position: 0, createdAt: Date(), updatedAt: Date()
+            isPublished: true, position: 0, createdAt: Date(), updatedAt: Date(),
+            contractTemplateID: template.id
         ))
         package = saved[0]
     }
 
     private func loaded() async -> BookingModel {
-        let booking = BookingModel(creator: creator, package: package)
+        let booking = BookingModel(creator: creator, package: package, signerName: "Sam Client")
         await booking.load(using: model)
         return booking
     }
@@ -121,6 +124,87 @@ final class BookingModelTests: XCTestCase {
         XCTAssertEqual(booking.confirmed?.startAt, chosen.start)
         XCTAssertEqual(booking.confirmed?.totalCents, 200_000)
         XCTAssertEqual(model.bookings.map(\.id), [booking.confirmed!.id])
+
+        let contract = booking.signedContract
+        XCTAssertEqual(contract?.status, .executed)
+        XCTAssertEqual(contract?.bookingID, booking.confirmed?.id)
+        XCTAssertEqual(contract?.signature(for: .client)?.signedName, "Sam Client")
+        XCTAssertEqual(contract?.signature(for: .creator)?.method, .onFile)
+        XCTAssertEqual(contract?.documentHash, booking.contractPreview?.documentHash, "They signed what they were shown")
+    }
+
+    func testTheContractIsFilledInForTheChosenTimeAndAddOns() async {
+        let booking = await loaded()
+        booking.toggle(package.addOns[0])
+        XCTAssertNil(booking.contractPreview, "Changing a choice clears the contract that was shown")
+        await booking.loadContract(using: model)
+
+        let text = booking.contractPreview?.contract.text ?? ""
+        XCTAssertEqual(booking.contractPhase, .ready)
+        XCTAssertNotEqual(model.clientDisplayName, "Client", "The demo person has a name")
+        XCTAssertTrue(text.contains(model.clientDisplayName), "The client, from their account")
+        XCTAssertTrue(text.contains("Dana Lens"), "The creator")
+        XCTAssertTrue(text.contains("Half day"))
+        XCTAssertTrue(text.contains("$2,150"), "Package plus the extra hour")
+        XCTAssertTrue(text.contains("Extra hour"))
+        XCTAssertFalse(text.contains("{{"), "Every placeholder was filled in")
+    }
+
+    func testChangingAChoiceAfterReadingMeansReadingAgain() async {
+        let booking = await loaded()
+        await booking.loadContract(using: model)
+        let first = booking.contractPreview?.documentHash
+        XCTAssertNotNil(first)
+
+        booking.select(booking.days[1].slots.first!)
+        XCTAssertNil(booking.contractPreview)
+        XCTAssertEqual(booking.contractPhase, .idle)
+        XCTAssertNotNil(booking.signBlocker)
+
+        await booking.loadContract(using: model)
+        XCTAssertNotEqual(booking.contractPreview?.documentHash, first, "A different day is a different contract")
+        XCTAssertNil(booking.signBlocker)
+    }
+
+    func testSigningNeedsANameAndInkIfDrawing() async {
+        let booking = await loaded()
+        await booking.loadContract(using: model)
+        XCTAssertNil(booking.signBlocker)
+
+        booking.capture.fullName = "S"
+        XCTAssertEqual(booking.signBlocker, "Add your full name to sign.")
+        let refused = await booking.submit(using: model)
+        XCTAssertFalse(refused)
+        XCTAssertNil(booking.confirmed)
+
+        booking.capture.fullName = "Sam Client"
+        booking.capture.method = .drawn
+        XCTAssertEqual(booking.signBlocker, "Draw your signature to continue.")
+        booking.capture.method = .typed
+        XCTAssertNil(booking.signBlocker)
+    }
+
+    func testIfTheWordingChangesAfterReadingTheyAreShownTheNewVersionAndNothingIsBooked() async throws {
+        let booking = await loaded()
+        await booking.loadContract(using: model)
+        let shown = booking.contractPreview!.documentHash
+
+        // The creator edits the contract while the client is reading it.
+        var edited = template!
+        edited.clauses.append(ContractClause(title: "Parking", body: "The Client arranges parking. Cancellation: {{cancellation_policy}}"))
+        _ = try await backend.saveContractTemplate(edited)
+
+        let ok = await booking.submit(using: model)
+        XCTAssertFalse(ok)
+        XCTAssertNil(booking.confirmed)
+        XCTAssertEqual(booking.notice, SlateError.contractChanged.errorDescription)
+        XCTAssertNotEqual(booking.contractPreview?.documentHash, shown, "The new wording is on screen to read")
+        XCTAssertTrue(booking.contractPreview?.contract.text.contains("Parking") == true)
+        let stored = try await backend.loadBookings(for: creator.id)
+        XCTAssertTrue(stored.isEmpty)
+
+        let again = await booking.submit(using: model)
+        XCTAssertTrue(again, "Signing the version they were shown now works")
     }
 
     func testWhenSomeoneElseTakesTheTimeTheScreenRecovers() async throws {
@@ -128,9 +212,10 @@ final class BookingModelTests: XCTestCase {
         let contested = booking.selectedSlot!
 
         // Another client books the very slot this screen is showing.
-        _ = try await backend.createBooking(
+        _ = try await ContractFixtures.signedBooking(
+            backend,
             BookingRequest(creatorID: creator.id, packageID: package.id, addOnIDs: [], startAt: contested.start, notes: ""),
-            clientID: UUID(), clientName: "Someone else"
+            name: "Someone Else"
         )
 
         let ok = await booking.submit(using: model)

@@ -10,10 +10,10 @@ extension LocalBackend {
 
     // MARK: - Paths
 
-    private func packagesURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("packages.json") }
-    private func availabilityURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("availability.json") }
+    func packagesURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("packages.json") }
+    func availabilityURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("availability.json") }
     private func busyURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("busy.json") }
-    private var bookingsURL: URL { root.appendingPathComponent("bookings.json") }
+    var bookingsURL: URL { root.appendingPathComponent("bookings.json") }
 
     // MARK: - Packages
 
@@ -23,6 +23,11 @@ extension LocalBackend {
 
     func savePackage(_ package: ServicePackage) async throws -> [ServicePackage] {
         guard PackageRules.problems(in: package).isEmpty else { throw SlateError.invalidPackage }
+        // A package can only use one of its own creator's contracts.
+        if let templateID = package.contractTemplateID,
+           !readTemplates(package.creatorID).contains(where: { $0.id == templateID }) {
+            throw SlateError.invalidContract
+        }
 
         var list = readPackages(package.creatorID)
         var saved = package
@@ -51,7 +56,7 @@ extension LocalBackend {
         return readPackages(creatorID)
     }
 
-    private func readPackages(_ creatorID: UUID) -> [ServicePackage] {
+    func readPackages(_ creatorID: UUID) -> [ServicePackage] {
         (read([ServicePackage].self, from: packagesURL(creatorID)) ?? []).sorted { $0.position < $1.position }
     }
 
@@ -92,7 +97,7 @@ extension LocalBackend {
         makeSchedule(for: creatorID, from: from, to: to)
     }
 
-    private func makeSchedule(for creatorID: UUID, from: Date, to: Date) -> CreatorSchedule {
+    func makeSchedule(for creatorID: UUID, from: Date, to: Date) -> CreatorSchedule {
         // A creator who hasn't set hours yet is closed, not "open by default".
         let settings = read(AvailabilitySettings.self, from: availabilityURL(creatorID))
             ?? AvailabilitySettings.closed()
@@ -108,7 +113,18 @@ extension LocalBackend {
 
     // MARK: - Bookings
 
-    func createBooking(_ request: BookingRequest, clientID: UUID, clientName: String) async throws -> Booking {
+    /// Everything needed to price, schedule and write a booking, resolved from stored data (never from the client).
+    struct ResolvedBooking {
+        var package: ServicePackage
+        var addOns: [AddOn]
+        var settings: AvailabilitySettings
+        var creatorName: String
+        var contract: RenderedContract
+        var creatorSignature: CreatorSignature
+        var durationMinutes: Int
+    }
+
+    func resolveBooking(_ request: BookingRequest, clientName: String) async throws -> ResolvedBooking {
         guard let package = readPackages(request.creatorID).first(where: { $0.id == request.packageID && $0.isPublished }) else {
             throw SlateError.packageUnavailable
         }
@@ -116,12 +132,48 @@ extension LocalBackend {
         let chosen = package.addOns(withIDs: requested)
         guard chosen.count == requested.count else { throw SlateError.packageUnavailable }
 
-        let now = Date()
-        let duration = package.durationMinutes(with: chosen)
+        guard let templateID = package.contractTemplateID,
+              let template = readTemplates(request.creatorID).first(where: { $0.id == templateID })
+        else { throw SlateError.contractMissing }
+        // Nobody can sign until the creator has a signature on file to countersign with.
+        guard let creatorSignature = read(CreatorSignature.self, from: signatureURL(request.creatorID)),
+              SignatureRules.isValid(creatorSignature)
+        else { throw SlateError.creatorNotReady }
+
+        let settings = read(AvailabilitySettings.self, from: availabilityURL(request.creatorID)) ?? AvailabilitySettings.closed()
+        let creatorName = try await loadProfile(for: request.creatorID)?.displayName ?? "Creator"
+        let values = ContractContextBuilder.make(
+            package: package, addOns: chosen, start: request.startAt, timeZone: settings.timeZone,
+            clientName: clientName, creatorName: creatorName, notes: request.notes
+        )
+        return ResolvedBooking(
+            package: package,
+            addOns: chosen,
+            settings: settings,
+            creatorName: creatorName,
+            contract: ContractRenderer.render(template: template, values: values),
+            creatorSignature: creatorSignature,
+            durationMinutes: package.durationMinutes(with: chosen)
+        )
+    }
+
+    func previewContract(_ request: BookingRequest, clientName: String) async throws -> ContractPreview {
+        ContractPreview(contract: try await resolveBooking(request, clientName: clientName).contract)
+    }
+
+    func createBooking(
+        _ request: BookingRequest, clientID: UUID, clientName: String, signature: SignatureInput
+    ) async throws -> SignedBooking {
+        let resolved = try await resolveBooking(request, clientName: clientName)
+        let package = resolved.package
+        // Stored dates are whole seconds, so use whole seconds here: what this returns then equals what is read back later.
+        let now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
+        let duration = resolved.durationMinutes
+
+        // Availability first, so someone who picked a taken time hears about that before anything else.
         let dayBefore = request.startAt.addingTimeInterval(-86_400)
         let dayAfter = request.startAt.addingTimeInterval(Double(duration) * 60 + 86_400)
         let schedule = makeSchedule(for: request.creatorID, from: dayBefore, to: dayAfter)
-
         guard AvailabilityEngine.isAvailable(start: request.startAt, durationMinutes: duration, schedule: schedule, now: now) else {
             // If the time would be fine with no other bookings, then someone else has it.
             let withoutBookings = CreatorSchedule(settings: schedule.settings, bookedRanges: [], externalBusy: schedule.externalBusy)
@@ -131,19 +183,24 @@ extension LocalBackend {
             throw onlyBookingsBlock ? SlateError.slotTaken : SlateError.slotUnavailable
         }
 
-        let summary = PriceSummary.make(package: package, addOns: chosen)
+        guard SignatureRules.isValid(signature) else { throw SlateError.invalidSignature }
+        let creatorSignature = resolved.creatorSignature
+        // The client signed a hash of what they were shown. If the wording has changed since, they must read it again.
+        guard signature.documentHash == resolved.contract.documentHash else { throw SlateError.contractChanged }
+
+        let summary = PriceSummary.make(package: package, addOns: resolved.addOns)
         let end = request.startAt.addingTimeInterval(Double(duration) * 60)
-        let creatorName = try await loadProfile(for: request.creatorID)?.displayName ?? "Creator"
+        let bookingID = UUID()
 
         let booking = Booking(
-            id: UUID(),
+            id: bookingID,
             creatorID: request.creatorID,
             clientID: clientID,
-            creatorName: creatorName,
+            creatorName: resolved.creatorName,
             clientName: clientName,
             packageID: package.id,
             packageName: package.name,
-            addOns: chosen.map { BookedAddOn(id: $0.id, name: $0.name, priceCents: $0.priceCents, extraMinutes: $0.extraMinutes) },
+            addOns: resolved.addOns.map { BookedAddOn(id: $0.id, name: $0.name, priceCents: $0.priceCents, extraMinutes: $0.extraMinutes) },
             startAt: request.startAt,
             endAt: end,
             blockedUntil: end.addingTimeInterval(Double(schedule.settings.bufferMinutes) * 60),
@@ -156,10 +213,44 @@ extension LocalBackend {
             createdAt: now
         )
 
-        var all = readBookings()
-        all.append(booking)
-        try write(all, to: bookingsURL)
-        return booking
+        let contract = Contract(
+            id: UUID(),
+            bookingID: bookingID,
+            creatorID: request.creatorID,
+            clientID: clientID,
+            templateID: resolved.contract.templateID,
+            templateVersion: resolved.contract.templateVersion,
+            title: resolved.contract.title,
+            sections: resolved.contract.sections,
+            documentHash: resolved.contract.documentHash,
+            status: .executed,
+            signatures: [
+                ContractSignature(
+                    id: UUID(), role: .client, userID: clientID,
+                    signedName: signature.signedName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    method: signature.method, imagePNG: signature.method == .drawn ? signature.imagePNG : nil,
+                    signedAt: now, consentVersion: signature.consentVersion, device: signature.device
+                ),
+                ContractSignature(
+                    id: UUID(), role: .creator, userID: request.creatorID,
+                    signedName: creatorSignature.signedName, method: .onFile, imagePNG: creatorSignature.method == .drawn ? creatorSignature.imagePNG : nil,
+                    signedAt: now, consentVersion: SigningConsent.version, device: "Signature on file, applied at booking"
+                ),
+            ],
+            createdAt: now,
+            executedAt: now
+        )
+
+        // Both are written or neither is.
+        let previousContracts = readContracts()
+        try write(previousContracts + [contract], to: contractsURL)
+        do {
+            try write(readBookings() + [booking], to: bookingsURL)
+        } catch {
+            try? write(previousContracts, to: contractsURL)
+            throw error
+        }
+        return SignedBooking(booking: booking, contract: contract)
     }
 
     func loadBookings(for userID: UUID) async throws -> [Booking] {
@@ -180,7 +271,7 @@ extension LocalBackend {
         return all[index]
     }
 
-    private func readBookings() -> [Booking] {
+    func readBookings() -> [Booking] {
         read([Booking].self, from: bookingsURL) ?? []
     }
 }

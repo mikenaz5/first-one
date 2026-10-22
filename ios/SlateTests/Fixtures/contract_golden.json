@@ -1,0 +1,183 @@
+{
+  "template": {
+    "title": "Agreement for {{package_name}}",
+    "clauses": [
+      {
+        "title": "Parties",
+        "body": "Between {{creator_name}} (Creator) and {{client_name}} (Client) for {{package_name}}."
+      },
+      {
+        "title": "When",
+        "body": "{{booking_date}}, {{booking_time}} ({{time_zone}}). Length: {{duration}}."
+      },
+      {
+        "title": "What you get",
+        "body": "Deliverables:\n{{deliverables}}\n\nAdd-ons:\n{{add_ons}}\n\nDelivered in {{turnaround}}, by {{delivery_date}}."
+      },
+      {
+        "title": "Money",
+        "body": "Total {{price}}. Deposit {{deposit}}. Balance {{balance}}."
+      },
+      {
+        "title": "Cancellation",
+        "body": "{{cancellation_policy}}"
+      },
+      {
+        "title": "Rights",
+        "body": "{{usage_rights}}"
+      },
+      {
+        "title": "Notes",
+        "body": "Notes: {{client_notes}}"
+      },
+      {
+        "title": "Odd bits",
+        "body": "Unknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "full",
+      "package": {
+        "name": "Wedding day coverage",
+        "price_cents": 240000,
+        "currency_code": "USD",
+        "duration_minutes": 480,
+        "deliverables": [
+          "500 edited photos",
+          "Online gallery",
+          "Print release"
+        ],
+        "turnaround_days": 14,
+        "deposit_cents": 60000,
+        "cancellation_policy": "moderate",
+        "usage_rights": "personal"
+      },
+      "chosen_add_ons": [
+        {
+          "name": "Extra hour",
+          "priceCents": 30000,
+          "extraMinutes": 60,
+          "turnaroundDeltaDays": 0
+        },
+        {
+          "name": "Rush delivery",
+          "priceCents": 15000,
+          "extraMinutes": 0,
+          "turnaroundDeltaDays": -7
+        }
+      ],
+      "start_utc": "2027-06-12T15:00:00Z",
+      "time_zone": "America/Chicago",
+      "client_name": "Alex Rivera",
+      "creator_name": "Maya Chen Photography",
+      "notes": "Ceremony at the lake house.\nParking is limited.",
+      "expected_text": "Agreement for Wedding day coverage\n\n1. Parties\nBetween Maya Chen Photography (Creator) and Alex Rivera (Client) for Wedding day coverage.\n\n2. When\nSaturday, June 12, 2027, 10:00 AM – 7:00 PM (America/Chicago). Length: 9 hours.\n\n3. What you get\nDeliverables:\n• 500 edited photos\n• Online gallery\n• Print release\n\nAdd-ons:\n• Extra hour (+$300)\n• Rush delivery (+$150)\n\nDelivered in 7 days, by Saturday, June 19, 2027.\n\n4. Money\nTotal $2,850. Deposit $600. Balance $2,250.\n\n5. Cancellation\nModerate. If the Client cancels at least 7 days before the shoot, the Client receives a full refund of the amounts paid. If the Client cancels at least 48 hours before the shoot, the Client receives a 50% refund. After that, no refund is due. If the Creator cancels, the Client receives a full refund.\n\n6. Rights\nPersonal use. The Client may use the deliverables for personal, non-commercial purposes, such as prints, albums and sharing with family and friends. The Creator keeps the copyright and may show the work in their portfolio and promotion.\n\n7. Notes\nNotes: Ceremony at the lake house.\nParking is limited.\n\n8. Odd bits\nUnknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+    },
+    {
+      "name": "minimal",
+      "package": {
+        "name": "Headshot",
+        "price_cents": 15050,
+        "currency_code": "EUR",
+        "duration_minutes": 90,
+        "deliverables": [],
+        "turnaround_days": 3,
+        "deposit_cents": 0,
+        "cancellation_policy": "flexible",
+        "usage_rights": "fullTransfer"
+      },
+      "chosen_add_ons": [],
+      "start_utc": "2027-03-14T08:30:00Z",
+      "time_zone": "America/New_York",
+      "client_name": "",
+      "creator_name": "Studio Nine",
+      "notes": "",
+      "expected_text": "Agreement for Headshot\n\n1. Parties\nBetween Studio Nine (Creator) and the Client (Client) for Headshot.\n\n2. When\nSunday, March 14, 2027, 4:30 AM – 6:00 AM (America/New_York). Length: 1 hour 30 minutes.\n\n3. What you get\nDeliverables:\nAs described in the package\n\nAdd-ons:\nNone\n\nDelivered in 3 days, by Wednesday, March 17, 2027.\n\n4. Money\nTotal EUR 150.50. Deposit EUR 0. Balance EUR 150.50.\n\n5. Cancellation\nFlexible. If the Client cancels at least 24 hours before the shoot, the Client receives a full refund of the amounts paid. If the Client cancels later, the Client receives a 50% refund. If the Creator cancels, the Client receives a full refund.\n\n6. Rights\nFull rights transfer. Copyright in the deliverables passes to the Client once the Client has paid in full. The Creator may still show the work in their portfolio and promotion unless the Client asks otherwise in writing.\n\n7. Notes\nNotes: None\n\n8. Odd bits\nUnknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+    },
+    {
+      "name": "hostile",
+      "package": {
+        "name": "Brand film {{price}}",
+        "price_cents": 500000,
+        "currency_code": "USD",
+        "duration_minutes": 120,
+        "deliverables": [
+          "Film {{deposit}}"
+        ],
+        "turnaround_days": 21,
+        "deposit_cents": 100000,
+        "cancellation_policy": "strict",
+        "usage_rights": "commercial"
+      },
+      "chosen_add_ons": [
+        {
+          "name": "Drone {{balance}}",
+          "priceCents": 25000,
+          "extraMinutes": 0,
+          "turnaroundDeltaDays": 0
+        }
+      ],
+      "start_utc": "2027-01-05T05:30:00Z",
+      "time_zone": "America/Chicago",
+      "client_name": "{{price}} Mallory\n\t Jones",
+      "creator_name": "Lee {{{client_name}}}",
+      "notes": "{{deposit}}\n{{client_name}}\r\n\r\nSee you at 11:30\rBye",
+      "expected_text": "Agreement for Brand film { {price} }\n\n1. Parties\nBetween Lee { { {client_name} } } (Creator) and { {price} } Mallory Jones (Client) for Brand film { {price} }.\n\n2. When\nMonday, January 4, 2027, 11:30 PM – 1:30 AM (America/Chicago). Length: 2 hours.\n\n3. What you get\nDeliverables:\n• Film { {deposit} }\n\nAdd-ons:\n• Drone { {balance} } (+$250)\n\nDelivered in 21 days, by Monday, January 25, 2027.\n\n4. Money\nTotal $5,250. Deposit $1,000. Balance $4,250.\n\n5. Cancellation\nStrict. If the Client cancels at least 14 days before the shoot, the Client receives a 50% refund of the amounts paid. After that, no refund is due. If the Creator cancels, the Client receives a full refund.\n\n6. Rights\nCommercial use. The Client may use the deliverables to promote the Client's own business, including on websites, social media and advertising. The Client may not resell the deliverables or license them to others. The Creator keeps the copyright and may show the work in their portfolio and promotion.\n\n7. Notes\nNotes: { {deposit} }\n{ {client_name} }\n\nSee you at 11:30\nBye\n\n8. Odd bits\nUnknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+    },
+    {
+      "name": "dst-spring",
+      "package": {
+        "name": "Night shoot",
+        "price_cents": 90000,
+        "currency_code": "USD",
+        "duration_minutes": 120,
+        "deliverables": [
+          "20 photos"
+        ],
+        "turnaround_days": 2,
+        "deposit_cents": 20000,
+        "cancellation_policy": "flexible",
+        "usage_rights": "personalSocial"
+      },
+      "chosen_add_ons": [],
+      "start_utc": "2027-03-14T07:00:00Z",
+      "time_zone": "America/Chicago",
+      "client_name": "Jo Park",
+      "creator_name": "Dana Lens",
+      "notes": "Meet at the pier.",
+      "expected_text": "Agreement for Night shoot\n\n1. Parties\nBetween Dana Lens (Creator) and Jo Park (Client) for Night shoot.\n\n2. When\nSunday, March 14, 2027, 1:00 AM – 4:00 AM (America/Chicago). Length: 2 hours.\n\n3. What you get\nDeliverables:\n• 20 photos\n\nAdd-ons:\nNone\n\nDelivered in 2 days, by Tuesday, March 16, 2027.\n\n4. Money\nTotal $900. Deposit $200. Balance $700.\n\n5. Cancellation\nFlexible. If the Client cancels at least 24 hours before the shoot, the Client receives a full refund of the amounts paid. If the Client cancels later, the Client receives a 50% refund. If the Creator cancels, the Client receives a full refund.\n\n6. Rights\nPersonal and social media use. The Client may use the deliverables for personal, non-commercial purposes and may post them on the Client's own social media accounts, crediting the Creator. The Creator keeps the copyright and may show the work in their portfolio and promotion.\n\n7. Notes\nNotes: Meet at the pier.\n\n8. Odd bits\nUnknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+    },
+    {
+      "name": "dst-fall",
+      "package": {
+        "name": "Night shoot",
+        "price_cents": 90000,
+        "currency_code": "USD",
+        "duration_minutes": 120,
+        "deliverables": [
+          "20 photos"
+        ],
+        "turnaround_days": 1,
+        "deposit_cents": 90000,
+        "cancellation_policy": "strict",
+        "usage_rights": "personal"
+      },
+      "chosen_add_ons": [
+        {
+          "name": "Print set",
+          "priceCents": 5,
+          "extraMinutes": 0,
+          "turnaroundDeltaDays": -5
+        }
+      ],
+      "start_utc": "2027-11-07T06:30:00Z",
+      "time_zone": "America/Chicago",
+      "client_name": "Jo Park",
+      "creator_name": "Dana Lens",
+      "notes": "   ",
+      "expected_text": "Agreement for Night shoot\n\n1. Parties\nBetween Dana Lens (Creator) and Jo Park (Client) for Night shoot.\n\n2. When\nSunday, November 7, 2027, 1:30 AM – 2:30 AM (America/Chicago). Length: 2 hours.\n\n3. What you get\nDeliverables:\n• 20 photos\n\nAdd-ons:\n• Print set (+$0.05)\n\nDelivered in 1 day, by Monday, November 8, 2027.\n\n4. Money\nTotal $900.05. Deposit $900. Balance $0.05.\n\n5. Cancellation\nStrict. If the Client cancels at least 14 days before the shoot, the Client receives a 50% refund of the amounts paid. After that, no refund is due. If the Creator cancels, the Client receives a full refund.\n\n6. Rights\nPersonal use. The Client may use the deliverables for personal, non-commercial purposes, such as prints, albums and sharing with family and friends. The Creator keeps the copyright and may show the work in their portfolio and promotion.\n\n7. Notes\nNotes: None\n\n8. Odd bits\nUnknown {{not_a_field}} stays; stray { and } and {{ unclosed stay too."
+    }
+  ]
+}

@@ -220,6 +220,12 @@ enum SlateError: LocalizedError, Equatable {
     case cannotBookYourself
     case notCancellable
     case calendarAccessDenied
+    case contractChanged
+    case contractMissing
+    case invalidContract
+    case invalidSignature
+    case creatorNotReady
+    case templateInUse
     case backend(String)
 
     var errorDescription: String? {
@@ -252,6 +258,18 @@ enum SlateError: LocalizedError, Equatable {
             "This booking can't be cancelled."
         case .calendarAccessDenied:
             "Calendar access is off. You can allow it in Settings."
+        case .contractChanged:
+            "The contract changed while you were reading it. Please read it again before signing."
+        case .contractMissing:
+            "This package doesn't have a contract yet, so it can't be booked."
+        case .invalidContract:
+            "This contract has a problem. Check the highlighted items and try again."
+        case .invalidSignature:
+            "Add your signature (your full name, typed or drawn) to continue."
+        case .creatorNotReady:
+            "This creator hasn't finished setting up their signature, so they can't take bookings yet."
+        case .templateInUse:
+            "A package still uses this contract. Switch those packages to another contract first."
         case .backend(let message):
             message
         }

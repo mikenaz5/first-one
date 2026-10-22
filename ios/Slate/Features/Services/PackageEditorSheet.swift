@@ -22,6 +22,7 @@ struct PackageEditorSheet: View {
                 timeSection
                 deliverablesSection
                 addOnsSection
+                contractSection
                 visibilitySection
                 problemsSection
 
@@ -218,6 +219,60 @@ struct PackageEditorSheet: View {
             Text("Optional add-ons")
         } footer: {
             Text("Clients can add these when they book. Extra time lengthens the booking.")
+        }
+    }
+
+    private var contractSection: some View {
+        Section {
+            Picker("Contract", selection: $draft.contractTemplateID) {
+                Text("None").tag(UUID?.none)
+                ForEach(model.contractTemplates) { template in
+                    Text(template.title).tag(UUID?.some(template.id))
+                }
+            }
+            .frame(minHeight: Metrics.minTapTarget)
+
+            Menu {
+                ForEach(StarterTemplates.kinds) { kind in
+                    Button(kind.title, systemImage: kind.symbol) { Task { await addStarter(kind) } }
+                }
+            } label: {
+                Label("Add a starter contract", systemImage: "doc.badge.plus")
+                    .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+            }
+
+            Picker("Cancellation policy", selection: $draft.cancellationPolicy) {
+                ForEach(CancellationPolicy.allCases) { policy in
+                    Text(policy.title).tag(policy)
+                }
+            }
+            .frame(minHeight: Metrics.minTapTarget)
+
+            Picker("Usage rights", selection: $draft.usageRights) {
+                ForEach(UsageRights.allCases) { rights in
+                    Text(rights.title).tag(rights)
+                }
+            }
+            .frame(minHeight: Metrics.minTapTarget)
+        } header: {
+            Text("Contract")
+        } footer: {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text("Clients sign this contract when they book. Cancellation: \(draft.cancellationPolicy.summary). Usage: \(draft.usageRights.summary).")
+                if !model.hasCreatorSignature {
+                    Text("Add your signature under Services > Contracts so clients can sign and book.")
+                        .foregroundStyle(Color.slateWarning)
+                }
+            }
+        }
+    }
+
+    private func addStarter(_ kind: ContractKind) async {
+        do {
+            let template = try await model.addStarterTemplate(kind)
+            draft.contractTemplateID = template.id
+        } catch {
+            model.show(error, title: "Couldn't add the contract")
         }
     }
 

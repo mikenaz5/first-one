@@ -89,6 +89,20 @@ If someone else takes the time first, the sheet says so, refreshes, and preselec
 
 **Trying the client side alone.** On-device mode lets you book your own packages (a server-backed account can't). Use *Profile → Preview as a client*, or *Home → Open as a client*, or open `slate://book/<your-handle>`. Bookings made this way are labelled "Test booking".
 
+## Contracts
+
+Every booking carries a contract that both people sign before the booking exists.
+
+- **Templates.** A creator keeps up to 20 contracts (`ContractTemplate`): a title and ordered sections written with `{{placeholders}}`. There are 17 fields (client and creator name, package, shoot date, time, time zone, duration, deliverables, add-ons, price, deposit, balance, turnaround, delivery date, cancellation policy, usage rights, client notes). The list is closed: the editor's Insert field menu, `ContractRules`, the SQL trigger and the renderer all use the same one, and a contract can't be saved with an unknown field or without the six essentials (who, what, when, how much, cancellation). Wording changes bump a version; signed contracts keep the version they were signed on.
+- **Starters.** Photography, videography and general freelance contracts (`StarterTemplates`), plus a blank one. They are plain-language starting points, not legal advice, and the app says so wherever they're offered.
+- **Each package picks** a contract, a cancellation policy (flexible, moderate or strict) and usage rights. A package can't be shown to clients without a contract. The policy and rights texts are fixed wording that goes into `{{cancellation_policy}}` and `{{usage_rights}}`.
+- **Book and sign in one step.** The booking sheet ends in *Review & sign*: the contract as the **backend** filled it in (`preview_contract` in SQL, the same `ContractRenderer` on-device), a clean readable view, and a typed or drawn signature with a consent line. The client signs the SHA-256 of the exact text they were shown. `create_booking` re-renders the contract itself and refuses with `contract_changed` if the words moved in the meantime, in which case the sheet shows the new version and asks again. The booking and its contract are written in one database call, so there's never one without the other.
+- **The creator's signature** is saved once (typed or drawn) with a standing authorization, and applied to each contract automatically at booking. It is recorded as *on file*, not as if they had signed that moment. This is a deliberate choice: it keeps booking at a few taps and never leaves a client waiting. A creator who wants to approve each job by hand is not supported yet. Without a saved signature, clients can't book (`creator_not_ready`), and the Services tab tells the creator why.
+- **Filling in is safe.** Client names and notes are cleaned so they can't contain a placeholder (`{{` becomes `{ {`), placeholders are replaced in a single pass, and values come from the creator's package, never from the request.
+- **Same words everywhere.** Money, dates and times are formatted without the device's locale, so a contract reads the same on every phone and on the server. `SlateTests/Fixtures/contract_golden.json` holds contracts rendered from the same inputs; the Postgres tests and the Swift tests both check they produce exactly those words (including a night shoot across a daylight-saving change and hostile names). To add a case, run the Postgres tests with `PRINT_GOLDEN=1`, read the output carefully, and paste it in as `expected_text`.
+- **Signed PDF.** Real text across as many pages as needed, then a page with both signatures and a certificate (who, how, when in UTC, document IDs, and the hash). It is stored once at `contracts/<contract id>.pdf` in a private bucket that only the two people on the contract can read, and the first PDF stored wins, so both see the identical file. Either person's app creates it if it isn't there yet. *The PDF is made on the phone, so treat the stored contract text and its hash as the record and the PDF as a convenient copy of it.* Producing it on the server is the stronger design and a good next step.
+- **What e-signatures are worth** depends on where you work. The app records name, method, time, consent wording version, device and a best-effort IP address, but have a lawyer confirm this suits your jurisdiction before relying on it.
+
 ## Layout
 
 ```
@@ -98,11 +112,12 @@ ios/
   Slate/
     App/                      Entry point, root state (AppModel), tabs
     Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
-    Services/                 EventKit (CalendarService)
+    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts
     Resources/                Asset catalog (accent color, app icon)
-  SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow)
+  SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF)
+    Fixtures/contract_golden.json   Contract text both SQL and Swift must reproduce exactly
   supabase/                   SQL migrations, Postgres rule tests, delete-account Edge Function
 ```
 
@@ -112,13 +127,16 @@ The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, co
 
 Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth.
 
-The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, and 30 clients racing for one slot). The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
+The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, contract rendering and placeholder injection, signature rules, signed-PDF storage access, and 30 clients racing for one slot). The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
 
-**Never exercised** (needs a device, an Apple ID or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking functions, the Edge Function, EventKit permission prompts and event writing, and the photo and video picking flows. The Swift side of the Supabase calls compiles but has not talked to a database.
+**Never exercised** (needs a device, an Apple ID or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking and contract functions (including uploading and downloading the signed PDF), the Edge Function, EventKit permission prompts and event writing, the photo and video picking flows, and finger-drawing a signature on a real screen. The Swift side of the Supabase calls compiles but has not talked to a database.
 
 ## Known gaps
 
-- **A booking doesn't collect a deposit or a signed contract yet.** The sheet says so. Cancelling doesn't refund anything.
+- **A booking doesn't collect a deposit yet.** The contract states the deposit and balance, but nothing is charged. Cancelling doesn't refund anything, even though the contract states the refund rules.
+- **The creator can't approve bookings one by one**; their saved signature is applied automatically.
+- **Signed PDFs are produced by the app, not the server** (see above).
+- **Contracts can't be amended after signing**, and cancelling a booking doesn't mark its contract void.
 - **No holds.** The spec's 10-minute slot hold isn't needed until payment exists; bookings are confirmed immediately.
 - **Calendar busy time is device-synced**, so it can be stale, and events written with write-only access can't be removed again on cancel.
 - **No push notifications or reminders** beyond the calendar alarms.
