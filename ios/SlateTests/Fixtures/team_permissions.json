@@ -1,0 +1,988 @@
+{
+ "_comment": "SPEC.md 4.3. permissions maps a permission key to the roles holding it. assign and manage are exhaustive.",
+ "roles": [
+  "owner",
+  "admin",
+  "manager",
+  "creator",
+  "viewer"
+ ],
+ "permissions": {
+  "company.delete": [
+   "owner"
+  ],
+  "billing.manage": [
+   "owner"
+  ],
+  "payments.connect": [
+   "owner"
+  ],
+  "payouts.split": [
+   "owner"
+  ],
+  "company.edit": [
+   "owner",
+   "admin"
+  ],
+  "team.invite": [
+   "owner",
+   "admin"
+  ],
+  "team.manage": [
+   "owner",
+   "admin"
+  ],
+  "services.manage": [
+   "owner",
+   "admin"
+  ],
+  "templates.manage": [
+   "owner",
+   "admin"
+  ],
+  "signer.designate": [
+   "owner",
+   "admin"
+  ],
+  "activity.view": [
+   "owner",
+   "admin"
+  ],
+  "bookings.assign": [
+   "owner",
+   "admin",
+   "manager"
+  ],
+  "bookings.manage": [
+   "owner",
+   "admin",
+   "manager"
+  ],
+  "bookings.view_all": [
+   "owner",
+   "admin",
+   "manager",
+   "viewer"
+  ],
+  "reports.view": [
+   "owner",
+   "admin",
+   "manager",
+   "viewer"
+  ],
+  "bookings.manage_assigned": [
+   "owner",
+   "admin",
+   "manager",
+   "creator"
+  ],
+  "calendar.manage_own": [
+   "owner",
+   "admin",
+   "manager",
+   "creator"
+  ],
+  "calendar.view_team": [
+   "owner",
+   "admin",
+   "manager",
+   "creator",
+   "viewer"
+  ],
+  "team.view": [
+   "owner",
+   "admin",
+   "manager",
+   "creator",
+   "viewer"
+  ]
+ },
+ "assign": [
+  {
+   "actor": "owner",
+   "current": "owner",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "owner",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "owner",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "owner",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "owner",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "admin",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "admin",
+   "new": "admin",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "admin",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "admin",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "admin",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "manager",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "manager",
+   "new": "admin",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "manager",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "manager",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "manager",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "creator",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "creator",
+   "new": "admin",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "creator",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "creator",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "creator",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "viewer",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "current": "viewer",
+   "new": "admin",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "viewer",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "viewer",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "current": "viewer",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "owner",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "owner",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "owner",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "owner",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "owner",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "admin",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "admin",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "admin",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "admin",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "admin",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "manager",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "manager",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "manager",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "manager",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "manager",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "creator",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "creator",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "creator",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "creator",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "creator",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "viewer",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "viewer",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "current": "viewer",
+   "new": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "viewer",
+   "new": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "current": "viewer",
+   "new": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "manager",
+   "current": "owner",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "owner",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "owner",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "owner",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "owner",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "admin",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "admin",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "admin",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "admin",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "admin",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "manager",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "manager",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "manager",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "manager",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "manager",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "creator",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "creator",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "creator",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "creator",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "creator",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "viewer",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "viewer",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "viewer",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "viewer",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "current": "viewer",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "owner",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "owner",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "owner",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "owner",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "owner",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "admin",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "admin",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "admin",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "admin",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "admin",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "manager",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "manager",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "manager",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "manager",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "manager",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "creator",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "creator",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "creator",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "creator",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "creator",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "viewer",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "viewer",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "viewer",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "viewer",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "current": "viewer",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "owner",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "owner",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "owner",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "owner",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "owner",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "admin",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "admin",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "admin",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "admin",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "admin",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "manager",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "manager",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "manager",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "manager",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "manager",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "creator",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "creator",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "creator",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "creator",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "creator",
+   "new": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "viewer",
+   "new": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "viewer",
+   "new": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "viewer",
+   "new": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "viewer",
+   "new": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "current": "viewer",
+   "new": "viewer",
+   "allowed": false
+  }
+ ],
+ "manage": [
+  {
+   "actor": "owner",
+   "target": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "owner",
+   "target": "admin",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "target": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "target": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "owner",
+   "target": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "target": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "target": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "admin",
+   "target": "manager",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "target": "creator",
+   "allowed": true
+  },
+  {
+   "actor": "admin",
+   "target": "viewer",
+   "allowed": true
+  },
+  {
+   "actor": "manager",
+   "target": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "target": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "target": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "target": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "manager",
+   "target": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "target": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "target": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "target": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "target": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "creator",
+   "target": "viewer",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "target": "owner",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "target": "admin",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "target": "manager",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "target": "creator",
+   "allowed": false
+  },
+  {
+   "actor": "viewer",
+   "target": "viewer",
+   "allowed": false
+  }
+ ],
+ "readOnlyWhenLapsed": [
+  "bookings.view_all",
+  "reports.view",
+  "calendar.view_team",
+  "team.view",
+  "activity.view",
+  "billing.manage",
+  "company.delete"
+ ]
+}
