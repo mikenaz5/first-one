@@ -30,10 +30,9 @@ extension AppModel {
     func enableNotifications() async {
         let granted = await notifications.requestAuthorization()
         await refreshNotificationStatus()
-        if granted {
-            if backend.sendsPushFromServer { notifications.registerForRemoteNotifications() }
-            await syncReminders()
-        }
+        if granted, backend.sendsPushFromServer { notifications.registerForRemoteNotifications() }
+        // Either way: with permission the reminders stay, without it any waiting ones are cleared.
+        await syncReminders()
     }
 
     func dismissNotificationPrompt() {
