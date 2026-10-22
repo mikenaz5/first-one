@@ -124,14 +124,14 @@ struct NotificationsPromptCard: View {
                 Button {
                     Task { await model.enableNotifications() }
                 } label: {
-                    Text("Turn On").frame(minHeight: Metrics.minTapTarget - Space.m)
+                    Text("Turn On").frame(minHeight: Metrics.buttonLabelHeight)
                 }
                 .buttonStyle(.borderedProminent)
 
                 Button {
                     withAnimation(.slateSmooth) { model.dismissNotificationPrompt() }
                 } label: {
-                    Text("Not Now").frame(minHeight: Metrics.minTapTarget - Space.m)
+                    Text("Not Now").frame(minHeight: Metrics.buttonLabelHeight)
                 }
                 .buttonStyle(.bordered)
             }

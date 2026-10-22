@@ -76,6 +76,7 @@ struct MessagesView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .motionSafe(.slateSmooth, value: model.conversations.map(\.bookingID))
     }
 }
 
@@ -99,7 +100,7 @@ struct ConversationRow: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Space.xxs) {
-                HStack(alignment: .firstTextBaseline) {
+                AdaptiveStack(spacing: Space.s) {
                     Text(name)
                         .font(.headline)
                         .lineLimit(1)
@@ -125,7 +126,8 @@ struct ConversationRow: View {
                 Text("\(summary.unreadCount)")
                     .font(.caption.weight(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+                    .foregroundStyle(Color.slateOnAccent)
                     .padding(.horizontal, Space.s)
                     .padding(.vertical, Space.xxs)
                     .background(Color.accentColor, in: Capsule())
@@ -133,6 +135,7 @@ struct ConversationRow: View {
             }
         }
         .frame(minHeight: Metrics.minTapTarget)
+        .motionSafe(.slateSnappy, value: summary.unreadCount)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(name), \(booking?.packageName ?? ""). \(unread ? "\(summary.unreadCount) unread. " : "")\(preview)")
     }

@@ -13,6 +13,10 @@ DEVELOPMENT_TEAM =
 STRIPE_PUBLISHABLE_KEY =
 APPLE_PAY_MERCHANT_ID =
 
+// The App Group the app and its widget share. Register it in your Apple developer account (Identifiers → App Groups)
+// and give it to both the app and the widget. Change it here, in one place, if you use another bundle ID.
+APP_GROUP_ID = group.com.example.slate
+
 // Sign in with Apple only. Secrets.xcconfig switches this to Slate.ApplePay.entitlements when real payments are on,
 // because that entitlement needs a merchant ID registered in your Apple developer account.
 CODE_SIGN_ENTITLEMENTS = Config/Slate.entitlements

@@ -27,6 +27,8 @@ final class AppModel {
     let authorizer: any PaymentAuthorizer
     /// The system's notification center, or a stand-in for tests and previews.
     let notifications: any NotificationCenterClient
+    /// Tells the home screen widget what the next booking is.
+    let widget: any WidgetPublisher
 
     private(set) var phase: Phase = .launching
     private(set) var loadErrorMessage: String?
@@ -87,11 +89,13 @@ final class AppModel {
     init(
         backend: any SlateBackend,
         authorizer: (any PaymentAuthorizer)? = nil,
-        notifications: (any NotificationCenterClient)? = nil
+        notifications: (any NotificationCenterClient)? = nil,
+        widget: (any WidgetPublisher)? = nil
     ) {
         self.backend = backend
         self.authorizer = authorizer ?? PaymentAuthorizerFactory.make(for: backend)
         self.notifications = notifications ?? InertNotificationCenter()
+        self.widget = widget ?? InertWidgetPublisher()
         reminderSync = CoalescedWork { [weak self] in await self?.syncRemindersOnce() }
         conversationSync = CoalescedWork { [weak self] in await self?.refreshConversationsOnce() }
     }
@@ -191,6 +195,7 @@ final class AppModel {
         contractTemplates = []
         creatorSignature = nil
         contractsByBooking = [:]
+        widget.publish(.signedOut)
         reviewsByBooking = [:]
         reviewsByCreator = [:]
         reviewSummaryByCreator = [:]

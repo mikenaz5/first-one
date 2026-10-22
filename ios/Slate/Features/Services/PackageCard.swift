@@ -67,31 +67,46 @@ struct PackageCard: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    /// Name beside price; the price drops under the name when they don't fit side by side (long names, big text).
     private var header: some View {
-        HStack(alignment: .top, spacing: Space.m) {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                if let category = package.category {
-                    Text(category.title).eyebrow()
-                }
-                Text(package.name)
-                    .font(.title3.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                if style == .owner && !package.isPublished {
-                    Label("Hidden from clients", systemImage: "eye.slash")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.slateWarning)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: Space.m) {
+                titleBlock
+                Spacer(minLength: Space.m)
+                priceBlock(alignment: .trailing)
             }
-            Spacer(minLength: Space.m)
-            VStack(alignment: .trailing, spacing: Space.xxs) {
-                Text(Money.format(package.priceCents, code: package.currencyCode))
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
-                if package.depositCents > 0 {
-                    Text("\(Money.format(package.depositCents, code: package.currencyCode)) deposit")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading, spacing: Space.s) {
+                titleBlock
+                priceBlock(alignment: .leading)
+            }
+        }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            if let category = package.category {
+                Text(category.title).eyebrow()
+            }
+            Text(package.name)
+                .font(.title3.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            if style == .owner && !package.isPublished {
+                Label("Hidden from clients", systemImage: "eye.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.slateWarning)
+            }
+        }
+    }
+
+    private func priceBlock(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: Space.xxs) {
+            Text(Money.format(package.priceCents, code: package.currencyCode))
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+            if package.depositCents > 0 {
+                Text("\(Money.format(package.depositCents, code: package.currencyCode)) deposit")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

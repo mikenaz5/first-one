@@ -76,6 +76,7 @@ struct BookingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .motionSafe(.slateSmooth, value: visible.map(\.id))
             .slatePageBackground()
             .navigationTitle("Bookings")
             .navigationBarTitleDisplayMode(.large)
@@ -138,6 +139,8 @@ struct BookingsView: View {
 // MARK: - Row
 
 struct BookingRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     let booking: Booking
     let isMine: Bool
     var summary: PaymentSummary?
@@ -161,7 +164,7 @@ struct BookingRow: View {
                     .font(.title2.weight(.bold))
                     .monospacedDigit()
             }
-            .frame(width: 52, height: 56)
+            .frame(minWidth: Metrics.dateTileWidth, minHeight: Metrics.dateTileHeight)
             .background(Color.slateFill, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
             .accessibilityHidden(true)
 
@@ -171,20 +174,27 @@ struct BookingRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Text(otherParty).font(.footnote).foregroundStyle(.secondary)
+                // At accessibility sizes there is no room beside the text, so the status goes under it.
+                if typeSize.isAccessibilitySize { status }
             }
             Spacer(minLength: 0)
-            if let summary {
-                PaymentStatusChip(summary: summary)
-                    .multilineTextAlignment(.trailing)
-            } else if booking.status != .confirmed {
-                Text(booking.status.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(booking.status == .cancelled ? Color.slateDanger : Color.secondary)
-            }
+            if !typeSize.isAccessibilitySize { status }
         }
         .frame(minHeight: Metrics.minTapTarget)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(booking.accessibilitySummary). \(otherParty).\(summary.map { " \($0.headline)." } ?? "")")
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        if let summary {
+            PaymentStatusChip(summary: summary)
+                .multilineTextAlignment(.trailing)
+        } else if booking.status != .confirmed {
+            Text(booking.status.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(booking.status == .cancelled ? Color.slateDanger : Color.secondary)
+        }
     }
 }
 

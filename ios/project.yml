@@ -30,7 +30,9 @@ targets:
     platform: iOS
     sources:
       - path: Slate
+      - path: Shared
     dependencies:
+      - target: SlateWidgets
       - package: Supabase
       - package: Stripe
         product: StripeApplePay
@@ -64,12 +66,37 @@ targets:
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         StripePublishableKey: $(STRIPE_PUBLISHABLE_KEY)
         ApplePayMerchantID: $(APPLE_PAY_MERCHANT_ID)
+        SlateAppGroup: $(APP_GROUP_ID)
         NSCalendarsFullAccessUsageDescription: Slate reads your calendars so clients can't book times when you're busy. Only the start and end times of busy events are shared, never their titles or details.
         NSCalendarsWriteOnlyAccessUsageDescription: Slate adds your bookings to your calendar.
         CFBundleURLTypes:
           - CFBundleURLName: com.example.slate
             CFBundleURLSchemes:
               - slate
+
+  # The home screen and lock screen widget (the next booking). It reads a small file the app writes into the App Group.
+  SlateWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SlateWidgets
+      - path: Shared
+    configFiles:
+      Debug: Config/App.xcconfig
+      Release: Config/App.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.slate.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: Config/SlateWidgets.entitlements
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: Config/SlateWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: Slate
+        SlateAppGroup: $(APP_GROUP_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
   SlateTests:
     type: bundle.unit-test

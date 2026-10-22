@@ -10,6 +10,8 @@ struct BookingSheet: View {
 
     @State private var booking: BookingModel
     @State private var showReview = false
+    /// Grows with the text, so a time like "10:30 AM" never wraps in its button.
+    @ScaledMetric(relativeTo: .subheadline) private var slotMinWidth = Metrics.timeSlotMinWidth
 
     init(creator: CreatorProfile, package: ServicePackage) {
         _booking = State(initialValue: BookingModel(creator: creator, package: package))
@@ -100,7 +102,7 @@ struct BookingSheet: View {
             .padding(.horizontal, Space.page)
             .padding(.top, Space.s)
             .padding(.bottom, Space.xl)
-            .frame(maxWidth: 640)
+            .frame(maxWidth: Metrics.readableWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -136,7 +138,7 @@ struct BookingSheet: View {
 
     private var addOns: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            Text("Add to your booking").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            SectionHeader("Add to your booking")
             VStack(spacing: 0) {
                 ForEach(Array(booking.package.addOns.enumerated()), id: \.element.id) { index, addOn in
                     if index > 0 { Divider().padding(.leading, Space.l) }
@@ -159,7 +161,7 @@ struct BookingSheet: View {
     @ViewBuilder
     private var whenSection: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            Text("When").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            SectionHeader("When")
 
             switch booking.phase {
             case .loading:
@@ -167,7 +169,7 @@ struct BookingSheet: View {
                     ProgressView()
                     Text("Finding open times…").foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 120)
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
                 .accessibilityElement(children: .combine)
 
             case .failed(let message):
@@ -176,20 +178,21 @@ struct BookingSheet: View {
                     Button("Try Again") { Task { await booking.load(using: model) } }
                         .buttonStyle(.bordered)
                 }
-                .frame(maxWidth: .infinity, minHeight: 120)
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
 
             case .noAvailability:
                 VStack(spacing: Space.s) {
                     Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 30, weight: .light))
+                        .heroSymbol(30, weight: .light)
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text("No open times").font(.headline)
                     Text("\(booking.creator.displayName) has no openings for this package right now. Try without add-ons, or check back soon.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity, minHeight: 140)
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
                 .card(.outlined)
 
             case .ready:
@@ -219,7 +222,7 @@ struct BookingSheet: View {
                                 .font(.subheadline.weight(.medium))
                                 .padding(.horizontal, Space.l)
                                 .frame(minHeight: Metrics.minTapTarget)
-                                .foregroundStyle(selected ? Color.white : Color.primary)
+                                .foregroundStyle(selected ? Color.slateOnAccent : Color.primary)
                                 .background(selected ? Color.accentColor : Color.slateCard, in: Capsule())
                                 .contentShape(Capsule())
                         }
@@ -265,7 +268,7 @@ struct BookingSheet: View {
                     .accessibilityLabel("Times for \(booking.formatter.fullDay(date))")
                     .id(day)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: Space.s)], spacing: Space.s) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: slotMinWidth), spacing: Space.s)], spacing: Space.s) {
                 ForEach(booking.slotsForSelectedDay) { slot in
                     let selected = booking.selectedSlot?.start == slot.start
                     Button {
@@ -275,7 +278,7 @@ struct BookingSheet: View {
                             .font(.subheadline.weight(.medium))
                             .monospacedDigit()
                             .frame(maxWidth: .infinity, minHeight: Metrics.minTapTarget)
-                            .foregroundStyle(selected ? Color.white : Color.primary)
+                            .foregroundStyle(selected ? Color.slateOnAccent : Color.primary)
                             .background(selected ? Color.accentColor : Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
                             .contentShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
                     }
@@ -310,7 +313,7 @@ struct BookingSheet: View {
                 showReview = true
             } label: {
                 Text(buttonTitle)
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -361,8 +364,8 @@ private struct DayChip: View {
                     Text(formatter.monthDay(day).prefix(3)).font(.caption2)
                 }
             }
-            .frame(width: 56, height: 68)
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .frame(minWidth: Metrics.dayChipWidth, minHeight: Metrics.dayChipHeight)
+            .foregroundStyle(isSelected ? Color.slateOnAccent : Color.primary)
             .background(isSelected ? Color.accentColor : Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
         }
@@ -380,7 +383,7 @@ struct PriceSummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            Text("Price").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            SectionHeader("Price")
 
             VStack(alignment: .leading, spacing: Space.m) {
                 ForEach(summary.lines) { line in
@@ -459,7 +462,7 @@ struct BookingConfirmationView: View {
             VStack(spacing: Space.xl) {
                 VStack(spacing: Space.m) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 76))
+                        .heroSymbol(76, weight: .regular)
                         .foregroundStyle(Color.slateSuccess)
                         .symbolEffect(.bounce, value: appeared)
                         .accessibilityHidden(true)
@@ -491,7 +494,7 @@ struct BookingConfirmationView: View {
                                 Text("View it or share the signed PDF").font(.footnote).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
                         }
                         .foregroundStyle(.primary)
                         .frame(minHeight: Metrics.minTapTarget)
@@ -511,7 +514,7 @@ struct BookingConfirmationView: View {
                             case .added: Label("Added to Calendar", systemImage: "checkmark")
                             }
                         }
-                        .frame(maxWidth: .infinity, minHeight: 28)
+                        .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
@@ -521,15 +524,16 @@ struct BookingConfirmationView: View {
                         Text(message).font(.footnote).foregroundStyle(Color.slateWarning).multilineTextAlignment(.center)
                     }
 
-                    Button("Done", action: onDone)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .frame(maxWidth: .infinity)
+                    Button(action: onDone) {
+                        Text("Done").frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
             }
             .padding(.horizontal, Space.page)
             .padding(.bottom, Space.xl)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: Metrics.readableWidth)
             .frame(maxWidth: .infinity)
         }
         .slatePageBackground()
@@ -541,7 +545,7 @@ struct BookingConfirmationView: View {
         Label {
             Text(text)
         } icon: {
-            Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 24)
+            Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(minWidth: Metrics.iconColumn)
         }
         .accessibilityElement(children: .combine)
     }

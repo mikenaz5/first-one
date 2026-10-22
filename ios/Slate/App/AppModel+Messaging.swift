@@ -57,6 +57,12 @@ extension AppModel {
     func bookingsChanged() {
         reminderSync.request()
         conversationSync.request()
+        publishWidget()
+    }
+
+    /// Tells the home screen widget what is coming up (it redraws only if that changed).
+    func publishWidget() {
+        widget.publish(WidgetSnapshotBuilder.make(bookings: bookings, userID: session?.userID, now: clock()))
     }
 
     // MARK: - Opening screens

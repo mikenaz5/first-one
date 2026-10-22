@@ -65,7 +65,7 @@ struct ReviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            HStack(alignment: .firstTextBaseline) {
+            AdaptiveStack(spacing: Space.s) {
                 StarsView(rating: review.rating)
                 Spacer(minLength: Space.s)
                 Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
@@ -109,12 +109,13 @@ struct ReviewsSection: View {
                 VStack(alignment: .leading, spacing: Space.m) {
                     SectionHeader(title: "Reviews") {
                         if let average = summary.average {
-                            Label(average.formatted(.number.precision(.fractionLength(1))), systemImage: "star.fill")
-                                .font(.headline)
-                                .foregroundStyle(Color.slateStar)
-                                .labelStyle(.titleAndIcon)
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel(summary.accessibilityText)
+                            HStack(spacing: Space.xs) {
+                                Image(systemName: "star.fill").foregroundStyle(Color.slateStar)
+                                Text(average.formatted(.number.precision(.fractionLength(1)))).monospacedDigit()
+                            }
+                            .font(.headline)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(summary.accessibilityText)
                         }
                     }
                     ForEach(reviews) { review in

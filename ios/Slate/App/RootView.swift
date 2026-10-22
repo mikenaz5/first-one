@@ -82,7 +82,7 @@ private struct LaunchView: View {
         ZStack {
             Color.slateBackground.ignoresSafeArea()
             Image(systemName: "camera.aperture")
-                .font(.system(size: 56, weight: .light))
+                .heroSymbol(56, weight: .light)
                 .foregroundStyle(Color.accentColor)
                 .accessibilityLabel("Slate")
         }

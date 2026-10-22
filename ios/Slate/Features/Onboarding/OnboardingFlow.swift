@@ -117,12 +117,12 @@ struct OnboardingFlow: View {
             Button(action: primaryAction) {
                 Group {
                     if isSaving {
-                        ProgressView().tint(.white)
+                        ProgressView().tint(Color.slateOnAccent)
                     } else {
                         Text(step.isLast ? "Create my page" : "Continue")
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 28)
+                .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -233,7 +233,7 @@ private struct OnboardingPage: View {
             .padding(.horizontal, Space.page)
             .padding(.top, Space.l)
             .padding(.bottom, Space.xxl)
-            .frame(maxWidth: 560, alignment: .leading)
+            .frame(maxWidth: Metrics.readableWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -365,8 +365,9 @@ private struct AddWorkTile: View {
     var body: some View {
         VStack(spacing: Space.s) {
             Image(systemName: "photo.badge.plus")
-                .font(.system(size: 34, weight: .light))
+                .heroSymbol(34, weight: .light)
                 .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
             Text(isEmpty ? "Add photos and reels" : "Add more")
                 .font(.headline)
             if isEmpty {
@@ -405,6 +406,7 @@ private struct PendingTile: View {
                         .foregroundStyle(.white)
                         .padding(Space.xs)
                         .shadow(radius: 2)
+                        .accessibilityHidden(true)
                 }
             }
             .overlay(alignment: .topTrailing) {

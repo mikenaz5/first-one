@@ -103,7 +103,7 @@ private struct TemplateRow: View {
             Image(systemName: template.kind.symbol)
                 .font(.title3)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 32)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(template.title).font(.headline)
@@ -112,7 +112,7 @@ private struct TemplateRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
         }
         .frame(minHeight: Metrics.minTapTarget)
         .contentShape(Rectangle())
@@ -128,7 +128,7 @@ struct SignatureStatusRow: View {
             Image(systemName: model.hasCreatorSignature ? "signature" : "exclamationmark.triangle.fill")
                 .font(.title3)
                 .foregroundStyle(model.hasCreatorSignature ? Color.accentColor : Color.slateWarning)
-                .frame(width: 32)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text("Your signature").font(.headline)
@@ -143,7 +143,7 @@ struct SignatureStatusRow: View {
                 }
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
         }
         .frame(minHeight: Metrics.minTapTarget)
         .contentShape(Rectangle())
@@ -189,7 +189,7 @@ struct CreatorSignatureSheet: View {
                 .padding(.horizontal, Space.page)
                 .padding(.top, Space.s)
                 .padding(.bottom, Space.xl)
-                .frame(maxWidth: 640)
+                .frame(maxWidth: Metrics.readableWidth)
                 .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)

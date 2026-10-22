@@ -54,7 +54,7 @@ final class SignatureCapture {
         format.scale = 2
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
-        let ink = UIColor(red: 0.08, green: 0.12, blue: 0.35, alpha: 1)
+        let ink = UIColor(Color.slateInk)
         return renderer.pngData { _ in
             ink.setStroke()
             for stroke in strokes where stroke.count > 1 {
@@ -140,15 +140,15 @@ struct TypedSignaturePreview: View {
         ZStack(alignment: .bottomLeading) {
             Text(name.isEmpty ? "Your signature" : name)
                 .font(.custom("SnellRoundhand-Bold", size: 38, relativeTo: .largeTitle))
-                .foregroundStyle(name.isEmpty ? Color.secondary.opacity(0.5) : Color(red: 0.08, green: 0.12, blue: 0.35))
+                .foregroundStyle(name.isEmpty ? Color.slateInk.opacity(0.35) : Color.slateInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .padding(.horizontal, Space.l)
                 .padding(.bottom, Space.m)
-                .frame(maxWidth: .infinity, minHeight: 96, alignment: .bottomLeading)
-            Rectangle().fill(Color.slateHairline).frame(height: 1).padding(.horizontal, Space.l).padding(.bottom, Space.s)
+                .frame(maxWidth: .infinity, minHeight: Metrics.signaturePreviewMinHeight, alignment: .bottomLeading)
+            Rectangle().fill(Color.slateInk.opacity(0.25)).frame(height: 1).padding(.horizontal, Space.l).padding(.bottom, Space.s)
         }
-        .background(Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+        .background(Color.slatePaper, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name.isEmpty ? "Typed signature, empty" : "Typed signature: \(name)")
     }
@@ -172,7 +172,7 @@ struct SignaturePad: View {
                             path.addQuadCurve(to: mid, control: stroke[index - 1])
                         }
                         path.addLine(to: stroke[stroke.count - 1])
-                        context.stroke(path, with: .color(Color(red: 0.08, green: 0.12, blue: 0.35)), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        context.stroke(path, with: .color(Color.slateInk), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
                     }
                 }
                 .gesture(
@@ -184,14 +184,14 @@ struct SignaturePad: View {
                 if !capture.hasInk {
                     Text("Sign here with your finger")
                         .font(.subheadline)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.slateInk.opacity(0.35))
                         .padding(Space.l)
                         .allowsHitTesting(false)
                 }
-                Rectangle().fill(Color.slateHairline).frame(height: 1).padding(.horizontal, Space.l).padding(.bottom, Space.l).allowsHitTesting(false)
+                Rectangle().fill(Color.slateInk.opacity(0.25)).frame(height: 1).padding(.horizontal, Space.l).padding(.bottom, Space.l).allowsHitTesting(false)
             }
-            .frame(height: 150)
-            .background(Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+            .frame(height: Metrics.signaturePadHeight)
+            .background(Color.slatePaper, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
             .background {
                 GeometryReader { proxy in

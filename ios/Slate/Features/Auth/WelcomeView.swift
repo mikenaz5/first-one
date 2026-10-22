@@ -15,70 +15,13 @@ struct WelcomeView: View {
         ZStack {
             AmbientBackground()
 
-            VStack(alignment: .leading, spacing: Space.xl) {
-                Spacer(minLength: Space.xxl)
-
-                VStack(alignment: .leading, spacing: Space.m) {
-                    Image(systemName: "camera.aperture")
-                        .font(.system(size: 44, weight: .light))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-
-                    Text("Get booked.\nGet signed.\nGet paid.")
-                        .font(SlateFont.display)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-
-                    Text("The booking page for photographers, videographers and creators, with a contract in every booking.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .stagger(appeared, index: 0)
-
-                VStack(alignment: .leading, spacing: Space.l) {
-                    FeatureRow(symbol: "link", title: "One link to share", detail: "Clients pick a package and a time.")
-                    FeatureRow(symbol: "signature", title: "Contracts built in", detail: "Signed before the booking is confirmed.")
-                    FeatureRow(symbol: "creditcard.fill", title: "Deposits upfront", detail: "Paid with Apple Pay.")
-                }
-                .stagger(appeared, index: 1)
-
-                Spacer()
-
-                VStack(spacing: Space.m) {
-                    SignInWithAppleButton(.continue) { request in
-                        let nonce = Nonce.random()
-                        rawNonce = nonce
-                        request.requestedScopes = [.fullName, .email]
-                        request.nonce = Nonce.sha256(nonce)
-                    } onCompletion: { result in
-                        handle(result)
-                    }
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(height: 54)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
-                    .accessibilityHint("Creates your account or signs you in")
-
-                    #if DEBUG
-                    if model.isLocalBackend {
-                        Button("Continue with a demo account") {
-                            Task { await model.signInAsDemo() }
-                        }
-                        .font(.subheadline)
-                        .frame(minHeight: Metrics.minTapTarget)
-                    }
-                    #endif
-
-                    Text("By continuing you agree to the Terms and Privacy Policy.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .stagger(appeared, index: 2)
+            // The page as designed, if it fits; otherwise the same page in a scroll view, so that at the largest
+            // text sizes (or on a small phone in landscape) the Continue button can still be reached.
+            ViewThatFits(in: .vertical) {
+                content
+                ScrollView { content }
             }
-            .padding(.horizontal, Space.page)
-            .padding(.bottom, Space.l)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: Metrics.readableWidth)
         }
         .onAppear {
             if reduceMotion {
@@ -87,6 +30,72 @@ struct WelcomeView: View {
                 withAnimation(.slateSpring) { appeared = true }
             }
         }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            Spacer(minLength: Space.xxl)
+
+            VStack(alignment: .leading, spacing: Space.m) {
+                Image(systemName: "camera.aperture")
+                    .heroSymbol(44, weight: .light)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+
+                Text("Get booked.\nGet signed.\nGet paid.")
+                    .font(SlateFont.display)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+
+                Text("The booking page for photographers, videographers and creators, with a contract in every booking.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .stagger(appeared, index: 0)
+
+            VStack(alignment: .leading, spacing: Space.l) {
+                FeatureRow(symbol: "link", title: "One link to share", detail: "Clients pick a package and a time.")
+                FeatureRow(symbol: "signature", title: "Contracts built in", detail: "Signed before the booking is confirmed.")
+                FeatureRow(symbol: "creditcard.fill", title: "Deposits upfront", detail: "Paid with Apple Pay.")
+            }
+            .stagger(appeared, index: 1)
+
+            Spacer()
+
+            VStack(spacing: Space.m) {
+                SignInWithAppleButton(.continue) { request in
+                    let nonce = Nonce.random()
+                    rawNonce = nonce
+                    request.requestedScopes = [.fullName, .email]
+                    request.nonce = Nonce.sha256(nonce)
+                } onCompletion: { result in
+                    handle(result)
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 54)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+                .accessibilityHint("Creates your account or signs you in")
+
+                #if DEBUG
+                if model.isLocalBackend {
+                    Button("Continue with a demo account") {
+                        Task { await model.signInAsDemo() }
+                    }
+                    .font(.subheadline)
+                    .frame(minHeight: Metrics.minTapTarget)
+                }
+                #endif
+
+                Text("By continuing you agree to the Terms and Privacy Policy.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .stagger(appeared, index: 2)
+        }
+        .padding(.horizontal, Space.page)
+        .padding(.bottom, Space.l)
     }
 
     private func handle(_ result: Result<ASAuthorization, Error>) {

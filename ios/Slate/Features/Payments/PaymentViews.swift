@@ -26,7 +26,7 @@ struct PaymentStatusChip: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(summary.tone.color)
             .labelStyle(.titleAndIcon)
-            .lineLimit(1)
+            .lineLimit(2)
     }
 }
 
@@ -49,12 +49,12 @@ struct PayButton: View {
                 Button(action: action) {
                     Group {
                         if model.isPaying {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(Color.slateOnAccent)
                         } else {
                             Label("Pay \(Money.format(amountCents, code: currencyCode)) \(noun)", systemImage: "creditcard")
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -109,7 +109,7 @@ struct PaymentStatusCard: View {
                     }
                 }
             } icon: {
-                Image(systemName: summary.symbol).foregroundStyle(summary.tone.color).frame(width: 28)
+                Image(systemName: summary.symbol).foregroundStyle(summary.tone.color).frame(minWidth: Metrics.iconColumn)
             }
             .accessibilityElement(children: .combine)
 
@@ -126,6 +126,7 @@ struct PaymentStatusCard: View {
             }
         }
         .sensoryFeedback(.success, trigger: summary.phase == .paidInFull)
+        .sensoryFeedback(trigger: message) { _, new in new == nil ? nil : .warning }
     }
 
     private func pay(_ kind: PaymentKind) async {
@@ -150,7 +151,7 @@ struct PaymentHistorySection: View {
         if !history.isEmpty {
             Section {
                 ForEach(history) { payment in
-                    HStack(alignment: .firstTextBaseline) {
+                    AdaptiveStack(spacing: Space.s) {
                         VStack(alignment: .leading, spacing: Space.xxs) {
                             Text(payment.kind.title)
                             Text(subtitle(for: payment)).font(.footnote).foregroundStyle(.secondary)
@@ -261,7 +262,7 @@ struct HeldBookingView: View {
             VStack(spacing: Space.xl) {
                 VStack(spacing: Space.m) {
                     Image(systemName: remaining == nil ? "clock.badge.xmark" : "hourglass")
-                        .font(.system(size: 64, weight: .light))
+                        .heroSymbol(64, weight: .light)
                         .foregroundStyle(remaining == nil ? Color.secondary : Color.accentColor)
                         .accessibilityHidden(true)
                     Text(remaining == nil ? "The hold ran out" : "Your time is held")
@@ -318,7 +319,7 @@ struct HeldBookingView: View {
             }
             .padding(.horizontal, Space.page)
             .padding(.bottom, Space.xl)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: Metrics.readableWidth)
             .frame(maxWidth: .infinity)
         }
         .slatePageBackground()
@@ -337,7 +338,7 @@ struct PaymentsCard: View {
             Image(systemName: "creditcard")
                 .font(.title2)
                 .foregroundStyle(account.canAcceptPayments ? Color.accentColor : Color.slateWarning)
-                .frame(width: 32)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Space.xs) {

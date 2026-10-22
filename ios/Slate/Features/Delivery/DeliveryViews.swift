@@ -51,7 +51,7 @@ struct DeliverySection: View {
             } icon: {
                 Image(systemName: summary.symbol)
                     .foregroundStyle(summary.tone.color)
-                    .frame(width: 28)
+                    .frame(minWidth: Metrics.iconColumn)
                     .accessibilityHidden(true)
             }
             .accessibilityElement(children: .combine)
@@ -90,12 +90,12 @@ struct DeliverySection: View {
                 } label: {
                     Group {
                         if isConfirming {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(Color.slateOnAccent)
                         } else {
                             Label(confirmTitle, systemImage: "checkmark.seal")
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -124,7 +124,7 @@ struct DeliverySection: View {
         } label: {
             Label(summary.link == nil ? "Share final files" : "Replace link",
                   systemImage: summary.link == nil ? "square.and.arrow.up" : "arrow.triangle.2.circlepath")
-                .frame(maxWidth: .infinity, minHeight: 28)
+                .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
         }
         if summary.link == nil {
             button.buttonStyle(.borderedProminent).controlSize(.large)

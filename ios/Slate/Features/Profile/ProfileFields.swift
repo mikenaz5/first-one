@@ -21,10 +21,11 @@ struct AvatarPicker: View {
 
                 Image(systemName: "camera.fill")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .foregroundStyle(Color.slateOnAccent)
+                    .frame(width: Metrics.badge, height: Metrics.badge)
                     .background(Color.accentColor, in: Circle())
                     .overlay(Circle().strokeBorder(.background, lineWidth: 3))
+                    .accessibilityHidden(true)
             }
         }
         .accessibilityLabel("Profile photo")
@@ -195,7 +196,8 @@ struct LocationField: View {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.title3)
                         .foregroundStyle(Color.accentColor)
-                        .frame(width: 28)
+                        .accessibilityHidden(true)
+                        .frame(minWidth: Metrics.iconColumn)
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         Text(draft.location?.name ?? "Choose your city")
                             .font(.body.weight(draft.location == nil ? .regular : .semibold))
@@ -208,6 +210,7 @@ struct LocationField: View {
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
                 .frame(minHeight: Metrics.minTapTarget)
                 .contentShape(Rectangle())

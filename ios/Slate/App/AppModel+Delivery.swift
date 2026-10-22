@@ -10,6 +10,12 @@ extension AppModel {
         DeliverySummary.make(booking: booking, viewer: booking.clientID == session?.userID ? .client : .creator, now: now)
     }
 
+    /// What the signed-in person has to do about their bookings right now.
+    var attentionItems: [AttentionItem] {
+        guard let session else { return [] }
+        return AttentionList.make(bookings: bookings, userID: session.userID, now: clock())
+    }
+
     func review(for booking: Booking) -> Review? { reviewsByBooking[booking.id] }
 
     /// Whether the signed-in person can still leave a review on this booking.

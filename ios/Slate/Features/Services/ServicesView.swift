@@ -128,6 +128,7 @@ struct ServicesView: View {
                 Text("Bookings you've already received keep their details.")
             }
             .sensoryFeedback(trigger: model.packages.count) { old, new in new > old ? .success : .warning }
+            .sensoryFeedback(.selection, trigger: model.packages.map(\.isPublished))
         }
     }
 
@@ -137,15 +138,16 @@ struct ServicesView: View {
         } label: {
             VStack(spacing: Space.s) {
                 Image(systemName: "camera.aperture")
-                    .font(.system(size: 34, weight: .light))
+                    .heroSymbol(34, weight: .light)
                     .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
                 Text("Create your first package").font(.headline)
                 Text("Set a price, what's included and how long it takes. Clients see packages as cards on your page.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, minHeight: 170)
+            .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
             .padding(.horizontal, Space.l)
             .background(
                 RoundedRectangle(cornerRadius: Radius.l, style: .continuous)
@@ -167,7 +169,7 @@ struct AvailabilityCard: View {
             Image(systemName: "calendar.badge.clock")
                 .font(.title2)
                 .foregroundStyle(model.needsAvailability ? Color.slateWarning : Color.accentColor)
-                .frame(width: 32)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Space.xs) {
@@ -226,7 +228,7 @@ struct ContractsCard: View {
             Image(systemName: "doc.text")
                 .font(.title2)
                 .foregroundStyle(model.hasCreatorSignature && !model.contractTemplates.isEmpty ? Color.accentColor : Color.slateWarning)
-                .frame(width: 32)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Space.xs) {

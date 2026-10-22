@@ -8,6 +8,8 @@ struct HomeView: View {
         model.profile?.displayName.split(separator: " ").first.map(String.init) ?? ""
     }
 
+    private var attention: [AttentionItem] { model.attentionItems }
+
     private var nextBooking: Booking? {
         let now = Date()
         return model.bookings.filter { $0.isUpcoming(at: now) }.min { $0.startAt < $1.startAt }
@@ -44,18 +46,19 @@ struct HomeView: View {
                         LinkCard(url: url, handle: profile.handle)
                     }
 
-                    ComingSoonCard(
-                        title: "Needs attention",
-                        systemImage: "exclamationmark.bubble",
-                        message: "Unsigned contracts, balances due and change requests."
-                    )
+                    if !attention.isEmpty {
+                        AttentionCard(items: attention)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
                 .padding(.horizontal, Space.page)
                 .padding(.bottom, Space.xxl)
-                .frame(maxWidth: 720)
+                .frame(maxWidth: Metrics.pageWidth)
                 .frame(maxWidth: .infinity)
             }
             .refreshable { await model.refresh() }
+            .motionSafe(.slateSmooth, value: attention.map(\.id))
+            .motionSafe(.slateSmooth, value: nextBooking?.id)
             .slatePageBackground()
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.large)
@@ -98,7 +101,7 @@ private struct SetupCard: View {
                 model.selectedTab = .services
             } label: {
                 Text(setupButtonTitle)
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -163,6 +166,24 @@ private struct LinkCard: View {
     let url: URL
     let handle: String
 
+    private var shareButton: some View {
+        ShareLink(item: url) {
+            Label("Share", systemImage: "square.and.arrow.up")
+                .frame(minHeight: Metrics.buttonLabelHeight)
+        }
+        .buttonStyle(.bordered)
+    }
+
+    private var openButton: some View {
+        Button {
+            if let link = AppConfig.bookingDeepLink(handle: handle) { model.handle(url: link) }
+        } label: {
+            Label("Open as a client", systemImage: "person.crop.circle.badge.checkmark")
+                .frame(minHeight: Metrics.buttonLabelHeight)
+        }
+        .buttonStyle(.bordered)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             Label("Your booking link", systemImage: "link")
@@ -174,44 +195,63 @@ private struct LinkCard: View {
             Text("Web booking pages arrive in a later release, so this link doesn't open yet. Inside the app, your page opens at \(AppConfig.urlScheme)://book/\(handle).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            HStack(spacing: Space.m) {
-                ShareLink(item: url) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                        .frame(minHeight: Metrics.minTapTarget - Space.m)
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    if let link = AppConfig.bookingDeepLink(handle: handle) { model.handle(url: link) }
-                } label: {
-                    Label("Open as a client", systemImage: "person.crop.circle.badge.checkmark")
-                        .frame(minHeight: Metrics.minTapTarget - Space.m)
-                }
-                .buttonStyle(.bordered)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.m) { shareButton; openButton }
+                VStack(alignment: .leading, spacing: Space.s) { shareButton; openButton }
             }
         }
         .card()
     }
 }
 
-private struct ComingSoonCard: View {
-    let title: String
-    let systemImage: String
-    let message: String
+/// What the person has to do about their bookings: pay, confirm, or deliver. Tapping one opens that booking.
+private struct AttentionCard: View {
+    @Environment(AppModel.self) private var model
+    let items: [AttentionItem]
+
+    private let limit = 3
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.m) {
-            Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(title).font(.headline)
-                Text(message).font(.subheadline).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeader("Needs attention")
+            VStack(spacing: 0) {
+                ForEach(Array(items.prefix(limit).enumerated()), id: \.element.id) { index, item in
+                    if index > 0 { Divider() }
+                    Button {
+                        model.openBooking(item.bookingID)
+                    } label: {
+                        HStack(alignment: .top, spacing: Space.m) {
+                            Image(systemName: item.symbol)
+                                .font(.title3)
+                                .foregroundStyle(Color.slateWarning)
+                                .frame(minWidth: Metrics.iconColumn)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(item.title).font(.subheadline.weight(.semibold))
+                                Text(item.detail).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: Space.s)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.vertical, Space.s)
+                        .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Opens the booking")
+                }
+                if items.count > limit {
+                    Divider()
+                    Button("See all \(items.count) in Bookings") { model.selectedTab = .bookings }
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, minHeight: Metrics.minTapTarget, alignment: .leading)
+                }
             }
         }
-        .card(.outlined)
-        .accessibilityElement(children: .combine)
+        .card()
     }
 }

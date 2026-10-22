@@ -147,7 +147,7 @@ private struct ConversationContent: View {
                 }
                 .padding(.horizontal, Space.page)
                 .padding(.vertical, Space.m)
-                .frame(maxWidth: 720)
+                .frame(maxWidth: Metrics.pageWidth)
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.bottom)
@@ -245,7 +245,7 @@ private struct ConversationContent: View {
                     .lineLimit(1...5)
                     .focused($focused)
                     .padding(.horizontal, Space.l)
-                    .padding(.vertical, Space.s + 2)
+                    .padding(.vertical, Space.m)
                     .frame(minHeight: Metrics.minTapTarget)
                     .background(Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
                     .accessibilityLabel("Message")
@@ -280,24 +280,30 @@ private struct Bubble: View {
     let isMine: Bool
     var dimmed = false
 
+    @State private var copiedCount = 0
+
     var body: some View {
         HStack(spacing: 0) {
             if isMine { Spacer(minLength: Space.xxxl) }
             Text(text)
                 .font(.body)
-                .foregroundStyle(isMine ? Color.white : Color.primary)
+                .foregroundStyle(isMine ? Color.slateOnAccent : Color.primary)
                 .padding(.horizontal, Space.l)
-                .padding(.vertical, Space.s + 2)
+                .padding(.vertical, Space.m)
                 .background(
                     RoundedRectangle(cornerRadius: Radius.l, style: .continuous)
                         .fill(isMine ? Color.accentColor : Color.slateCard)
                 )
                 .opacity(dimmed ? 0.6 : 1)
                 .contextMenu {
-                    Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
+                    Button("Copy", systemImage: "doc.on.doc") {
+                        UIPasteboard.general.string = text
+                        copiedCount += 1
+                    }
                 }
             if !isMine { Spacer(minLength: Space.xxxl) }
         }
+        .sensoryFeedback(.success, trigger: copiedCount)
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
 }

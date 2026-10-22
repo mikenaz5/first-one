@@ -43,7 +43,7 @@ struct ContractReaderSheet: View {
             ScrollView {
                 ContractDocumentView(title: contract.title, sections: contract.sections)
                     .padding(Space.page)
-                    .frame(maxWidth: 680)
+                    .frame(maxWidth: Metrics.readableWidth)
                     .frame(maxWidth: .infinity)
             }
             .slatePageBackground()
@@ -87,7 +87,7 @@ struct KeyTermsCard: View {
         HStack(alignment: .top, spacing: Space.m) {
             Image(systemName: symbol)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 24)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(label).font(.footnote).foregroundStyle(.secondary)
@@ -133,7 +133,7 @@ struct ContractReviewView: View {
             .padding(.horizontal, Space.page)
             .padding(.top, Space.s)
             .padding(.bottom, Space.xl)
-            .frame(maxWidth: 640)
+            .frame(maxWidth: Metrics.readableWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -157,7 +157,7 @@ struct ContractReviewView: View {
                 ProgressView()
                 Text("Preparing your contract…").foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 160)
+            .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
             .accessibilityElement(children: .combine)
 
         case .failed(let message):
@@ -165,7 +165,7 @@ struct ContractReviewView: View {
                 Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 Button("Try Again") { Task { await booking.loadContract(using: model) } }.buttonStyle(.bordered)
             }
-            .frame(maxWidth: .infinity, minHeight: 160)
+            .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
 
         case .ready:
             let formatter = booking.formatter
@@ -182,13 +182,13 @@ struct ContractReviewView: View {
                 showFullContract = true
             } label: {
                 Label("Read the full contract", systemImage: "doc.text")
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
 
             VStack(alignment: .leading, spacing: Space.m) {
-                Text("Sign").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                SectionHeader("Sign")
                 SignatureSection(capture: booking.capture, consent: SigningConsent.text)
             }
         }
@@ -207,12 +207,12 @@ struct ContractReviewView: View {
             } label: {
                 Group {
                     if booking.isSubmitting {
-                        ProgressView().tint(.white)
+                        ProgressView().tint(Color.slateOnAccent)
                     } else {
                         Text(signTitle)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 28)
+                .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -258,13 +258,13 @@ struct SignedContractView: View {
                     ContentUnavailableView("No contract found", systemImage: "doc.questionmark",
                                            description: Text("This booking doesn't have a contract on file."))
                 } else {
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 200)
+                    ProgressView().frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
                 }
             }
             .padding(.horizontal, Space.page)
             .padding(.top, Space.s)
             .padding(.bottom, Space.xl)
-            .frame(maxWidth: 680)
+            .frame(maxWidth: Metrics.readableWidth)
             .frame(maxWidth: .infinity)
         }
         .slatePageBackground()
@@ -326,21 +326,27 @@ struct SignatureRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text("\(signature.role.title): \(signature.signedName)").font(.subheadline.weight(.semibold))
-            if signature.method == .drawn, let data = signature.imagePNG, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 56)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityHidden(true)
-            } else {
-                Text(signature.signedName)
-                    .font(.custom("SnellRoundhand-Bold", size: 28, relativeTo: .title))
-                    .foregroundStyle(Color(red: 0.08, green: 0.12, blue: 0.35))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .accessibilityHidden(true)
+            Group {
+                if signature.method == .drawn, let data = signature.imagePNG, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: Metrics.signaturePreviewHeight)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(signature.signedName)
+                        .font(.custom("SnellRoundhand-Bold", size: 28, relativeTo: .title))
+                        .foregroundStyle(Color.slateInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            // Ink is dark and drawn for a white page, so it sits on paper in Dark Mode too.
+            .padding(.horizontal, Space.m)
+            .padding(.vertical, Space.s)
+            .background(Color.slatePaper, in: RoundedRectangle(cornerRadius: Radius.s, style: .continuous))
+            .accessibilityHidden(true)
             Text("\(methodText) · \(signature.signedAt.formatted(date: .abbreviated, time: .shortened))")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

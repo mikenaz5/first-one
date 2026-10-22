@@ -38,7 +38,7 @@ struct AvatarView: View {
             Rectangle().fill(Color.accentColor.gradient)
             Text(initials)
                 .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.slateOnAccent)
         }
     }
 
@@ -63,7 +63,7 @@ struct SpecialtyChip: View {
                 .font(.subheadline.weight(.medium))
                 .padding(.horizontal, Space.m)
                 .frame(minHeight: Metrics.minTapTarget)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .foregroundStyle(isSelected ? Color.slateOnAccent : Color.primary)
                 .background(isSelected ? Color.accentColor : Color.slateFill, in: Capsule())
                 .contentShape(Capsule())
         }
@@ -170,37 +170,23 @@ extension SectionHeader where Trailing == EmptyView {
     }
 }
 
-// MARK: - Placeholder screen
+// MARK: - Button feedback
 
-/// Shared body for tabs that aren't built yet. Honest about being a placeholder.
-struct PlaceholderScreen: View {
-    let title: String
-    let systemImage: String
-    let headline: String
-    let message: String
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label(headline, systemImage: systemImage)
-            } description: {
-                Text(message)
-            }
-            .slatePageBackground()
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.large)
-        }
+/// Subtle press-down for tappable tiles. Stays still when Reduce Motion is on.
+struct PressableTileStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PressableTileLabel(configuration: configuration)
     }
 }
 
-// MARK: - Button feedback
+private struct PressableTileLabel: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let configuration: ButtonStyleConfiguration
 
-/// Subtle press-down for tappable tiles.
-struct PressableTileStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
+    var body: some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.slateSnappy, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(reduceMotion ? nil : .slateSnappy, value: configuration.isPressed)
     }
 }
 

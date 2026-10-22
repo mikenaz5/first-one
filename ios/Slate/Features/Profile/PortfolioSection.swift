@@ -1,6 +1,7 @@
 import AVKit
 import PhotosUI
 import SwiftUI
+import UIKit
 
 /// The portfolio grid with a Photos/Reels filter. Owners can add, reorder and delete.
 struct PortfolioSection: View {
@@ -51,7 +52,7 @@ struct PortfolioSection: View {
                     Text("Nothing here yet.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 120)
+                        .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
                 } else {
                     grid
                 }
@@ -155,14 +156,15 @@ struct PortfolioSection: View {
             ) {
                 VStack(spacing: Space.s) {
                     Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 34, weight: .light))
+                        .heroSymbol(34, weight: .light)
                         .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
                     Text("Add your best work").font(.headline)
                     Text("Photos and reels, up to \(AppConfig.portfolioLimit).")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 160)
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
                 .background(
                     RoundedRectangle(cornerRadius: Radius.l, style: .continuous)
                         .strokeBorder(Color.accentColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
@@ -176,7 +178,7 @@ struct PortfolioSection: View {
             Text("No work to show yet.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 120)
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
         }
     }
 }
@@ -195,7 +197,7 @@ struct PortfolioCell: View {
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else if phase.error != nil {
-                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
+                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary).accessibilityLabel("Couldn't load")
                     } else {
                         ProgressView()
                     }
@@ -205,6 +207,7 @@ struct PortfolioCell: View {
                 if item.isVideo {
                     HStack(spacing: Space.xs) {
                         Image(systemName: "play.fill")
+                            .accessibilityHidden(true)
                         if let duration = item.duration {
                             Text(Duration.seconds(Int(duration.rounded())).formatted(.time(pattern: .minuteSecond)))
                                 .monospacedDigit()
@@ -300,7 +303,7 @@ private struct PortfolioPage: View {
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else if phase.error != nil {
-                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.white.opacity(0.7))
+                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.white.opacity(0.7)).accessibilityLabel("Couldn't load")
                 } else {
                     ProgressView().tint(.white)
                 }
@@ -311,6 +314,8 @@ private struct PortfolioPage: View {
     private func play() {
         guard item.isVideo, let url = item.videoURL else { return }
         if player == nil { player = AVPlayer(url: url) }
-        player?.play()
+        // "Auto-Play Video Previews" is an accessibility setting (motion can be a problem); when it's off, the reel waits
+        // for the person to press play on its controls.
+        if UIAccessibility.isVideoAutoplayEnabled { player?.play() }
     }
 }

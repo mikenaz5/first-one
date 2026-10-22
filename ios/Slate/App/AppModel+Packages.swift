@@ -15,6 +15,7 @@ extension AppModel {
     /// Runs once the account has loaded and the person is in the app.
     func afterAccountLoaded() {
         calendarAccess = calendar.access
+        publishWidget()
         startupTasks = [
             Task { await syncCalendar() },
             Task { await openPendingBookingLinkIfNeeded() },

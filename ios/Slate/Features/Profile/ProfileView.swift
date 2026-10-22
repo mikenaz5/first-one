@@ -120,7 +120,7 @@ struct CreatorPageView: View {
             .padding(.horizontal, Space.page)
             .padding(.top, Space.s)
             .padding(.bottom, Space.xxl)
-            .frame(maxWidth: 720)
+            .frame(maxWidth: Metrics.pageWidth)
             .frame(maxWidth: .infinity)
         }
         .refreshable {
@@ -140,7 +140,7 @@ struct CreatorPageView: View {
                 Text("No packages to book yet.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 100)
+                    .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
                     .card(.outlined)
             } else {
                 ForEach(packages) { package in

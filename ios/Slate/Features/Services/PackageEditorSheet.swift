@@ -359,7 +359,7 @@ struct AddOnRow: View {
         HStack(spacing: Space.m) {
             Image(systemName: addOn.kind.symbol)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 28)
+                .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(addOn.name.isEmpty ? addOn.kind.title : addOn.name)

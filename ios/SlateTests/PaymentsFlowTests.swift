@@ -22,6 +22,7 @@ final class PaymentsFlowTests: XCTestCase {
     private var clock: ManualClock!
     private var backend: LocalBackend!
     private var authorizer: ScriptedAuthorizer!
+    private var widget: RecordingWidgetPublisher!
     private var model: AppModel!
     private var creator: CreatorProfile!
     private var package: ServicePackage!
@@ -34,7 +35,8 @@ final class PaymentsFlowTests: XCTestCase {
         let clock = self.clock!
         backend = LocalBackend(root: root, clock: { clock.now })
         authorizer = ScriptedAuthorizer()
-        model = AppModel(backend: backend, authorizer: authorizer)
+        widget = RecordingWidgetPublisher()
+        model = AppModel(backend: backend, authorizer: authorizer, widget: widget)
         try await makeCreator()
         await model.signInAsDemo() // The person who will be booking.
     }
@@ -221,6 +223,16 @@ final class PaymentsFlowTests: XCTestCase {
         XCTAssertEqual(done.status, .completed)
         XCTAssertEqual(model.paymentSummary(for: done, now: clock.now).phase, .paidInFull)
         XCTAssertEqual(authorizer.requests.last?.info.amountCents, 150_000)
+    }
+
+    func testTheWidgetFollowsTheBookingsAndForgetsThemOnSignOut() async throws {
+        let booking = try await ownBooking()
+        XCTAssertEqual(widget.last?.state, .signedIn)
+        XCTAssertEqual(widget.last?.bookings.map(\.id), [booking.id], "The new, confirmed booking is the next one")
+        XCTAssertEqual(widget.last?.bookings.first?.title, booking.packageName)
+
+        await model.signOut()
+        XCTAssertEqual(widget.last, .signedOut, "A signed-out phone's home screen shows nothing of the account")
     }
 
     func testAFileLinkThatIsNotSecureIsRefusedWithAnExplanation() async throws {
