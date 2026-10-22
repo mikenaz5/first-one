@@ -281,6 +281,23 @@ struct PlanSummary: Codable, Equatable, Hashable {
     static let unsubscribed = PlanSummary(required: true, status: .none, isOK: false, graceUntil: nil, cancelAtPeriodEnd: false, periodEnd: nil)
     static let notRequired = PlanSummary(required: false, status: .none, isOK: true, graceUntil: nil, cancelAtPeriodEnd: false, periodEnd: nil)
 
+    /// Builds the summary from what the database reports. The company may take members and bookings while the plan is
+    /// trialing or active, or payment failed and the grace period hasn't run out (`public.org_billing_ok`).
+    static func make(
+        required: Bool, status: PlanStatus, graceUntil: Date?, cancelAtPeriodEnd: Bool, periodEnd: Date?, now: Date = Date()
+    ) -> PlanSummary {
+        let good: Bool
+        switch status {
+        case .trialing, .active: good = true
+        case .pastDue: good = (graceUntil ?? .distantPast) > now
+        case .none, .canceled: good = false
+        }
+        return PlanSummary(
+            required: required, status: status, isOK: !required || good, graceUntil: graceUntil,
+            cancelAtPeriodEnd: cancelAtPeriodEnd, periodEnd: periodEnd
+        )
+    }
+
     /// What the people running the company should be told, if anything.
     var banner: String? {
         guard required else { return nil }
@@ -509,7 +526,6 @@ struct OrganizationDraft: Equatable {
     var legalAddress: String = ""
     var bio: String = ""
     var specialties: [Specialty] = []
-    var locationName: String? = nil
     /// The Owner's own display name, if they have no profile of their own yet.
     var ownerDisplayName: String? = nil
 

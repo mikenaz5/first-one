@@ -67,6 +67,20 @@ enum TeamAvailability {
             .sorted { $0.start < $1.start }
     }
 
+    /// The hours a person can take bookings for a company: its hours, narrowed by their own. A day they don't list is a
+    /// day off; a day where the two don't overlap is closed. `public.effective_weekly` does the same in the database.
+    static func effectiveHours(company: [DayHours], member: [DayHours]?) -> [DayHours] {
+        guard let member else { return company }
+        var result: [DayHours] = []
+        for day in company.sorted(by: { $0.weekday < $1.weekday }) {
+            guard let own = member.first(where: { $0.weekday == day.weekday }) else { continue }
+            let start = max(day.window.startMinute, own.window.startMinute)
+            let end = min(day.window.endMinute, own.window.endMinute)
+            if start < end { result.append(DayHours(weekday: day.weekday, window: TimeWindow(startMinute: start, endMinute: end))) }
+        }
+        return result
+    }
+
     /// The people who could take a booking at exactly this time.
     static func freeMembers(start: Date, durationMinutes: Int, team: TeamSchedule, now: Date) -> [MemberSchedule] {
         let day = CalendarDay(start, calendar: team.settings.calendar)

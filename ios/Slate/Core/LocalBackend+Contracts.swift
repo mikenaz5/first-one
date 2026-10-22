@@ -20,6 +20,7 @@ extension LocalBackend {
     }
 
     func saveContractTemplate(_ template: ContractTemplate) async throws -> [ContractTemplate] {
+        try authorizeOwner(template.creatorID, .templatesManage)
         guard ContractRules.problems(in: template).isEmpty else { throw SlateError.invalidContract }
 
         var list = readTemplates(template.creatorID)
@@ -32,6 +33,10 @@ extension LocalBackend {
             let reworded = existing.title != saved.title || existing.clauses != saved.clauses
             saved.version = reworded ? existing.version + 1 : existing.version
             saved.updatedAt = reworded ? now : existing.updatedAt
+            if reworded {
+                recordForCompany(template.creatorID, actor: currentUserID(), "template.edited",
+                                 "Edited the contract template \(saved.title) (version \(saved.version))")
+            }
             list[index] = saved
         } else {
             guard list.count < ContractRules.templateLimit else { throw SlateError.invalidContract }
@@ -39,6 +44,7 @@ extension LocalBackend {
             saved.createdAt = now
             saved.updatedAt = now
             list.append(saved)
+            recordForCompany(template.creatorID, actor: currentUserID(), "template.created", "Added the contract template \(saved.title)")
         }
         try fileManager.createDirectory(at: userDirectory(template.creatorID), withIntermediateDirectories: true)
         try write(list, to: templatesURL(template.creatorID))
@@ -46,10 +52,14 @@ extension LocalBackend {
     }
 
     func deleteContractTemplate(_ id: UUID, for creatorID: UUID) async throws -> [ContractTemplate] {
+        try authorizeOwner(creatorID, .templatesManage)
         guard !readPackages(creatorID).contains(where: { $0.contractTemplateID == id }) else {
             throw SlateError.templateInUse
         }
         var list = readTemplates(creatorID)
+        if let gone = list.first(where: { $0.id == id }) {
+            recordForCompany(creatorID, actor: currentUserID(), "template.deleted", "Deleted the contract template \(gone.title)")
+        }
         list.removeAll { $0.id == id }
         try write(list, to: templatesURL(creatorID))
         return readTemplates(creatorID)
@@ -76,7 +86,9 @@ extension LocalBackend {
     }
 
     func loadContract(bookingID: UUID, for userID: UUID) async throws -> Contract? {
-        readContracts().first { $0.bookingID == bookingID && ($0.creatorID == userID || $0.clientID == userID) }
+        let orgs = readOrganizations()
+        guard let booking = readBookings().first(where: { $0.id == bookingID }), isParty(userID, booking, .view, in: orgs) else { return nil }
+        return readContracts().first { $0.bookingID == bookingID }
     }
 
     func loadContractPDF(contractID: UUID) async throws -> Data? {

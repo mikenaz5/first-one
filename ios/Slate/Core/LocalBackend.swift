@@ -15,13 +15,19 @@ actor LocalBackend: SlateBackend {
     /// Whether to behave as if a server sends push notifications (so the app registers its device and leaves
     /// shoot reminders to the server). Always false in the app; tests turn it on to exercise those paths.
     let sendsPushFromServer: Bool
+    /// Seat numbers. The database holds the real ones; tests pass small ones.
+    let teamConfig: TeamConfig
 
     /// Handles that pretend to belong to other people, so the "taken" state is easy to see.
     private let simulatedTakenHandles: Set<String> = ["maya", "demo", "studio", "photo", "video"]
 
-    init(root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }, sendsPushFromServer: Bool = false) {
+    init(
+        root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }, sendsPushFromServer: Bool = false,
+        teamConfig: TeamConfig = .standard
+    ) {
         self.clock = clock
         self.sendsPushFromServer = sendsPushFromServer
+        self.teamConfig = teamConfig
         let base: URL
         if let root {
             base = root
@@ -46,7 +52,7 @@ actor LocalBackend: SlateBackend {
 
     // MARK: - Stored shapes
 
-    private struct StoredProfile: Codable {
+    struct StoredProfile: Codable {
         var id: UUID
         var handle: String
         var displayName: String
@@ -56,6 +62,8 @@ actor LocalBackend: SlateBackend {
         var avatarFile: String?
         var createdAt: Date
         var updatedAt: Date
+        /// Nil in profiles saved before companies existed: a person.
+        var kind: ProfileKind? = nil
     }
 
     private struct StoredItem: Codable {
@@ -73,14 +81,14 @@ actor LocalBackend: SlateBackend {
 
     // MARK: - Paths
 
-    private var sessionURL: URL { root.appendingPathComponent("session.json") }
+    var sessionURL: URL { root.appendingPathComponent("session.json") }
     var accountsURL: URL { root.appendingPathComponent("accounts.json") }
 
     func userDirectory(_ userID: UUID) -> URL {
         root.appendingPathComponent(userID.uuidString.lowercased(), isDirectory: true)
     }
 
-    private func profileURL(_ userID: UUID) -> URL {
+    func profileURL(_ userID: UUID) -> URL {
         userDirectory(userID).appendingPathComponent("profile.json")
     }
 
@@ -122,6 +130,11 @@ actor LocalBackend: SlateBackend {
 
     func deleteAccount() async throws {
         guard let session = read(AuthSession.self, from: sessionURL) else { throw SlateError.notSignedIn }
+        // Like the server: an Owner hands the company over or closes it first.
+        if readOrganizations().contains(where: { $0.state != .closed && activeMember($0, session.userID)?.role == .owner }) {
+            throw SlateError.lastOwner
+        }
+        try endAllMemberships(of: session.userID)
         try? fileManager.removeItem(at: userDirectory(session.userID))
         var accounts = read([String: UUID].self, from: accountsURL) ?? [:]
         accounts = accounts.filter { $0.value != session.userID }
@@ -143,6 +156,7 @@ actor LocalBackend: SlateBackend {
 
     func saveProfile(_ profile: CreatorProfile, avatarJPEG: Data?) async throws -> CreatorProfile {
         let userID = profile.id
+        try authorizeOwner(userID, .companyEdit)
         guard !isHandleTaken(profile.handle, excluding: userID) else { throw SlateError.handleTaken }
 
         try fileManager.createDirectory(at: userDirectory(userID), withIntermediateDirectories: true)
@@ -168,7 +182,8 @@ actor LocalBackend: SlateBackend {
             location: profile.location,
             avatarFile: avatarFile,
             createdAt: existing?.createdAt ?? profile.createdAt,
-            updatedAt: Date()
+            updatedAt: Date(),
+            kind: existing?.kind ?? (profile.kind == .company ? .company : nil)
         )
         try write(stored, to: profileURL(userID))
         return makeProfile(stored, userID: userID)
@@ -181,6 +196,7 @@ actor LocalBackend: SlateBackend {
     }
 
     func addPortfolioItems(_ items: [NewPortfolioItem], for userID: UUID) async throws -> [PortfolioItem] {
+        try authorizeOwner(userID, .companyEdit)
         var stored = readItems(userID)
         guard stored.count + items.count <= AppConfig.portfolioLimit else {
             throw SlateError.portfolioFull(limit: AppConfig.portfolioLimit)
@@ -226,6 +242,7 @@ actor LocalBackend: SlateBackend {
     }
 
     func deletePortfolioItem(_ id: UUID, for userID: UUID) async throws -> [PortfolioItem] {
+        try authorizeOwner(userID, .companyEdit)
         var stored = readItems(userID)
         guard let index = stored.firstIndex(where: { $0.id == id }) else {
             return makeItems(stored, userID: userID)
@@ -241,6 +258,7 @@ actor LocalBackend: SlateBackend {
     }
 
     func movePortfolioItemToFront(_ id: UUID, for userID: UUID) async throws -> [PortfolioItem] {
+        try authorizeOwner(userID, .companyEdit)
         var stored = readItems(userID)
         if let index = stored.firstIndex(where: { $0.id == id }), index != 0 {
             let item = stored.remove(at: index)
@@ -253,16 +271,17 @@ actor LocalBackend: SlateBackend {
 
     // MARK: - Helpers
 
-    private func isHandleTaken(_ handle: String, excluding userID: UUID) -> Bool {
+    func isHandleTaken(_ handle: String, excluding userID: UUID) -> Bool {
         if simulatedTakenHandles.contains(handle) { return true }
         let accounts = read([String: UUID].self, from: accountsURL) ?? [:]
-        for other in accounts.values where other != userID {
+        let companies = readOrganizations().map(\.id)
+        for other in Set(accounts.values).union(companies) where other != userID {
             if read(StoredProfile.self, from: profileURL(other))?.handle == handle { return true }
         }
         return false
     }
 
-    private func makeProfile(_ stored: StoredProfile, userID: UUID) -> CreatorProfile {
+    func makeProfile(_ stored: StoredProfile, userID: UUID) -> CreatorProfile {
         CreatorProfile(
             id: stored.id,
             handle: stored.handle,
@@ -272,7 +291,8 @@ actor LocalBackend: SlateBackend {
             location: stored.location,
             avatarURL: stored.avatarFile.map { userDirectory(userID).appendingPathComponent($0) },
             createdAt: stored.createdAt,
-            updatedAt: stored.updatedAt
+            updatedAt: stored.updatedAt,
+            kind: stored.kind ?? .person
         )
     }
 

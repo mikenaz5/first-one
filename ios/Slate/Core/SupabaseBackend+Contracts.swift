@@ -60,9 +60,13 @@ extension SupabaseBackend {
         var signedAt: Date
         var consentVersion: Int
         var device: String
+        var onBehalfOf: String?
+        var signerTitle: String?
 
         enum CodingKeys: String, CodingKey {
             case id, role, method, device
+            case onBehalfOf = "on_behalf_of"
+            case signerTitle = "signer_title"
             case userId = "user_id"
             case signedName = "signed_name"
             case imagePng = "image_png"
@@ -86,11 +90,19 @@ extension SupabaseBackend {
         var status: String
         var createdAt: Date
         var executedAt: Date?
+        var providerLegalName: String?
+        var countersignerId: String?
+        var countersignerName: String?
+        var countersignerTitle: String?
         var signatures: [ContractSignatureRow]?
         var embeddedSignatures: [ContractSignatureRow]?
 
         enum CodingKeys: String, CodingKey {
             case id, title, sections, status, signatures
+            case providerLegalName = "provider_legal_name"
+            case countersignerId = "countersigner_id"
+            case countersignerName = "countersigner_name"
+            case countersignerTitle = "countersigner_title"
             case bookingId = "booking_id"
             case creatorId = "creator_id"
             case clientId = "client_id"
@@ -312,7 +324,9 @@ extension SupabaseBackend {
                 imagePNG: signature.imagePng.flatMap { Data(base64Encoded: $0) },
                 signedAt: signature.signedAt,
                 consentVersion: signature.consentVersion,
-                device: signature.device
+                device: signature.device,
+                onBehalfOf: signature.onBehalfOf,
+                signerTitle: signature.signerTitle.flatMap { $0.isEmpty ? nil : $0 }
             )
         }
         // The client's signature first, then the creator's, whichever order the server returned them in.
@@ -331,7 +345,11 @@ extension SupabaseBackend {
             status: ContractStatus(rawValue: row.status) ?? .executed,
             signatures: signatures,
             createdAt: row.createdAt,
-            executedAt: row.executedAt
+            executedAt: row.executedAt,
+            providerLegalName: row.providerLegalName,
+            countersignerID: row.countersignerId.flatMap(UUID.init(uuidString:)),
+            countersignerName: row.countersignerName,
+            countersignerTitle: row.countersignerTitle.flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 

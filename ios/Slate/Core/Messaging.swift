@@ -171,7 +171,7 @@ enum MessageRules {
 /// How system lines and previews read. System lines carry facts, not sentences, so this is the one place that words them.
 enum ConversationText {
     static func systemLine(_ message: Message, booking: Booking?, viewerID: UUID?) -> String {
-        let viewerIsCreator = booking.map { $0.creatorID == viewerID } ?? false
+        let viewerIsCreator = viewerID.flatMap { id in booking?.isProviderFor(id) } ?? false
         let viewerIsClient = booking.map { $0.clientID == viewerID } ?? false
         let client = booking?.clientName.nonEmpty ?? "The client"
         let creator = booking?.creatorName.nonEmpty ?? "The creator"

@@ -12,7 +12,7 @@ extension LocalBackend {
 
     func packagesURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("packages.json") }
     func availabilityURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("availability.json") }
-    private func busyURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("busy.json") }
+    func busyURL(_ userID: UUID) -> URL { userDirectory(userID).appendingPathComponent("busy.json") }
     var bookingsURL: URL { root.appendingPathComponent("bookings.json") }
 
     // MARK: - Packages
@@ -22,6 +22,7 @@ extension LocalBackend {
     }
 
     func savePackage(_ package: ServicePackage) async throws -> [ServicePackage] {
+        try authorizeOwner(package.creatorID, .servicesManage)
         guard PackageRules.problems(in: package).isEmpty else { throw SlateError.invalidPackage }
         // A package can only use one of its own creator's contracts.
         if let templateID = package.contractTemplateID,
@@ -35,8 +36,10 @@ extension LocalBackend {
         if let index = list.firstIndex(where: { $0.id == package.id }) {
             saved.createdAt = list[index].createdAt
             saved.position = list[index].position
+            recordPackageChange(from: list[index], to: saved)
             list[index] = saved
         } else {
+            recordPackageChange(from: nil, to: saved)
             saved.createdAt = Date()
             saved.position = (list.map(\.position).max() ?? -1) + 1
             list.append(saved)
@@ -46,7 +49,15 @@ extension LocalBackend {
     }
 
     func deletePackage(_ id: UUID, for creatorID: UUID) async throws -> [ServicePackage] {
+        try authorizeOwner(creatorID, .servicesManage)
         var list = readPackages(creatorID)
+        if let gone = list.first(where: { $0.id == id }), readOrganization(creatorID) != nil {
+            let who = currentUserID()
+            try? mutateOrganization(creatorID) { stored in
+                self.addActivity(&stored, actor: who, "package.deleted", "Deleted the service \(gone.name)")
+                stored.packageMembers[id.uuidString.lowercased()] = nil
+            }
+        }
         list.removeAll { $0.id == id }
         try write(list.enumerated().map { index, package -> ServicePackage in
             var copy = package
@@ -67,6 +78,7 @@ extension LocalBackend {
     }
 
     func saveAvailability(_ settings: AvailabilitySettings, for creatorID: UUID) async throws -> AvailabilitySettings {
+        try authorizeOwner(creatorID, .companyEdit)
         guard settings.isValid else { throw SlateError.invalidAvailability }
         try fileManager.createDirectory(at: userDirectory(creatorID), withIntermediateDirectories: true)
         try write(settings, to: availabilityURL(creatorID))
@@ -90,6 +102,16 @@ extension LocalBackend {
                 packages: readPackages(userID).filter(\.isPublished)
             )
         }
+        // A company that is open for business.
+        for org in readOrganizations() where org.state == .active {
+            guard let profile = try await loadProfile(for: org.id), profile.handle == handle, profile.isComplete else { continue }
+            return PublicCreatorPage(
+                profile: profile,
+                portfolio: try await loadPortfolio(for: org.id),
+                packages: readPackages(org.id).filter(\.isPublished),
+                team: publicTeam(org)
+            )
+        }
         return nil
     }
 
@@ -105,7 +127,7 @@ extension LocalBackend {
         let window = DateInterval(start: from, end: max(to, from))
         let now = self.now
         let booked = readBookings()
-            .filter { $0.creatorID == creatorID && $0.effectiveStatus(at: now).blocksTime }
+            .filter { $0.occupant == creatorID && $0.effectiveStatus(at: now).blocksTime }
             .map(\.blockedRange)
             .filter { IntervalMath.overlaps($0, window) }
         let external = (read([DateInterval].self, from: busyURL(creatorID)) ?? [])
@@ -124,6 +146,16 @@ extension LocalBackend {
         var contract: RenderedContract
         var creatorSignature: CreatorSignature
         var durationMinutes: Int
+        /// For a company's booking: who the contract is with and who countersigns it.
+        var company: CompanyContext? = nil
+    }
+
+    /// What a company's contract says it is with, fixed when the client signs.
+    struct CompanyContext {
+        var legalName: String
+        var signerID: UUID
+        var signerName: String
+        var signerTitle: String
     }
 
     func resolveBooking(_ request: BookingRequest, clientName: String) async throws -> ResolvedBooking {
@@ -133,20 +165,34 @@ extension LocalBackend {
         let requested = Set(request.addOnIDs)
         let chosen = package.addOns(withIDs: requested)
         guard chosen.count == requested.count else { throw SlateError.packageUnavailable }
+        // A company that isn't open for business sells nothing.
+        let org = readOrganization(request.creatorID)
+        if let org, org.state != .active { throw SlateError.packageUnavailable }
 
         guard let templateID = package.contractTemplateID,
               let template = readTemplates(request.creatorID).first(where: { $0.id == templateID })
         else { throw SlateError.contractMissing }
-        // Nobody can sign until the creator has a signature on file to countersign with.
-        guard let creatorSignature = read(CreatorSignature.self, from: signatureURL(request.creatorID)),
-              SignatureRules.isValid(creatorSignature)
-        else { throw SlateError.creatorNotReady }
+        // Nobody can sign until there is a signature on file to countersign with: the creator's own, or for a company
+        // the one belonging to the person it has authorised.
+        let creatorSignature: CreatorSignature
+        var company: CompanyContext?
+        if let org {
+            guard let signerID = org.signerUserID, let member = activeMember(org, signerID), org.signerRoles.contains(member.role),
+                  let signed = read(CreatorSignature.self, from: signatureURL(signerID)), SignatureRules.isValid(signed)
+            else { throw SlateError.creatorNotReady }
+            creatorSignature = signed
+            company = CompanyContext(legalName: org.legalName, signerID: signerID, signerName: signed.signedName, signerTitle: org.signerTitle)
+        } else {
+            guard let signed = read(CreatorSignature.self, from: signatureURL(request.creatorID)), SignatureRules.isValid(signed)
+            else { throw SlateError.creatorNotReady }
+            creatorSignature = signed
+        }
 
         let settings = read(AvailabilitySettings.self, from: availabilityURL(request.creatorID)) ?? AvailabilitySettings.closed()
         let creatorName = try await loadProfile(for: request.creatorID)?.displayName ?? "Creator"
         let values = ContractContextBuilder.make(
             package: package, addOns: chosen, start: request.startAt, timeZone: settings.timeZone,
-            clientName: clientName, creatorName: creatorName, notes: request.notes
+            clientName: clientName, creatorName: company?.legalName ?? creatorName, notes: request.notes
         )
         return ResolvedBooking(
             package: package,
@@ -155,7 +201,8 @@ extension LocalBackend {
             creatorName: creatorName,
             contract: ContractRenderer.render(template: template, values: values),
             creatorSignature: creatorSignature,
-            durationMinutes: package.durationMinutes(with: chosen)
+            durationMinutes: package.durationMinutes(with: chosen),
+            company: company
         )
     }
 
@@ -177,14 +224,53 @@ extension LocalBackend {
         // Availability first, so someone who picked a taken time hears about that before anything else.
         let dayBefore = request.startAt.addingTimeInterval(-86_400)
         let dayAfter = request.startAt.addingTimeInterval(Double(duration) * 60 + 86_400)
-        let schedule = makeSchedule(for: request.creatorID, from: dayBefore, to: dayAfter)
-        guard AvailabilityEngine.isAvailable(start: request.startAt, durationMinutes: duration, schedule: schedule, now: now) else {
-            // If the time would be fine with no other bookings, then someone else has it.
-            let withoutBookings = CreatorSchedule(settings: schedule.settings, bookedRanges: [], externalBusy: schedule.externalBusy)
-            let onlyBookingsBlock = AvailabilityEngine.isAvailable(
-                start: request.startAt, durationMinutes: duration, schedule: withoutBookings, now: now
-            )
-            throw onlyBookingsBlock ? SlateError.slotTaken : SlateError.slotUnavailable
+        let settings: AvailabilitySettings
+        // A person's own booking is theirs. A company's goes to someone free, or waits for a manager.
+        var assignee: UUID? = request.creatorID
+        var shareBps: Int?
+        if let org = readOrganization(request.creatorID) {
+            guard read(AvailabilitySettings.self, from: availabilityURL(org.id)) != nil else { throw SlateError.slotUnavailable }
+            let full = try makeTeamSchedule(org: org, package: package, from: dayBefore, to: dayAfter)
+            if let named = request.memberID, !full.members.contains(where: { $0.userID == named }) {
+                throw SlateError.memberUnavailable
+            }
+            let offered = request.memberID.map { full.filtered(to: $0) } ?? full
+            guard AvailabilityEngine.isAvailable(start: request.startAt, durationMinutes: duration, schedule: offered.asSchedule, now: now) else {
+                // If the time would be fine with no bookings in the way, then someone else has it.
+                let quiet = try makeTeamSchedule(org: org, package: package, from: dayBefore, to: dayAfter, includeBookings: false)
+                let wanted = request.memberID.map { quiet.filtered(to: $0) } ?? quiet
+                let onlyBookingsBlock = AvailabilityEngine.isAvailable(
+                    start: request.startAt, durationMinutes: duration, schedule: wanted.asSchedule, now: now
+                )
+                throw onlyBookingsBlock ? SlateError.slotTaken : SlateError.slotUnavailable
+            }
+            settings = full.settings
+            if let named = request.memberID {
+                assignee = named
+            } else if org.assignmentMode == .auto {
+                let free = TeamAvailability.freeMembers(start: request.startAt, durationMinutes: duration, team: full, now: now)
+                assignee = AssignmentPlanner.choose(from: free.map { person in
+                    AssignmentPlanner.Candidate(
+                        userID: person.userID,
+                        joinedAt: org.members.first(where: { $0.userID == person.userID })?.joinedAt ?? .distantPast,
+                        upcoming: upcomingCount(for: person.userID), isFree: true
+                    )
+                })
+            } else {
+                assignee = nil
+            }
+            if let who = assignee, org.splitEnabled { shareBps = activeMember(org, who)?.shareBps }
+        } else {
+            let schedule = makeSchedule(for: request.creatorID, from: dayBefore, to: dayAfter)
+            guard AvailabilityEngine.isAvailable(start: request.startAt, durationMinutes: duration, schedule: schedule, now: now) else {
+                // If the time would be fine with no other bookings, then someone else has it.
+                let withoutBookings = CreatorSchedule(settings: schedule.settings, bookedRanges: [], externalBusy: schedule.externalBusy)
+                let onlyBookingsBlock = AvailabilityEngine.isAvailable(
+                    start: request.startAt, durationMinutes: duration, schedule: withoutBookings, now: now
+                )
+                throw onlyBookingsBlock ? SlateError.slotTaken : SlateError.slotUnavailable
+            }
+            settings = schedule.settings
         }
 
         guard SignatureRules.isValid(signature) else { throw SlateError.invalidSignature }
@@ -209,8 +295,8 @@ extension LocalBackend {
             addOns: resolved.addOns.map { BookedAddOn(id: $0.id, name: $0.name, priceCents: $0.priceCents, extraMinutes: $0.extraMinutes) },
             startAt: request.startAt,
             endAt: end,
-            blockedUntil: end.addingTimeInterval(Double(schedule.settings.bufferMinutes) * 60),
-            timeZoneID: schedule.settings.timeZoneID,
+            blockedUntil: end.addingTimeInterval(Double(settings.bufferMinutes) * 60),
+            timeZoneID: settings.timeZoneID,
             currencyCode: package.currencyCode,
             totalCents: summary.totalCents,
             depositCents: summary.depositCents,
@@ -218,7 +304,11 @@ extension LocalBackend {
             notes: String(request.notes.prefix(500)),
             createdAt: now,
             holdExpiresAt: isHeld ? now.addingTimeInterval(Double(PaymentRules.holdMinutes) * 60) : nil,
-            cancellationPolicy: package.cancellationPolicy
+            cancellationPolicy: package.cancellationPolicy,
+            assignedTo: assignee,
+            assignedAt: assignee == nil ? nil : now,
+            requestedMember: request.memberID != nil,
+            assigneeShareBps: shareBps
         )
 
         let clientSignature = ContractSignature(
@@ -240,7 +330,11 @@ extension LocalBackend {
             status: .pending,
             signatures: [clientSignature],
             createdAt: now,
-            executedAt: nil
+            executedAt: nil,
+            providerLegalName: resolved.company?.legalName,
+            countersignerID: resolved.company?.signerID,
+            countersignerName: resolved.company?.signerName,
+            countersignerTitle: resolved.company?.signerTitle
         )
         if !isHeld {
             contract = Self.executed(contract, with: creatorSignature, at: now)
@@ -258,23 +352,39 @@ extension LocalBackend {
         // The conversation starts with what just happened. A failure here must not undo a booking that succeeded.
         try? appendSystemMessage(
             .booked, bookingID: bookingID,
-            data: MessageEventData(packageName: package.name, startAt: request.startAt, timeZone: schedule.settings.timeZoneID), at: now
+            data: MessageEventData(packageName: package.name, startAt: request.startAt, timeZone: settings.timeZoneID), at: now
         )
         if !isHeld { try? appendSystemMessage(.contractSigned, bookingID: bookingID, at: now) }
+        recordBookingCreated(booking)
+        if contract.status == .executed { recordContractExecuted(contract, booking: booking) }
         return SignedBooking(booking: booking, contract: contract)
     }
 
-    /// The contract with the creator's saved signature added and marked complete.
+    /// The contract with the creator's saved signature added and marked complete. For a company the signature is the
+    /// authorised person's, applied on the company's behalf, and the picture only if it still has their name.
     static func executed(_ contract: Contract, with creatorSignature: CreatorSignature, at date: Date) -> Contract {
         var done = contract
         if done.signature(for: .creator) == nil {
-            done.signatures.append(ContractSignature(
-                id: UUID(), role: .creator, userID: contract.creatorID,
-                signedName: creatorSignature.signedName, method: .onFile,
-                imagePNG: creatorSignature.method == .drawn ? creatorSignature.imagePNG : nil,
-                signedAt: date, consentVersion: SigningConsent.version,
-                device: "Signature on file, applied when the booking was confirmed"
-            ))
+            if let company = contract.providerLegalName {
+                let name = contract.countersignerName ?? creatorSignature.signedName
+                let title = contract.countersignerTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                done.signatures.append(ContractSignature(
+                    id: UUID(), role: .creator, userID: contract.countersignerID,
+                    signedName: name, method: .onFile,
+                    imagePNG: creatorSignature.method == .drawn && creatorSignature.signedName == name ? creatorSignature.imagePNG : nil,
+                    signedAt: date, consentVersion: SigningConsent.version,
+                    device: "Signature on file, applied for the company when the booking was confirmed",
+                    onBehalfOf: company, signerTitle: title.isEmpty ? nil : title
+                ))
+            } else {
+                done.signatures.append(ContractSignature(
+                    id: UUID(), role: .creator, userID: contract.creatorID,
+                    signedName: creatorSignature.signedName, method: .onFile,
+                    imagePNG: creatorSignature.method == .drawn ? creatorSignature.imagePNG : nil,
+                    signedAt: date, consentVersion: SigningConsent.version,
+                    device: "Signature on file, applied when the booking was confirmed"
+                ))
+            }
         }
         done.status = .executed
         done.executedAt = date
@@ -283,8 +393,9 @@ extension LocalBackend {
 
     func loadBookings(for userID: UUID) async throws -> [Booking] {
         try expireLapsedHolds()
+        let orgs = readOrganizations()
         return readBookings()
-            .filter { $0.creatorID == userID || $0.clientID == userID }
+            .filter { isParty(userID, $0, .view, in: orgs) }
             .sorted { $0.startAt < $1.startAt }
     }
 

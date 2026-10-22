@@ -28,9 +28,11 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         var avatarPath: String?
         var createdAt: Date?
         var updatedAt: Date?
+        /// `person` or `company`. Never sent: the database fixes it when the profile is made and never changes it.
+        var kind: String?
 
         enum CodingKeys: String, CodingKey {
-            case id, handle, bio, specialties, latitude, longitude
+            case id, handle, bio, specialties, latitude, longitude, kind
             case displayName = "display_name"
             case locationName = "location_name"
             case travelRadiusKm = "travel_radius_km"
@@ -176,11 +178,18 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             travelRadiusKm: profile.location?.travelRadiusKm,
             avatarPath: avatarPath,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            kind: nil
         )
 
         do {
-            try await client.from("creator_profiles").upsert(row, onConflict: "id").execute()
+            if profile.kind == .company {
+                // A company's profile already exists. An upsert would also be checked as if a person were making it, so
+                // a company's is only ever updated, and the database decides whether this person may.
+                try await client.from("creator_profiles").update(row).eq("id", value: userKey).execute()
+            } else {
+                try await client.from("creator_profiles").upsert(row, onConflict: "id").execute()
+            }
         } catch {
             // 23505 = unique_violation on `handle`.
             if "\(error)".contains("23505") || "\(error)".localizedCaseInsensitiveContains("duplicate key") {
@@ -314,7 +323,7 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
 
     // MARK: - Mapping
 
-    private func publicURL(bucket: String, path: String) throws -> URL {
+    func publicURL(bucket: String, path: String) throws -> URL {
         try client.storage.from(bucket).getPublicURL(path: path)
     }
 
@@ -338,7 +347,8 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             location: location,
             avatarURL: try row.avatarPath.map { try publicURL(bucket: "avatars", path: $0) },
             createdAt: row.createdAt ?? Date(),
-            updatedAt: row.updatedAt ?? Date()
+            updatedAt: row.updatedAt ?? Date(),
+            kind: ProfileKind(rawValue: row.kind ?? "person") ?? .person
         )
     }
 

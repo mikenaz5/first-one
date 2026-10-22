@@ -58,13 +58,17 @@ extension LocalBackend {
     // MARK: - Reading
 
     func loadPayments(for userID: UUID) async throws -> [Payment] {
-        let mine = Set(readBookings().filter { $0.creatorID == userID || $0.clientID == userID }.map(\.id))
+        let orgs = readOrganizations()
+        let mine = Set(readBookings().filter { isParty(userID, $0, .view, in: orgs) }.map(\.id))
         return readPayments().filter { mine.contains($0.bookingID) }.sorted { $0.createdAt < $1.createdAt }
     }
 
     func loadPaymentAccount(for creatorID: UUID) async throws -> PaymentAccount { .simulated }
 
-    func beginPaymentAccountSetup(for creatorID: UUID) async throws -> PaymentAccountSetup { .ready(.simulated) }
+    func beginPaymentAccountSetup(for creatorID: UUID) async throws -> PaymentAccountSetup {
+        try authorizeOwner(creatorID, .paymentsConnect)
+        return .ready(.simulated)
+    }
 
     func refreshPaymentAccount(for creatorID: UUID) async throws -> PaymentAccount { .simulated }
 
@@ -141,7 +145,7 @@ extension LocalBackend {
             // Paid just after the hold ran out. If nobody has taken the time, honour it.
             let mine = bookings[bookingIndex]
             let taken = bookings.contains {
-                $0.id != mine.id && $0.creatorID == mine.creatorID
+                $0.id != mine.id && $0.occupant == mine.occupant
                     && $0.effectiveStatus(at: now).blocksTime && IntervalMath.overlaps($0.blockedRange, mine.blockedRange)
             }
             if taken { refundNeeded = true } else { confirm = true }
@@ -160,6 +164,7 @@ extension LocalBackend {
         }
         if complete {
             bookings[bookingIndex].status = .completed
+            recordBookingEvent(bookings[bookingIndex], "booking.completed", "Completed", actor: nil)
         }
         if refundNeeded {
             payments.append(Payment(
@@ -184,9 +189,21 @@ extension LocalBackend {
     private func executeContract(bookingID: UUID, creatorID: UUID, at date: Date) throws {
         var contracts = readContracts()
         guard let index = contracts.firstIndex(where: { $0.bookingID == bookingID }), contracts[index].status != .executed else { return }
-        guard let creatorSignature = read(CreatorSignature.self, from: signatureURL(creatorID)) else { throw SlateError.creatorNotReady }
+        // A company's contract is countersigned by the person it named when the client signed.
+        let company = contracts[index].providerLegalName != nil
+        let saved = read(CreatorSignature.self, from: signatureURL(contracts[index].countersignerID ?? creatorID))
+        let creatorSignature: CreatorSignature
+        if let saved {
+            creatorSignature = saved
+        } else if company {
+            // The signer's picture is gone, but what they signed for stands: the name is on the contract.
+            creatorSignature = CreatorSignature(signedName: contracts[index].countersignerName ?? "", method: .typed, imagePNG: nil, updatedAt: date)
+        } else {
+            throw SlateError.creatorNotReady
+        }
         contracts[index] = Self.executed(contracts[index], with: creatorSignature, at: date)
         try write(contracts, to: contractsURL)
+        recordContractExecuted(contracts[index], booking: readBookings().first { $0.id == bookingID })
     }
 
     // MARK: - Cancelling
@@ -208,10 +225,10 @@ extension LocalBackend {
         try expireLapsedHolds()
         let now = self.now
         guard let booking = readBookings().first(where: { $0.id == bookingID }),
-              booking.creatorID == userID || booking.clientID == userID,
+              isParty(userID, booking, .manage),
               booking.canCancel(at: now)
         else { throw SlateError.notCancellable }
-        return quote(for: booking, payments: readPayments(), byCreator: booking.creatorID == userID, now: now)
+        return quote(for: booking, payments: readPayments(), byCreator: isProviderSide(userID, booking), now: now)
     }
 
     func cancelBooking(_ id: UUID, by userID: UUID) async throws -> CancellationResult {
@@ -219,12 +236,13 @@ extension LocalBackend {
         let now = Date(timeIntervalSince1970: self.now.timeIntervalSince1970.rounded(.down))
         var bookings = readBookings()
         guard let index = bookings.firstIndex(where: { $0.id == id }),
-              bookings[index].creatorID == userID || bookings[index].clientID == userID,
+              isParty(userID, bookings[index], .manage),
               bookings[index].canCancel(at: now)
         else { throw SlateError.notCancellable }
 
         var payments = readPayments()
-        let figures = quote(for: bookings[index], payments: payments, byCreator: bookings[index].creatorID == userID, now: now)
+        let byCreator = isProviderSide(userID, bookings[index])
+        let figures = quote(for: bookings[index], payments: payments, byCreator: byCreator, now: now)
 
         bookings[index].status = .cancelled
         bookings[index].cancelledAt = now
@@ -255,9 +273,10 @@ extension LocalBackend {
         try writePayments(payments)
         try? appendSystemMessage(
             .cancelled, bookingID: id,
-            data: MessageEventData(refundCents: figures.refundCents, currency: bookings[index].currencyCode, byCreator: bookings[index].creatorID == userID),
+            data: MessageEventData(refundCents: figures.refundCents, currency: bookings[index].currencyCode, byCreator: byCreator),
             at: now
         )
+        recordBookingEvent(bookings[index], "booking.cancelled", "Cancelled", actor: userID)
         return CancellationResult(booking: bookings[index], refundCents: figures.refundCents, percent: figures.percent)
     }
 

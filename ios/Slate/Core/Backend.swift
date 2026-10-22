@@ -119,6 +119,85 @@ protocol SlateBackend {
 
     /// Whether a creator may book their own packages. True on-device so the flow can be tested alone.
     var allowsSelfBooking: Bool { get }
+
+    // MARK: Companies
+    //
+    // A company is an owner like a person: its id is its profile id, and packages, contract templates, hours, bookings
+    // and the payment account are all found by that id. These methods are about the company itself and its people.
+    // Every one is checked against the caller's role (`OrgPermission`); the database does the checking, the app only
+    // hides what a role can't use.
+
+    /// The numbers behind seats and invites. They live in the database so they can change without a release.
+    func loadTeamConfig() async throws -> TeamConfig
+    /// Every account this person can act as: their own, and each company they belong to.
+    func loadAccounts(for userID: UUID) async throws -> AccountList
+    /// Starts a company from nothing. The person becomes its Owner and gets a minimal profile of their own if they had none.
+    func createOrganization(_ draft: OrganizationDraft, by userID: UUID) async throws -> Organization
+    /// Turns an individual account into a company: services and contract templates move to it, bookings and signed
+    /// contracts stay where they are. Throws `profileRequired`, `bookingsInHold`.
+    func upgradeToCompany(_ draft: OrganizationDraft, by userID: UUID) async throws -> Organization
+    /// The other way, for an Owner who is alone with nothing coming up. Throws `teamNotEmpty`, `hasUpcomingBookings`.
+    func downgradeToIndividual(organizationID: UUID, by userID: UUID) async throws
+    func loadOrganization(_ id: UUID, for userID: UUID) async throws -> Organization
+    func updateOrganization(_ id: UUID, with update: OrganizationUpdate, by userID: UUID) async throws -> Organization
+    func setSplitEnabled(_ enabled: Bool, organizationID: UUID, by userID: UUID) async throws -> Organization
+    /// Names who countersigns company contracts. Throws `signerRoleNotAllowed`, `signatureRequired`.
+    func designateSigner(userID: UUID, title: String, organizationID: UUID, by actorID: UUID) async throws -> Organization
+    func transferOwnership(organizationID: UUID, to userID: UUID, by actorID: UUID) async throws
+    /// Closes a company for good (its signed contracts are kept). Throws `hasUpcomingBookings`.
+    func closeOrganization(_ id: UUID, by userID: UUID) async throws
+
+    // Members
+    func loadMembers(organizationID: UUID, for userID: UUID) async throws -> [TeamMember]
+    func setMemberRole(_ role: OrgRole, memberID: UUID, organizationID: UUID, by userID: UUID) async throws
+    func updateMember(_ update: MemberUpdate, memberID: UUID, organizationID: UUID, by userID: UUID) async throws
+    /// Sets a member's share of the bookings assigned to them, in basis points. Owner only.
+    func setMemberShare(bps: Int, memberID: UUID, organizationID: UUID, by userID: UUID) async throws
+    /// Takes someone off the team. Their upcoming bookings go back to the queue. Throws `lastOwner`.
+    func removeMember(memberID: UUID, organizationID: UUID, by userID: UUID) async throws
+    func leaveOrganization(_ id: UUID, by userID: UUID) async throws
+    /// A member's own working hours at this company. Nil means the company's. They can only narrow the company's.
+    func saveMyHours(_ hours: [DayHours]?, organizationID: UUID, by userID: UUID) async throws
+
+    // Invites
+    func loadInvites(organizationID: UUID, for userID: UUID) async throws -> [OrgInvite]
+    /// A single-use invite. The link is returned once and never stored. Throws `seatLimit`, `planInactive`, `invalidRole`.
+    func createInvite(role: OrgRole, email: String?, organizationID: UUID, by userID: UUID) async throws -> CreatedInvite
+    func revokeInvite(_ id: UUID, organizationID: UUID, by userID: UUID) async throws
+    /// A lost link is replaced, not recovered: the old invite is cancelled and a new one made.
+    func resendInvite(_ id: UUID, organizationID: UUID, by userID: UUID) async throws -> CreatedInvite
+    /// What a person sees before joining. One error (`inviteInvalid`) for every bad token, so tokens can't be probed.
+    func previewInvite(token: String, for userID: UUID) async throws -> InvitePreview
+    /// Joins the company under the invite's role. Throws `inviteInvalid`, `alreadyMember`.
+    func acceptInvite(token: String, displayName: String?, by userID: UUID) async throws -> Organization
+    /// On-device only: a teammate accepting an invite, so teams can be tried without a second phone. Returns the
+    /// teammate's id. Throws everywhere else.
+    func completeSimulatedJoin(inviteID: UUID, displayName: String) async throws -> UUID
+
+    // Activity and billing
+    func loadActivity(organizationID: UUID, limit: Int, before: Date?, for userID: UUID) async throws -> [ActivityEntry]
+    func loadBilling(organizationID: UUID, for userID: UUID) async throws -> BillingOverview
+    /// What adding (`delta` > 0) or removing people does to the bill, for the sheet that asks first.
+    func previewSeatChange(delta: Int, organizationID: UUID, for userID: UUID) async throws -> SeatPlan
+    /// A Stripe-hosted page to start the plan or manage it. Open it in a web authentication session.
+    func beginBilling(_ action: BillingAction, organizationID: UUID, by userID: UUID) async throws -> URL
+
+    // Assigning bookings
+    /// Bookings waiting for someone, soonest first.
+    func loadAssignmentQueue(organizationID: UUID, for userID: UUID) async throws -> [Booking]
+    func loadAssignmentOptions(bookingID: UUID, for userID: UUID) async throws -> [AssignmentOption]
+    /// Gives a booking to a person (or moves it). Throws `invalidAssignee`, `slotTaken`, `notAssignable`.
+    func assignBooking(_ bookingID: UUID, to memberID: UUID, by userID: UUID) async throws -> Booking
+
+    // Calendar and shared services
+    /// Everyone's hours, busy time and bookings. Only these people, if `members` isn't empty.
+    func loadTeamCalendar(organizationID: UUID, from: Date, to: Date, members: Set<UUID>, for userID: UUID) async throws -> TeamCalendar
+    /// For a client choosing a time: the company's rules and each eligible person's hours and busy time. With `memberID`,
+    /// only that person.
+    func loadTeamSchedule(packageID: UUID, memberID: UUID?, from: Date, to: Date) async throws -> TeamSchedule
+    /// The people who offer a package. Empty means everyone who can take bookings.
+    func loadPackageMembers(packageID: UUID) async throws -> [UUID]
+    func setPackageMembers(_ memberIDs: [UUID], packageID: UUID, by userID: UUID) async throws
 }
 
 enum BackendFactory {

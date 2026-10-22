@@ -28,7 +28,7 @@ extension LocalBackend {
     func shareDelivery(bookingID: UUID, link: String, note: String, by creatorID: UUID) async throws -> Booking {
         let now = wholeSecondNow
         var bookings = readBookings()
-        guard let index = bookings.firstIndex(where: { $0.id == bookingID }), bookings[index].creatorID == creatorID else {
+        guard let index = bookings.firstIndex(where: { $0.id == bookingID }), providerAccess(creatorID, bookings[index], .manage) else {
             throw SlateError.bookingNotFound
         }
         guard bookings[index].canShareDelivery(at: now) else { throw SlateError.notDeliverable }
@@ -44,6 +44,9 @@ extension LocalBackend {
         // Like the database, say nothing when the same link is shared again.
         if linkChanged {
             try? appendSystemMessage(.deliveryShared, bookingID: bookingID, data: MessageEventData(revised: revised), at: now)
+            let client = bookings[index].clientName.isEmpty ? "a client" : bookings[index].clientName
+            recordForCompany(bookings[index].creatorID, actor: creatorID, "booking.delivered",
+                             "Shared the final files for \(bookings[index].packageName) (\(client))")
         }
         return bookings[index]
     }
@@ -60,7 +63,10 @@ extension LocalBackend {
 
         bookings[index].receiptConfirmedAt = now
         // With nothing left to pay, confirming finishes the booking.
-        if bookings[index].balanceCents == 0 { bookings[index].status = .completed }
+        if bookings[index].balanceCents == 0 {
+            bookings[index].status = .completed
+            recordBookingEvent(bookings[index], "booking.completed", "Completed", actor: nil)
+        }
         try write(bookings, to: bookingsURL)
         try? appendSystemMessage(
             .receiptConfirmed, bookingID: bookingID,
@@ -95,7 +101,8 @@ extension LocalBackend {
 
     func loadReview(bookingID: UUID, for userID: UUID) async throws -> Review? {
         // Like the database, a stranger just sees nothing.
-        guard readBookings().contains(where: { $0.id == bookingID && ($0.creatorID == userID || $0.clientID == userID) }) else { return nil }
+        let orgs = readOrganizations()
+        guard readBookings().contains(where: { $0.id == bookingID && isParty(userID, $0, .view, in: orgs) }) else { return nil }
         return readReviews().first { $0.review.bookingID == bookingID }?.review
     }
 

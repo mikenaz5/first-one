@@ -87,6 +87,16 @@ struct Booking: Identifiable, Codable, Equatable, Hashable {
         return holdExpiresAt.timeIntervalSince(now)
     }
 
+    /// Whose calendar this booking takes time from: the person it is assigned to, or for an older booking (made before
+    /// assignment existed) the creator. A company's booking nobody has taken yet answers with the company.
+    var occupant: UUID { assignedTo ?? creatorID }
+
+    /// On the provider side of this booking as the person who does it: its creator, or the team member it is assigned to.
+    func isProviderFor(_ userID: UUID) -> Bool { creatorID == userID || assignedTo == userID }
+
+    /// Mine to attend or to do: I booked it, I own it, or it is assigned to me.
+    func involves(_ userID: UUID) -> Bool { clientID == userID || isProviderFor(userID) }
+
     /// A company's booking that no one has been given yet.
     var isWaitingForAssignment: Bool { assignedTo == nil && status.blocksTime }
 

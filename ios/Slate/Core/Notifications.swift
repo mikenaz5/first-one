@@ -120,9 +120,9 @@ enum ReminderPlanner {
     ) -> [PlannedReminder] {
         guard enabled else { return [] }
         var planned: [PlannedReminder] = []
-        for booking in bookings where booking.creatorID == userID || booking.clientID == userID {
+        for booking in bookings where booking.involves(userID) {
             guard booking.effectiveStatus(at: now) == .confirmed, booking.startAt > now else { continue }
-            let other = booking.creatorID == userID ? booking.clientName : booking.creatorName
+            let other = booking.isProviderFor(userID) ? booking.clientName : booking.creatorName
             for lead in ReminderRules.leadMinutes {
                 let fire = booking.startAt.addingTimeInterval(-Double(lead) * 60)
                 guard fire > now, booking.createdAt < fire else { continue }

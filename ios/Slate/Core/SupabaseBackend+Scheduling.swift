@@ -93,7 +93,7 @@ extension SupabaseBackend {
         }
     }
 
-    private struct BookingRow: Decodable {
+    struct BookingRow: Decodable {
         var id: String
         var creatorId: String
         var clientId: String?
@@ -120,9 +120,17 @@ extension SupabaseBackend {
         var cancelledAt: Date?
         var cancelledBy: String?
         var cancellationPolicy: String?
+        var assignedTo: String?
+        var assignedAt: Date?
+        var requestedMember: Bool?
+        var assigneeShareBps: Int?
 
         enum CodingKeys: String, CodingKey {
             case id, status, notes
+            case assignedTo = "assigned_to"
+            case assignedAt = "assigned_at"
+            case requestedMember = "requested_member"
+            case assigneeShareBps = "assignee_share_bps"
             case creatorId = "creator_id"
             case clientId = "client_id"
             case creatorName = "creator_name"
@@ -184,8 +192,11 @@ extension SupabaseBackend {
         var pNotes: String
         var pDocumentHash: String
         var pSignature: SignaturePayload
+        /// For a company: the person the client asked for. Left out, the company chooses.
+        var pMemberId: String?
 
         enum CodingKeys: String, CodingKey {
+            case pMemberId = "p_member_id"
             case pPackageId = "p_package_id"
             case pAddOnIds = "p_add_on_ids"
             case pStartAt = "p_start_at"
@@ -367,7 +378,10 @@ extension SupabaseBackend {
             .order("position", ascending: true)
             .execute()
             .value
-        return PublicCreatorPage(profile: profile, portfolio: portfolio, packages: try rows.map(makePackage))
+        // A company also shows the people a client can book directly.
+        var team: [PublicTeamMember] = []
+        if profile.kind == .company { team = try await loadPublicTeam(organizationID: profile.id) }
+        return PublicCreatorPage(profile: profile, portfolio: portfolio, packages: try rows.map(makePackage), team: team)
     }
 
     func loadSchedule(for creatorID: UUID, from: Date, to: Date) async throws -> CreatorSchedule {
@@ -407,7 +421,8 @@ extension SupabaseBackend {
                 imagePng: signature.method == .drawn ? signature.imagePNG?.base64EncodedString() : nil,
                 consentVersion: signature.consentVersion,
                 device: signature.device
-            )
+            ),
+            pMemberId: request.memberID.map(Self.key)
         )
         do {
             let row: SignedBookingRow = try await client.rpc("create_booking", params: params).execute().value
@@ -470,7 +485,7 @@ extension SupabaseBackend {
         try await client.rpc("expire_holds").execute()
     }
 
-    private func makeBooking(_ row: BookingRow) throws -> Booking {
+    func makeBooking(_ row: BookingRow) throws -> Booking {
         guard let id = UUID(uuidString: row.id), let creatorID = UUID(uuidString: row.creatorId) else {
             throw SlateError.backend("Malformed booking id.")
         }
@@ -500,7 +515,11 @@ extension SupabaseBackend {
             receiptConfirmedAt: row.receiptConfirmedAt,
             cancelledAt: row.cancelledAt,
             cancelledByID: row.cancelledBy.flatMap(UUID.init(uuidString:)),
-            cancellationPolicy: row.cancellationPolicy.flatMap(CancellationPolicy.init(rawValue:)) ?? .moderate
+            cancellationPolicy: row.cancellationPolicy.flatMap(CancellationPolicy.init(rawValue:)) ?? .moderate,
+            assignedTo: row.assignedTo.flatMap(UUID.init(uuidString:)),
+            assignedAt: row.assignedAt,
+            requestedMember: row.requestedMember ?? false,
+            assigneeShareBps: row.assigneeShareBps
         )
     }
 

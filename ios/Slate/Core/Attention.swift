@@ -56,7 +56,7 @@ enum AttentionList {
                     ))
                 }
             }
-            if booking.creatorID == userID, booking.needsFollowUp(at: now), booking.deliveredAt == nil {
+            if booking.isProviderFor(userID), booking.needsFollowUp(at: now), booking.deliveredAt == nil {
                 items.append(AttentionItem(
                     kind: .shareFiles, bookingID: booking.id, title: "Share the final files",
                     detail: "\(booking.packageName) for \(name(booking.clientName, "your client"))",

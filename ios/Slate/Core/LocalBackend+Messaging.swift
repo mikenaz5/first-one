@@ -32,8 +32,8 @@ extension LocalBackend {
         Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded(.down))
     }
 
-    private func partyBooking(_ id: UUID, for userID: UUID) -> Booking? {
-        readBookings().first { $0.id == id && ($0.creatorID == userID || $0.clientID == userID) }
+    private func partyBooking(_ id: UUID, for userID: UUID, level: ProviderLevel = .view) -> Booking? {
+        readBookings().first { $0.id == id && isParty(userID, $0, level) }
     }
 
     /// Adds a line the system writes when something happens to a booking. Called only from this backend's own changes.
@@ -61,7 +61,8 @@ extension LocalBackend {
         let messages = readMessages()
         let marks = readMarks()
         var found: [(position: Int, summary: ConversationSummary)] = []
-        for booking in readBookings() where booking.creatorID == userID || booking.clientID == userID {
+        let orgs = readOrganizations()
+        for booking in readBookings() where isParty(userID, booking, .view, in: orgs) {
             // A hold that ran out never became a booking.
             if booking.effectiveStatus(at: now) == .expired { continue }
             let conversation = messages.filter { $0.bookingID == booking.id }
@@ -84,7 +85,7 @@ extension LocalBackend {
     func sendMessage(_ body: String, bookingID: UUID, clientMessageID: UUID, from userID: UUID) async throws -> Message {
         try expireLapsedHolds()
         let now = wholeSecondNow
-        guard let booking = partyBooking(bookingID, for: userID) else { throw SlateError.bookingNotFound }
+        guard let booking = partyBooking(bookingID, for: userID, level: .manage) else { throw SlateError.bookingNotFound }
 
         var messages = readMessages()
         // Sending again after a dropped connection returns the message already stored.
