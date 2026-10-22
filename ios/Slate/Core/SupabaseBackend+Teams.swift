@@ -389,7 +389,7 @@ extension SupabaseBackend {
         }
     }
 
-    private struct PackageMemberRow: Decodable {
+    struct PackageMemberRow: Decodable {
         var userId: String
 
         enum CodingKeys: String, CodingKey { case userId = "user_id" }

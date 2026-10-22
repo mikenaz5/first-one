@@ -33,9 +33,31 @@ final class AppModel {
     private(set) var phase: Phase = .launching
     private(set) var loadErrorMessage: String?
     private(set) var session: AuthSession?
-    private(set) var profile: CreatorProfile?
-    private(set) var portfolio: [PortfolioItem] = []
+    /// The profile and portfolio of the account being shown: the person's own, or a company's.
+    var profile: CreatorProfile?
+    var portfolio: [PortfolioItem] = []
     var alert: ErrorAlert?
+
+    // Accounts. A person can act as themselves or as any company they work for, the way Apple's apps switch accounts.
+    /// The person's own profile. `profile` is the active account's, which is this one unless a company is showing.
+    var personalProfile: CreatorProfile?
+    /// Every account this person can act as.
+    var accounts: AccountList = .empty
+    var activeAccount: ActiveAccount = .personal
+    /// The company on screen (its settings, this person's role in it, its seats and plan), when one is.
+    var organization: Organization?
+    /// The numbers behind seats and invites, from the database so they can change without a release.
+    var teamConfig: TeamConfig = .standard
+    /// What the active company's roles let this person see. Each is empty for a role that can't see it.
+    var teamMembers: [TeamMember] = []
+    var teamInvites: [OrgInvite] = []
+    var assignmentQueue: [Booking] = []
+    /// Who offers each shared service. A service with no entry is offered by everyone who takes bookings.
+    var packageMembers: [UUID: [UUID]] = [:]
+    /// An invite link opened before the person was ready for it.
+    @ObservationIgnored var pendingInviteToken: String?
+    /// An invite the person is looking at, waiting for them to join or decline.
+    var presentedInvite: InviteOffer?
 
     // Scheduling state. Internal (not private(set)) because the extensions in
     // AppModel+Packages / +Booking / +Calendar update it from their own files.
@@ -188,6 +210,16 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
         session = nil
         profile = nil
+        personalProfile = nil
+        accounts = .empty
+        activeAccount = .personal
+        organization = nil
+        teamMembers = []
+        teamInvites = []
+        assignmentQueue = []
+        packageMembers = [:]
+        presentedInvite = nil
+        pendingInviteToken = nil
         portfolio = []
         packages = []
         availability = nil
@@ -214,9 +246,13 @@ final class AppModel {
     private func loadAccount() async {
         guard let session else { return }
         do {
-            profile = try await backend.loadProfile(for: session.userID)
-            portfolio = try await backend.loadPortfolio(for: session.userID)
-            try await loadScheduling(for: session.userID)
+            personalProfile = try await backend.loadProfile(for: session.userID)
+            // Companies are an extra: a failure to list them must not stop the person's own account from opening.
+            accounts = (try? await backend.loadAccounts(for: session.userID))
+                ?? AccountList(hasPersonalProfile: personalProfile != nil, companies: [])
+            teamConfig = (try? await backend.loadTeamConfig()) ?? .standard
+            activeAccount = restoredActiveAccount(for: session.userID)
+            try await loadOwnerData()
             loadErrorMessage = nil
             updatePhase()
             afterAccountLoaded()
@@ -224,6 +260,43 @@ final class AppModel {
             loadErrorMessage = error.localizedDescription
             phase = .loadFailed
         }
+    }
+
+    /// The account the person had open last time, if they still belong to it.
+    private func restoredActiveAccount(for userID: UUID) -> ActiveAccount {
+        let wanted = ActiveAccount(storageValue: UserDefaults.standard.string(forKey: AppConfig.activeAccountKey(for: userID)))
+        if case .company(let id) = wanted, accounts.companies.contains(where: { $0.organizationID == id }) { return wanted }
+        // Someone who only works for a company opens on it.
+        if personalProfile?.isComplete != true, let first = accounts.companies.first { return .company(first.organizationID) }
+        return .personal
+    }
+
+    /// Loads the active account's profile, portfolio, services, hours, contracts and (for a company) its team.
+    /// Bookings, payments and conversations belong to the person and are loaded as theirs: the backend returns what
+    /// their role lets them see.
+    func loadOwnerData() async throws {
+        guard let session else { return }
+        switch activeAccount {
+        case .personal:
+            profile = personalProfile
+            organization = nil
+        case .company(let id):
+            do {
+                organization = try await backend.loadOrganization(id, for: session.userID)
+            } catch SlateError.notFound {
+                // Removed from the company, or it was closed: go back to being yourself.
+                activeAccount = .personal
+                UserDefaults.standard.set(ActiveAccount.personal.storageValue, forKey: AppConfig.activeAccountKey(for: session.userID))
+                accounts = (try? await backend.loadAccounts(for: session.userID)) ?? accounts
+                try await loadOwnerData()
+                return
+            }
+            profile = try await backend.loadProfile(for: id)
+        }
+        let owner = ownerID ?? session.userID
+        portfolio = try await backend.loadPortfolio(for: owner)
+        try await loadScheduling(owner: owner, user: session.userID)
+        if activeAccount.companyID != nil { await loadTeam() }
     }
 
     func retryLoad() async {
@@ -234,9 +307,9 @@ final class AppModel {
     func refresh() async {
         guard let session else { return }
         do {
-            profile = try await backend.loadProfile(for: session.userID)
-            portfolio = try await backend.loadPortfolio(for: session.userID)
-            try await loadScheduling(for: session.userID)
+            personalProfile = try await backend.loadProfile(for: session.userID)
+            if let latest = try? await backend.loadAccounts(for: session.userID) { accounts = latest }
+            try await loadOwnerData()
             Task { await syncCalendar() }
             Task { await settlePendingRefunds() }
             Task { await loadReviews(for: session.userID) }
@@ -246,20 +319,23 @@ final class AppModel {
         }
     }
 
-    private func updatePhase() {
+    func updatePhase() {
         if session == nil {
             phase = .signedOut
-        } else if profile?.isComplete == true {
+        } else if personalProfile?.isComplete == true || !accounts.companies.isEmpty {
             phase = .ready
             Task { await openPendingBookingLinkIfNeeded() }
+            Task { await openPendingInviteIfNeeded() }
         } else {
             phase = .onboarding
+            // An invite opened before the account existed is the first thing to show, in place of choosing a type.
+            Task { await openPendingInviteIfNeeded() }
         }
     }
 
     func isHandleAvailable(_ handle: String) async throws -> Bool {
         guard let session else { throw SlateError.notSignedIn }
-        return try await backend.isHandleAvailable(handle, excluding: session.userID)
+        return try await backend.isHandleAvailable(handle, excluding: ownerID ?? session.userID)
     }
 
     // MARK: - Profile
@@ -268,8 +344,10 @@ final class AppModel {
     /// profile: the person lands in the app and can retry from their profile.
     func completeOnboarding(draft: ProfileDraft, portfolio newItems: [NewPortfolioItem]) async throws {
         guard let session else { throw SlateError.notSignedIn }
-        let toSave = draft.makeProfile(id: session.userID, existing: profile)
-        profile = try await backend.saveProfile(toSave, avatarJPEG: draft.avatarJPEG)
+        let toSave = draft.makeProfile(id: session.userID, existing: personalProfile)
+        let saved = try await backend.saveProfile(toSave, avatarJPEG: draft.avatarJPEG)
+        personalProfile = saved
+        if activeAccount == .personal { profile = saved }
 
         if !newItems.isEmpty {
             do {
@@ -281,36 +359,40 @@ final class AppModel {
         updatePhase()
     }
 
+    /// Saves the profile on screen: the person's own, or the company's when one is showing.
     func updateProfile(from draft: ProfileDraft) async throws {
         guard let session else { throw SlateError.notSignedIn }
-        let toSave = draft.makeProfile(id: session.userID, existing: profile)
-        profile = try await backend.saveProfile(toSave, avatarJPEG: draft.avatarJPEG)
+        let toSave = draft.makeProfile(id: ownerID ?? session.userID, existing: profile)
+        let saved = try await backend.saveProfile(toSave, avatarJPEG: draft.avatarJPEG)
+        profile = saved
+        if activeAccount == .personal { personalProfile = saved }
+        if activeAccount.companyID != nil { organization = try? await backend.loadOrganization(saved.id, for: session.userID) }
     }
 
     // MARK: - Portfolio
 
     func addPortfolio(_ items: [NewPortfolioItem]) async {
-        guard let session, !items.isEmpty else { return }
+        guard let owner = ownerID, !items.isEmpty else { return }
         do {
-            portfolio = try await backend.addPortfolioItems(items, for: session.userID)
+            portfolio = try await backend.addPortfolioItems(items, for: owner)
         } catch {
             show(error, title: "Couldn't add to your portfolio")
         }
     }
 
     func deletePortfolioItem(_ item: PortfolioItem) async {
-        guard let session else { return }
+        guard let owner = ownerID else { return }
         do {
-            portfolio = try await backend.deletePortfolioItem(item.id, for: session.userID)
+            portfolio = try await backend.deletePortfolioItem(item.id, for: owner)
         } catch {
             show(error, title: "Couldn't delete")
         }
     }
 
     func movePortfolioItemToFront(_ item: PortfolioItem) async {
-        guard let session else { return }
+        guard let owner = ownerID else { return }
         do {
-            portfolio = try await backend.movePortfolioItemToFront(item.id, for: session.userID)
+            portfolio = try await backend.movePortfolioItemToFront(item.id, for: owner)
         } catch {
             show(error, title: "Couldn't reorder")
         }

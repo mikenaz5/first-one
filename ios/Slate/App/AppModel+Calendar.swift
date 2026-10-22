@@ -101,7 +101,8 @@ extension AppModel {
         else { return }
 
         let now = Date()
-        for booking in bookings where booking.creatorID == userID {
+        // The shoots that are the person's: their own, and the company jobs given to them.
+        for booking in bookings where booking.isProviderFor(userID) {
             let existing = calendarPrefs.eventIDs[booking.id]
             if booking.status == .confirmed, booking.endAt > now, existing == nil {
                 if let eventID = try? calendar.addEvent(

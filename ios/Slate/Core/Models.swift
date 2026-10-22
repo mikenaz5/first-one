@@ -449,6 +449,9 @@ enum AppConfig {
     /// Fake Apple user identifier used by the debug-only demo sign-in.
     static let demoAppleUserID = "slate.demo"
 
+    /// Which account (their own, or a company's) a person last had open on this device.
+    static func activeAccountKey(for userID: UUID) -> String { "slate.activeAccount.\(userID.uuidString.lowercased())" }
+
     /// Custom URL scheme: `slate://book/<handle>` opens a creator's page in the app.
     static let urlScheme = "slate"
 

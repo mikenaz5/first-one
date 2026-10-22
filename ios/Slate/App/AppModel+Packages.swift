@@ -1,15 +1,17 @@
 import Foundation
 
 extension AppModel {
-    /// Loads everything scheduling-related for the signed-in creator.
-    func loadScheduling(for userID: UUID) async throws {
-        packages = try await backend.loadPackages(for: userID)
-        availability = try await backend.loadAvailability(for: userID)
+    /// Loads everything scheduling-related for the account on screen. Services, hours, contract templates and the
+    /// payment account belong to `owner` (the person, or their company); bookings, payments and the person's own
+    /// signature belong to `userID`, and the backend returns the bookings and payments their role lets them see.
+    func loadScheduling(owner: UUID, user userID: UUID) async throws {
+        packages = try await backend.loadPackages(for: owner)
+        availability = try await backend.loadAvailability(for: owner)
         bookings = try await backend.loadBookings(for: userID)
-        contractTemplates = try await backend.loadContractTemplates(for: userID)
+        contractTemplates = try await backend.loadContractTemplates(for: owner)
         creatorSignature = try await backend.loadCreatorSignature(for: userID)
         payments = try await backend.loadPayments(for: userID)
-        paymentAccount = try? await backend.loadPaymentAccount(for: userID)
+        paymentAccount = try? await backend.loadPaymentAccount(for: owner)
     }
 
     /// Runs once the account has loaded and the person is in the app.
@@ -43,7 +45,7 @@ extension AppModel {
     func makeNewPackage() -> ServicePackage {
         ServicePackage(
             id: UUID(),
-            creatorID: session?.userID ?? UUID(),
+            creatorID: ownerID ?? UUID(),
             name: "",
             summary: "",
             category: nil,
@@ -66,9 +68,9 @@ extension AppModel {
     }
 
     func deletePackage(_ package: ServicePackage) async {
-        guard let session else { return }
+        guard let owner = ownerID else { return }
         do {
-            packages = try await backend.deletePackage(package.id, for: session.userID)
+            packages = try await backend.deletePackage(package.id, for: owner)
         } catch {
             show(error, title: "Couldn't delete the package")
         }

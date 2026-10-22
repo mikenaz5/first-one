@@ -110,7 +110,8 @@ final class ProfileDraft {
             location: location,
             avatarURL: existing?.avatarURL,
             createdAt: existing?.createdAt ?? Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            kind: existing?.kind ?? .person
         )
     }
 }

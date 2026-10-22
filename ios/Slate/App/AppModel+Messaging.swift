@@ -21,7 +21,7 @@ extension AppModel {
     /// The other person in a booking, from the signed-in person's side.
     func counterpartName(for booking: Booking) -> String {
         if booking.creatorID == booking.clientID { return "Test booking (you)" }
-        if booking.creatorID == session?.userID {
+        if isProviderSide(booking) {
             return booking.clientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Client" : booking.clientName
         }
         return booking.creatorName

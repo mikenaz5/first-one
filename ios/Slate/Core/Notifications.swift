@@ -211,6 +211,10 @@ enum AppLink: Equatable {
     case booking(UUID?)
     case messages(UUID?)
     case stripeReturn
+    /// A company invite: `slate://join/<token>`.
+    case join(token: String)
+    /// Back from the company plan's Stripe pages: `slate://billing/return` or `/cancel`.
+    case billingReturn
 
     init?(url: URL) {
         guard url.scheme == AppConfig.urlScheme, let host = url.host else { return nil }
@@ -226,6 +230,11 @@ enum AppLink: Equatable {
             self = .messages(UUID(uuidString: last))
         case "stripe":
             self = .stripeReturn
+        case "join":
+            guard !last.isEmpty, last != "/" else { return nil }
+            self = .join(token: last)
+        case "billing":
+            self = .billingReturn
         default:
             return nil
         }

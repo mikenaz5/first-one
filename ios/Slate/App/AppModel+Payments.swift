@@ -138,9 +138,9 @@ extension AppModel {
 
     /// Starts (or continues) getting paid. Returns an address to open when Stripe's own pages finish the job.
     func setUpPayments() async -> URL? {
-        guard let session else { return nil }
+        guard let owner = ownerID else { return nil }
         do {
-            switch try await backend.beginPaymentAccountSetup(for: session.userID) {
+            switch try await backend.beginPaymentAccountSetup(for: owner) {
             case .ready(let account):
                 paymentAccount = account
                 return nil
@@ -154,8 +154,8 @@ extension AppModel {
     }
 
     func refreshPaymentAccount() async {
-        guard let session else { return }
-        if let account = try? await backend.refreshPaymentAccount(for: session.userID) {
+        guard let owner = ownerID else { return }
+        if let account = try? await backend.refreshPaymentAccount(for: owner) {
             paymentAccount = account
         }
     }

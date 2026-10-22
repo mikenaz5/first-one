@@ -4,8 +4,8 @@ extension AppModel {
     // MARK: - Availability
 
     func saveAvailability(_ settings: AvailabilitySettings) async throws {
-        guard let session else { throw SlateError.notSignedIn }
-        availability = try await backend.saveAvailability(settings, for: session.userID)
+        guard let owner = ownerID else { throw SlateError.notSignedIn }
+        availability = try await backend.saveAvailability(settings, for: owner)
         // The window of dates that matter may have changed.
         Task { await syncBusyTime() }
     }
@@ -22,14 +22,16 @@ extension AppModel {
         )
     }
 
-    /// Whether the signed-in person may book this creator's packages.
+    /// Whether the signed-in person may book this creator's packages. Nobody books themselves, or a company they work for.
     func canBook(creatorID: UUID) -> Bool {
-        creatorID != session?.userID || backend.allowsSelfBooking
+        let isOwn = creatorID == session?.userID || accounts.companies.contains { $0.organizationID == creatorID }
+        return !isOwn || backend.allowsSelfBooking
     }
 
     /// The name that appears in the contract for this person.
     var clientDisplayName: String {
-        let name = profile?.displayName ?? session?.fullName ?? ""
+        // A client is always the person, never the company they happen to have on screen.
+        let name = personalProfile?.displayName ?? session?.fullName ?? ""
         return name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Client" : name
     }
 
@@ -86,12 +88,14 @@ extension AppModel {
         }
     }
 
-    func isMine(_ booking: Booking) -> Bool { booking.creatorID == session?.userID }
+    /// True when the person is on the providing side of a booking: it is theirs, assigned to them, or a company's they work for.
+    func isMine(_ booking: Booking) -> Bool { isProviderSide(booking) }
 
     // MARK: - Deep links
 
     /// Handles `slate://book/<handle>` (open a creator's page), `slate://booking/<id>` (from a calendar event or a
-    /// notification), `slate://messages/<id>` (a message notification) and `slate://stripe/…` (back from Stripe).
+    /// notification), `slate://messages/<id>` (a message notification), `slate://join/<token>` (a company invite),
+    /// `slate://stripe/…` (back from Stripe) and `slate://billing/…` (back from the company plan's pages).
     func handle(url: URL) {
         guard let link = AppLink(url: url) else { return }
         switch link {
@@ -105,6 +109,10 @@ extension AppModel {
         case .stripeReturn:
             // Back from Stripe's setup pages: see where the account stands now.
             Task { await refreshPaymentAccount() }
+        case .join(let token):
+            openInviteLink(token: token)
+        case .billingReturn:
+            Task { await billingReturned() }
         }
     }
 

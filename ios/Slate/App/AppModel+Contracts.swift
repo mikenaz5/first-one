@@ -1,8 +1,12 @@
 import Foundation
 
 extension AppModel {
-    /// True once the creator has saved a signature. Without one, clients can't sign and book.
-    var hasCreatorSignature: Bool { creatorSignature != nil }
+    /// True once contracts can be countersigned: the creator has saved a signature, or (for a company) a signer is named.
+    /// Without one, clients can't sign and book.
+    var hasCreatorSignature: Bool {
+        if let organization { return organization.hasSigner }
+        return creatorSignature != nil
+    }
 
     // MARK: - Templates
 
@@ -18,24 +22,24 @@ extension AppModel {
     /// Adds an editable copy of one of the starter contracts and returns it.
     @discardableResult
     func addStarterTemplate(_ kind: ContractKind) async throws -> ContractTemplate {
-        guard let session else { throw SlateError.notSignedIn }
-        let starter = StarterTemplates.make(kind, creatorID: session.userID)
+        guard let owner = ownerID else { throw SlateError.notSignedIn }
+        let starter = StarterTemplates.make(kind, creatorID: owner)
         contractTemplates = try await backend.saveContractTemplate(starter)
         return contractTemplates.first { $0.id == starter.id } ?? starter
     }
 
     @discardableResult
     func addBlankTemplate() async throws -> ContractTemplate {
-        guard let session else { throw SlateError.notSignedIn }
-        let blank = StarterTemplates.blank(creatorID: session.userID)
+        guard let owner = ownerID else { throw SlateError.notSignedIn }
+        let blank = StarterTemplates.blank(creatorID: owner)
         contractTemplates = try await backend.saveContractTemplate(blank)
         return contractTemplates.first { $0.id == blank.id } ?? blank
     }
 
     func deleteTemplate(_ template: ContractTemplate) async {
-        guard let session else { return }
+        guard let owner = ownerID else { return }
         do {
-            contractTemplates = try await backend.deleteContractTemplate(template.id, for: session.userID)
+            contractTemplates = try await backend.deleteContractTemplate(template.id, for: owner)
         } catch {
             show(error, title: "Couldn't delete the contract")
         }
