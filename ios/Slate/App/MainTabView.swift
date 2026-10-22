@@ -25,14 +25,10 @@ struct MainTabView: View {
                 .tabItem { Label("Services", systemImage: "camera.aperture") }
                 .tag(AppTab.services)
 
-            PlaceholderScreen(
-                title: "Messages",
-                systemImage: "bubble.left.and.bubble.right",
-                headline: "No messages yet",
-                message: "Each booking gets its own conversation with your client."
-            )
-            .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
-            .tag(AppTab.messages)
+            MessagesView()
+                .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
+                .badge(model.unreadMessageCount)
+                .tag(AppTab.messages)
 
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }

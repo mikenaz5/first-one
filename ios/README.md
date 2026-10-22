@@ -65,7 +65,7 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
 
 ### Signing and capabilities
 
-Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The app currently uses one capability, Sign in with Apple (`Config/Slate.entitlements`). Apple's free "Personal Team" doesn't support it; use a paid developer account. Change the bundle ID (`com.example.slate` in `project.yml`) before shipping.
+Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The default build uses one capability, Sign in with Apple (`Config/Slate.entitlements`); Apple Pay and push notifications are switched on through `Config/Secrets.xcconfig` (see "Turning on real payments" and "Turning on notifications"). Apple's free "Personal Team" doesn't support any of them; use a paid developer account. Change the bundle ID (`com.example.slate` in `project.yml`) before shipping.
 
 ## Packages, availability and booking
 
@@ -136,6 +136,44 @@ Every booking shows its money in plain words (*Deposit due*, *Deposit paid*, *Ba
 3. **Webhook:** in the Stripe dashboard add `https://<project>.supabase.co/functions/v1/stripe-webhook` for `payment_intent.succeeded`, `payment_intent.payment_failed`, `refund.created`, `refund.updated`, `refund.failed`, `charge.refund.updated` and `account.updated`, and copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. **Apple Pay:** register a merchant ID in your Apple developer account and its payment-processing certificate in the Stripe dashboard. In `Config/Secrets.xcconfig` set `STRIPE_PUBLISHABLE_KEY`, `APPLE_PAY_MERCHANT_ID` and `CODE_SIGN_ENTITLEMENTS = Config/Slate.ApplePay.entitlements` (see `Secrets.example.xcconfig`). Without these, a server-backed build tells the person that payments aren't set up rather than failing mysteriously, and on-device mode is unaffected.
 
+## Messaging and notifications
+
+**Messages.** Every booking has one conversation between its two people (Messages tab, or "Message …" on a booking). Besides what people write, the conversation records what happens to the booking, as short centred lines: *booked*, *deposit paid*, *contract signed*, *delivered*, *balance paid*, *cancelled (and what's refunded)*. Those lines are written by the database from the booking's own changes (triggers on `bookings`, `payments` and `contracts`), never by a person, so they can be trusted as a history. A text message is tidied before it is stored (line breaks, control characters; `MessageRules` and `message_clean()` share a fixture), limited to 2,000 characters and to 20 a minute, and sent with an id the app makes so a retry after a dropped connection can't post it twice. People who aren't in the booking can read and write nothing (Row Level Security plus the functions). A lapsed hold has no conversation; a cancelled or completed booking keeps its conversation, for refund questions. New lines arrive by **polling every few seconds while a conversation is open** (and every ten on the list), not a live connection.
+
+**Notifications.** Seven kinds, grouped into five switches in *Profile → More → Notifications*: **bookings** (a new booking, a cancellation), **contracts** (signed by both), **payments** (a deposit or balance received; a balance falling due), **messages**, and **shoot reminders** (a day before and two hours before, for both people, for confirmed bookings only). The payment and contract notifications are sent when Stripe confirms the money, not when someone taps, and nothing is announced for a payment that was handed straight back (cancelled while paying, or a duplicate). The app asks for permission only when the person taps *Turn On* (a card on Home, or the settings screen), never at launch. Tapping a notification opens the booking or the conversation (`slate://booking/<id>`, `slate://messages/<id>`). The icon badge is the number of unread messages.
+
+**Two ways reminders arrive, never both.** With a server, the database queues reminders and `send-push` delivers them; they are correct even if the other person cancelled while your phone was off, and they follow you across devices. On-device (no server), the app schedules them itself as local notifications from its bookings and keeps them in step whenever a booking changes (50 at most, soonest first). The reminder rules are the same in both (`enqueue_due_reminders()` and `ReminderPlanner`; the lead times are in `SlateTests/Fixtures/notification_rules.json`, checked by both test suites).
+
+**How a push gets from an event to a phone.** Triggers write *facts* (who, what, which booking, the amounts) into `push_outbox`, with a dedupe key so the same event can't queue twice and with the person's settings applied. The `send-push` Edge Function claims what's due (the database hands each notification to one run at a time), words each one, signs a request to Apple's push service with your `.p8` key, and tells the database how it went: delivered, try again (up to five times, with growing pauses), or *this device token is dead* (the app was deleted), in which case the token is forgotten. A phone that signs out unregisters itself. If a person has several devices, each gets it.
+
+### Turning on notifications
+
+Notifications on a server-backed build need Apple, Supabase and a schedule. None of it is needed to try messaging or reminders on-device.
+
+1. **Apple:** in your developer account, turn on **Push Notifications** for the app's identifier, and create an **APNs Auth Key** (Keys → +, Apple Push Notifications service). Download the `.p8` file once and note its Key ID and your Team ID.
+2. **App:** in `Config/Secrets.xcconfig` set `CODE_SIGN_ENTITLEMENTS` to `Config/Slate.Push.entitlements` (or `Config/Slate.ApplePay.Push.entitlements` with Apple Pay). Xcode builds talk to Apple's sandbox, TestFlight and App Store builds to production, and the app tells the server which (`PushEnvironment.current`).
+3. **Functions**, from `ios/`:
+   ```sh
+   supabase db push
+   supabase secrets set APNS_KEY_P8="$(cat AuthKey_XXXXXXXXXX.p8)" APNS_KEY_ID=XXXXXXXXXX APNS_TEAM_ID=YYYYYYYYYY APNS_TOPIC=com.example.slate PUSH_CRON_SECRET="$(openssl rand -hex 32)"
+   supabase functions deploy send-push --no-verify-jwt
+   ```
+   `send-push` is for the scheduler, not for people: it answers only a request carrying the service role key or `PUSH_CRON_SECRET`, and answers `503` (touching nothing) until the four `APNS_*` values are set.
+4. **Schedule it.** Run `send-push` every minute, which both sends what's waiting and queues the reminders that have come due. With the `pg_cron` and `pg_net` extensions enabled (Database → Extensions) and the secret stored in Vault, for example:
+   ```sql
+   select cron.schedule('slate-send-push', '* * * * *', $$
+     select net.http_post(
+       url := 'https://<project>.supabase.co/functions/v1/send-push',
+       headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'push_cron_secret')),
+       body := '{}'::jsonb);
+   $$);
+   ```
+   For messages to arrive in seconds rather than within a minute, also add a **Database Webhook** on inserts into `push_outbox` that calls the same function (Database → Webhooks). Without a schedule nothing is ever sent: that is the one step that is easy to miss.
+
+Until then the app still builds and runs. Notification settings explain that this build can't receive push, and (on-device) reminders still work.
+
+**Never exercised:** a real push to a real phone. The wording, the payload, the APNs token signing (checked against its public key), the request shape, the retry and dead-token rules and the access check on `send-push` are tested in Node; the queue, the triggers, the reminder windows and the access rules are tested in Postgres; the permission flow, reminder scheduling, registration and the conversation screens' logic are tested in Swift against a stand-in for the system's notification center. Not exercised: HTTP/2 to `api.push.apple.com`, a device token, the entitlement, the notification banner, `pg_cron`/`pg_net`, or the Deno wiring.
+
 ## Layout
 
 ```
@@ -145,31 +183,32 @@ ios/
   Slate/
     App/                      Entry point, root state (AppModel), tabs
     Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
-    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer)
+    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer), notifications (NotificationService)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments, Messages, Notifications
     Resources/                Asset catalog (accent color, app icon)
   SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF, payments)
     Fixtures/contract_golden.json   Contract text both SQL and Swift must reproduce exactly
     Fixtures/refund_golden.json     Refund amounts both SQL and Swift must agree on
+    Fixtures/notification_rules.json  Message tidying, the message limit and reminder times both must agree on
   supabase/
     migrations/               Schema, security and the booking, contract and payment functions
     tests/                    Postgres rule tests (booking_rules.py)
-    functions/                Edge Functions: delete-account, and the payment ones (logic in _shared/payments.ts)
-    function-tests/           Node tests and type-check for the payment logic
+    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts) and send-push (_shared/push.ts, apns.ts)
+    function-tests/           Node tests and type-check for the payment and push logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.
 
 ## Status of verification
 
-Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth. When contracts landed it compiled and ran 233 tests with 0 failures, including the check that Swift renders the golden contracts word for word as Postgres does.
+Written on a Linux machine with no Xcode, so **the Swift is compiled and tested by CI, not locally.** The `iOS` workflow builds the app and runs the unit tests on a macOS runner; treat it as the source of truth. When payments landed it compiled (including the Stripe SDK dependency) and ran 302 tests with 0 failures, including the check that Swift renders the golden contracts word for word as Postgres does and quotes the golden refunds to the cent. Messaging and notifications add tests for the message rules (against a fixture shared with Postgres), the reminder planner, the conversation and settings logic on the on-device backend, and the permission, registration and reminder flows against a stand-in for the system's notification center; the count after CI is recorded below.
 
-The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, contract rendering and placeholder injection, signature rules, signed-PDF storage access, holds and their expiry, deposits, late and duplicate payments, balances, refunds by every policy, who may call which payment function, and many clients racing for one slot or reporting one payment at once). It once caught a real bug: two clients booking overlapping times at the same instant could get a deadlock error instead of "slot taken". Bookings for one creator are now serialised with an advisory lock, and the race tests passed ten runs in a row afterwards. The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
+The booking rules in SQL are tested for real: `supabase/tests/booking_rules.py` applies the migrations to a throwaway Postgres and tries to break them (overlaps, buffers, hours, blackouts, notice, price tampering, row level security, contract rendering and placeholder injection, signature rules, signed-PDF storage access, holds and their expiry, deposits, late and duplicate payments, balances, refunds by every policy, who may call which payment function, who can read or write a conversation, message limits and retries, unread counts, the lines and notifications each booking event produces (and none for a payment that was handed straight back), reminder windows, the push queue's claiming, retrying and clean-up, device tokens, and many clients racing for one slot, one payment report or one message). It once caught a real bug: two clients booking overlapping times at the same instant could get a deadlock error instead of "slot taken". Bookings for one creator are now serialised with an advisory lock, and the race tests passed ten runs in a row afterwards. The `Database` workflow runs it on every change to `supabase/`; you can run it locally with `PGPORT=5432 python3 supabase/tests/booking_rules.py`.
 
-The payment logic in the Edge Functions (`_shared/payments.ts`) is type-checked and tested with Node against fake database and Stripe objects (`cd supabase/function-tests && npm ci && npm test`): amounts and destinations come from the database, a forged or repeated webhook changes nothing, refunds are idempotent and retry only when Stripe couldn't be reached, and so on. CI runs it too.
+The payment and push logic in the Edge Functions (`_shared/payments.ts`, `push.ts`, `apns.ts`) is type-checked and tested with Node against fake database, Stripe and APNs objects (`cd supabase/function-tests && npm ci && npm test`): amounts and destinations come from the database, a forged or repeated webhook changes nothing, refunds are idempotent and retry only when Stripe couldn't be reached; notifications are worded as expected in the shoot's own time zone, the APNs token verifies against its public key and is reused for half an hour, dead device tokens are forgotten, failures are retried, and `send-push` refuses anyone without the service key. CI runs it too.
 
-**Never exercised** (needs a device, an Apple ID, Stripe or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking, contract and payment functions (including the signed PDF upload), **Stripe itself (PaymentIntents, Connect onboarding, the webhook, refunds)**, **Apple Pay on a real device**, the thin Deno wiring that connects the tested payment logic to the real Stripe and Supabase clients (`_shared/runtime.ts` and each function's `index.ts`), EventKit permission prompts and event writing, the photo and video picking flows, and finger-drawing a signature on a real screen. The Swift side of the Supabase calls compiles but has not talked to a database.
+**Never exercised** (needs a device, an Apple ID, Stripe, Apple's push servers or a live project): Sign in with Apple, Supabase auth, storage and the Swift calls to the booking, contract, payment and messaging functions (including the signed PDF upload), **a real push notification reaching a real phone (see "Turning on notifications")**, **Stripe itself (PaymentIntents, Connect onboarding, the webhook, refunds)**, **Apple Pay on a real device**, the thin Deno wiring that connects the tested payment and push logic to the real Stripe, APNs and Supabase clients (`_shared/runtime.ts` and each function's `index.ts`), EventKit permission prompts and event writing, the photo and video picking flows, and finger-drawing a signature on a real screen. The Swift side of the Supabase calls compiles but has not talked to a database.
 
 ## Known gaps
 
@@ -177,13 +216,16 @@ The payment logic in the Edge Functions (`_shared/payments.ts`) is type-checked 
 - **The creator can't approve bookings one by one**; their saved signature is applied automatically.
 - **Signed PDFs are produced by the app, not the server** (see above).
 - **Contracts can't be amended after signing.** Cancelling a booking voids its contract.
-- **Nothing runs on a schedule.** Expired holds are released whenever anyone books, pays or lists bookings, and owed refunds are retried when the app opens or refreshes. A scheduled job (for example `pg_cron` calling `expire_holds()` and `process-refunds`) would make both prompt even when nobody opens the app.
-- **No balance reminders or overdue handling yet.** The balance becomes payable when the creator marks the work delivered; nothing nudges the client (that arrives with notifications), and a client who never pays isn't chased.
+- **Little runs on a schedule you haven't set up.** Expired holds are released whenever anyone books, pays, messages or lists bookings, and owed refunds are retried when the app opens or refreshes; a scheduled job (for example `pg_cron` calling `expire_holds()` and `process-refunds`) would make both prompt even when nobody opens the app. Server-side push notifications and shoot reminders need the schedule in "Turning on notifications" and send nothing without it.
+- **A balance is announced once, not chased.** The client gets one notification when the creator marks the work delivered; nothing repeats it, and a client who never pays isn't followed up or flagged as overdue.
 - **No disputes, chargebacks, payout screens or earnings summary.** Stripe's dashboard has them.
 - **Apple Pay's country comes from the device's region**, not the creator's. For creators outside that country it needs to come from their Stripe account.
 - **Delivery is the creator's word.** There is no proof-of-delivery step and no client confirmation.
 - **Calendar busy time is device-synced**, so it can be stale, and events written with write-only access can't be removed again on cancel.
-- **No push notifications or reminders** beyond the calendar alarms.
+- **Messages are fetched by polling**, every few seconds while a conversation is open, not streamed. There are no typing indicators, no read receipts shown to the other person, no photos or files, and a message can't be edited or deleted.
+- **No way to report or block.** Messaging is limited to the two people on a booking, but Apple's App Review guideline 1.2 expects an app with user-generated content to offer reporting and blocking. Add them before submitting.
+- **Notifications are English only, have no quiet hours or per-booking mute** (iOS Focus modes and the Show Previews setting apply), and a message's text appears in the banner. Nothing is retried for a phone that is off for more than the notification's lifetime (a day or two; a week for messages).
+- **A person with no server-backed account gets only shoot reminders.** On-device, the other person is an account on the same phone, so there is nobody to send a push to.
 - **Booking links don't resolve.** `slate.example` is a reserved placeholder host. The Home tab says so.
 - **Apple token revocation on account deletion** is not implemented (Apple requires it). It needs a client secret signed with your Apple key; see the TODO in `supabase/functions/delete-account/index.ts`.
 - **The Apple user ID is kept in `UserDefaults`**, not the Keychain. It's an identifier, not a secret, but Keychain is the better home.

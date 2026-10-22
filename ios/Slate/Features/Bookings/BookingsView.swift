@@ -11,7 +11,6 @@ struct BookingsView: View {
     }
 
     @State private var scope: Scope = .upcoming
-    @State private var path: [UUID] = []
     @State private var pendingCancel: Booking?
     @State private var calendarMessage: String?
 
@@ -34,7 +33,9 @@ struct BookingsView: View {
     private var visible: [Booking] { scope == .upcoming ? followUp + upcoming : past }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        @Bindable var model = model
+
+        NavigationStack(path: $model.bookingsPath) {
             List {
                 Section {
                     Picker("Show", selection: $scope.animation(.slateSmooth)) {
@@ -257,6 +258,26 @@ struct BookingDetailView: View {
                 } label: {
                     Label("Signed contract and PDF", systemImage: "doc.text")
                         .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                }
+            }
+
+            if model.canMessage(booking) {
+                Section("Messages") {
+                    let unread = model.conversation(for: booking.id)?.unreadCount ?? 0
+                    NavigationLink {
+                        ConversationView(bookingID: booking.id)
+                    } label: {
+                        HStack {
+                            Label("Message \(model.counterpartName(for: booking))", systemImage: "bubble.left.and.bubble.right")
+                            Spacer()
+                            if unread > 0 {
+                                Text("\(unread) new")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                    }
                 }
             }
 

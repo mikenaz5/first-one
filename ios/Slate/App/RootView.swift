@@ -41,6 +41,8 @@ struct RootView: View {
             // Pick up calendar changes and new bookings whenever the app comes back.
             if phase == .active, model.phase == .ready {
                 Task { await model.syncCalendar() }
+                Task { await model.refreshLiveData() }
+                Task { await model.refreshNotificationStatus() }
             }
         }
         .task {

@@ -169,6 +169,15 @@ extension LocalBackend {
         }
         try write(bookings, to: bookingsURL)
         try writePayments(payments)
+
+        // Money that stayed (not one handed straight back) is worth a line in the conversation.
+        if confirm || complete {
+            try? appendSystemMessage(
+                payment.kind == .deposit ? .depositPaid : .balancePaid, bookingID: payment.bookingID,
+                data: MessageEventData(amountCents: payment.amountCents, currency: payment.currencyCode), at: now
+            )
+        }
+        if confirm { try? appendSystemMessage(.contractSigned, bookingID: payment.bookingID, at: now) }
     }
 
     /// Adds the creator's saved signature and completes the contract.
@@ -244,6 +253,11 @@ extension LocalBackend {
         try write(bookings, to: bookingsURL)
         try write(contracts, to: contractsURL)
         try writePayments(payments)
+        try? appendSystemMessage(
+            .cancelled, bookingID: id,
+            data: MessageEventData(refundCents: figures.refundCents, currency: bookings[index].currencyCode, byCreator: bookings[index].creatorID == userID),
+            at: now
+        )
         return CancellationResult(booking: bookings[index], refundCents: figures.refundCents, percent: figures.percent)
     }
 
@@ -274,6 +288,10 @@ extension LocalBackend {
         // With nothing left to pay, delivery finishes the booking.
         if bookings[index].balanceCents == 0 { bookings[index].status = .completed }
         try write(bookings, to: bookingsURL)
+        try? appendSystemMessage(
+            .delivered, bookingID: bookingID,
+            data: MessageEventData(balanceCents: bookings[index].balanceCents, currency: bookings[index].currencyCode), at: now
+        )
         return bookings[index]
     }
 }

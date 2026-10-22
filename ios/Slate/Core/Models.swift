@@ -236,6 +236,10 @@ enum SlateError: LocalizedError, Equatable {
     case applePayUnavailable
     case notDeliverable
     case bookingNotFound
+    case conversationClosed
+    case invalidMessage
+    case messageTooLong
+    case rateLimited
     case backend(String)
 
     var errorDescription: String? {
@@ -300,6 +304,14 @@ enum SlateError: LocalizedError, Equatable {
             "This booking can't be marked as delivered yet."
         case .bookingNotFound:
             "That booking couldn't be found."
+        case .conversationClosed:
+            "This conversation is closed."
+        case .invalidMessage:
+            "Write something to send."
+        case .messageTooLong:
+            "Messages can be up to \(MessageRules.maxLength.formatted()) characters."
+        case .rateLimited:
+            "You're sending messages very quickly. Wait a moment and try again."
         case .backend(let message):
             message
         }
@@ -318,6 +330,8 @@ enum AppConfig {
 
     /// UserDefaults key for the Apple user identifier (used to detect revoked credentials).
     static let appleUserIDKey = "slate.appleUserID"
+    /// Set once the person says "Not now" to the card asking them to turn notifications on.
+    static let notificationPromptDismissedKey = "slate.notificationPromptDismissed"
     /// Fake Apple user identifier used by the debug-only demo sign-in.
     static let demoAppleUserID = "slate.demo"
 

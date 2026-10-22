@@ -9,7 +9,14 @@
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["*.test.ts", "../functions/_shared/payments.ts"]
+  "include": [
+    "*.test.ts",
+    "../functions/_shared/payments.ts",
+    "../functions/_shared/push.ts",
+    "../functions/_shared/apns.ts"
+  ]
 }

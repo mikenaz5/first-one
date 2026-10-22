@@ -25,6 +25,8 @@ final class AppModel {
     let backend: any SlateBackend
     /// Shows the payment sheet. Apple Pay with a real server; an instant pretend one on-device.
     let authorizer: any PaymentAuthorizer
+    /// The system's notification center, or a stand-in for tests and previews.
+    let notifications: any NotificationCenterClient
 
     private(set) var phase: Phase = .launching
     private(set) var loadErrorMessage: String?
@@ -51,14 +53,42 @@ final class AppModel {
     var calendarAccess: CalendarService.Access = .notDetermined
     /// Which tab is showing. Lives here so deep links can switch tabs.
     var selectedTab: AppTab = .home
+    /// What each tab's navigation stack has open (booking ids), so notifications and links can open a screen.
+    var bookingsPath: [UUID] = []
+    var messagesPath: [UUID] = []
+    /// Every conversation the person is part of, newest first.
+    var conversations: [ConversationSummary] = []
+    /// The conversation on screen, if any. A push about it doesn't need a banner.
+    var openConversationID: UUID?
+    var notificationPreferences = NotificationPreferences()
+    var notificationAuthorization: NotificationAuthorization = .notDetermined
+    /// Why Apple wouldn't give this build a push token (usually: the build has no push entitlement). Nil when fine.
+    var pushRegistrationProblem: String?
+    var notificationPromptDismissed = UserDefaults.standard.bool(forKey: AppConfig.notificationPromptDismissedKey)
+    /// The token Apple last gave this device, so it can be forgotten when the person signs out.
+    @ObservationIgnored var deviceToken: String?
+    /// What "now" is for reminders and for who can still be messaged. Tests set it so they don't depend on the day they run.
+    @ObservationIgnored var clock: () -> Date = { Date() }
+    /// Syncing reminders and refreshing conversations each run one at a time (see `CoalescedWork`).
+    @ObservationIgnored private(set) var reminderSync: CoalescedWork!
+    @ObservationIgnored private(set) var conversationSync: CoalescedWork!
+    /// What was started when the account loaded, so tests can wait for it.
+    @ObservationIgnored var startupTasks: [Task<Void, Never>] = []
     /// A creator's public page opened from a booking link, shown over the app.
     var presentedPage: PublicCreatorPage?
     @ObservationIgnored var pendingBookingHandle: String?
     let calendar = CalendarService()
 
-    init(backend: any SlateBackend, authorizer: (any PaymentAuthorizer)? = nil) {
+    init(
+        backend: any SlateBackend,
+        authorizer: (any PaymentAuthorizer)? = nil,
+        notifications: (any NotificationCenterClient)? = nil
+    ) {
         self.backend = backend
         self.authorizer = authorizer ?? PaymentAuthorizerFactory.make(for: backend)
+        self.notifications = notifications ?? InertNotificationCenter()
+        reminderSync = CoalescedWork { [weak self] in await self?.syncRemindersOnce() }
+        conversationSync = CoalescedWork { [weak self] in await self?.refreshConversationsOnce() }
     }
 
     /// True when running on-device with no server configured (enables the demo sign-in in debug builds).
@@ -125,13 +155,14 @@ final class AppModel {
     }
 
     func signOut() async {
+        await forgetDevice()
         do {
             try await backend.signOut()
         } catch {
             show(error, title: "Couldn't sign out")
             return
         }
-        clearAccount()
+        await clearAccount()
     }
 
     func deleteAccount() async {
@@ -141,10 +172,10 @@ final class AppModel {
             show(error, title: "Couldn't delete your account")
             return
         }
-        clearAccount()
+        await clearAccount()
     }
 
-    private func clearAccount() {
+    private func clearAccount() async {
         UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
         session = nil
         profile = nil
@@ -159,6 +190,7 @@ final class AppModel {
         paymentAccount = nil
         presentedPage = nil
         pendingBookingHandle = nil
+        await resetNotifications()
         CalendarPreferences.clear()
         calendarPrefs = CalendarPreferences()
         phase = .signedOut
@@ -194,6 +226,7 @@ final class AppModel {
             try await loadScheduling(for: session.userID)
             Task { await syncCalendar() }
             Task { await settlePendingRefunds() }
+            bookingsChanged()
         } catch {
             show(error, title: "Couldn't refresh")
         }

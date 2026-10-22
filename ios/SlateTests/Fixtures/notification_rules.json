@@ -1,0 +1,31 @@
+{
+  "comment": "Rules the database and the app must agree on. Checked by supabase/tests/booking_rules.py and by the Swift tests.",
+  "reminderLeadMinutes": [1440, 120],
+  "maxMessageLength": 2000,
+  "messageCleaning": [
+    { "input": "hello", "expected": "hello" },
+    { "input": "  hello  ", "expected": "hello" },
+    { "input": "line one\r\nline two", "expected": "line one\nline two" },
+    { "input": "carriage\rreturn", "expected": "carriage\nreturn" },
+    { "input": "a\r\n\r\nb", "expected": "a\n\nb" },
+    { "input": "a\r\r\nb", "expected": "a\n\nb" },
+    { "input": "\n\n hi \n\n", "expected": "hi" },
+    { "input": "tab\there", "expected": "tab\there" },
+    { "input": "\t\ttabs around\t\t", "expected": "tabs around" },
+    { "input": "bell\u0007 ring", "expected": "bell ring" },
+    { "input": "null\u0001ish", "expected": "nullish" },
+    { "input": "vertical\u000btab and form\u000cfeed", "expected": "verticaltab and formfeed" },
+    { "input": "del\u007fete", "expected": "delete" },
+    { "input": "emoji 📸 ok", "expected": "emoji 📸 ok" },
+    { "input": " nbsp ", "expected": " nbsp " },
+    { "input": "x​z", "expected": "x​z" },
+    { "input": "line separator", "expected": "line separator" },
+    { "input": "next\u0085line", "expected": "next\u0085line" },
+    { "input": "keep  inner   spaces", "expected": "keep  inner   spaces" },
+    { "input": "ünïcödé — dashes “quotes”", "expected": "ünïcödé — dashes “quotes”" },
+    { "input": "ends with CR\r", "expected": "ends with CR" },
+    { "input": "   ", "expected": "" },
+    { "input": "\r\n", "expected": "" },
+    { "input": "\u0001\u0007", "expected": "" }
+  ]
+}

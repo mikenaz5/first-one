@@ -82,6 +82,28 @@ protocol SlateBackend {
     /// Sends any refunds owed on a booking to the card that paid.
     func settleRefunds(bookingID: UUID) async throws
 
+    // Messages (one conversation per booking)
+    /// Every conversation the person is part of, newest first, with unread counts. Bookings whose hold ran out have none.
+    func loadConversations(for userID: UUID) async throws -> [ConversationSummary]
+    /// A conversation in time order. With `since`, only what came after (the app asks for a little before the last
+    /// line it has, and ignores repeats, so a line that committed late is never missed).
+    func loadMessages(bookingID: UUID, since: Date?, for userID: UUID) async throws -> [Message]
+    /// Sends text. The backend tidies it (`MessageRules.clean`) and returns the stored message; sending the same
+    /// `clientMessageID` again returns the first one instead of posting a copy.
+    func sendMessage(_ body: String, bookingID: UUID, clientMessageID: UUID, from userID: UUID) async throws -> Message
+    /// Marks everything in the conversation as read.
+    func markConversationRead(bookingID: UUID, for userID: UUID) async throws
+
+    // Notifications
+    /// True when a server queues and sends push notifications, shoot reminders included. Then the app registers its
+    /// device and must not schedule its own reminders as well. False on-device, where the app schedules them itself.
+    var sendsPushFromServer: Bool { get }
+    func loadNotificationPreferences(for userID: UUID) async throws -> NotificationPreferences
+    func saveNotificationPreferences(_ preferences: NotificationPreferences, for userID: UUID) async throws -> NotificationPreferences
+    /// Remembers this device so the server can push to it. `token` is the lowercase hex APNs gave the app.
+    func registerDevice(token: String, environment: PushEnvironment, for userID: UUID) async throws
+    func unregisterDevice(token: String) async throws
+
     /// Whether a creator may book their own packages. True on-device so the flow can be tested alone.
     var allowsSelfBooking: Bool { get }
 }

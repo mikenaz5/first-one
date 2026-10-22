@@ -12,12 +12,16 @@ actor LocalBackend: SlateBackend {
     private let decoder: JSONDecoder
     /// What "now" is. Tests move it forward to see holds run out.
     let clock: @Sendable () -> Date
+    /// Whether to behave as if a server sends push notifications (so the app registers its device and leaves
+    /// shoot reminders to the server). Always false in the app; tests turn it on to exercise those paths.
+    let sendsPushFromServer: Bool
 
     /// Handles that pretend to belong to other people, so the "taken" state is easy to see.
     private let simulatedTakenHandles: Set<String> = ["maya", "demo", "studio", "photo", "video"]
 
-    init(root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }) {
+    init(root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }, sendsPushFromServer: Bool = false) {
         self.clock = clock
+        self.sendsPushFromServer = sendsPushFromServer
         let base: URL
         if let root {
             base = root

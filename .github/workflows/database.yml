@@ -1,17 +1,20 @@
 name: Database
 
-# Runs the booking and payment rules against a real Postgres: no double-booking (including 30 clients racing
-# for one slot), working hours, blackouts, buffers, server-side pricing, contracts, payments, refunds and row
-# level security. A second job type-checks and tests the Edge Function logic with Node (no Stripe account needed).
+# Runs the booking, payment and messaging rules against a real Postgres: no double-booking (including 30 clients racing
+# for one slot), working hours, blackouts, buffers, server-side pricing, contracts, payments, refunds, conversations,
+# the notification queue and row level security. A second job type-checks and tests the Edge Function logic with Node
+# (no Stripe or Apple account needed).
 
 on:
   push:
     paths:
       - "ios/supabase/**"
+      - "ios/SlateTests/Fixtures/**"
       - ".github/workflows/database.yml"
   pull_request:
     paths:
       - "ios/supabase/**"
+      - "ios/SlateTests/Fixtures/**"
       - ".github/workflows/database.yml"
   workflow_dispatch:
 

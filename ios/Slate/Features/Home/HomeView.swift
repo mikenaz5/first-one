@@ -27,6 +27,11 @@ struct HomeView: View {
                         SetupCard()
                     }
 
+                    if model.wantsNotificationPrompt {
+                        NotificationsPromptCard()
+                            .transition(.opacity)
+                    }
+
                     if let nextBooking {
                         NextBookingCard(booking: nextBooking)
                     }

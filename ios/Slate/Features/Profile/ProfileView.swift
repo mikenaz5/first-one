@@ -5,6 +5,7 @@ struct ProfileView: View {
     @Environment(AppModel.self) private var model
 
     @State private var showEditor = false
+    @State private var showNotifications = false
     @State private var showPreview = false
     @State private var confirmSignOut = false
     @State private var confirmDelete = false
@@ -33,6 +34,7 @@ struct ProfileView: View {
                                 Label("Share booking link", systemImage: "square.and.arrow.up")
                             }
                         }
+                        Button("Notifications", systemImage: "bell") { showNotifications = true }
                         Divider()
                         Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right") {
                             confirmSignOut = true
@@ -58,6 +60,10 @@ struct ProfileView: View {
                 if let profile = model.profile {
                     EditProfileSheet(profile: profile)
                 }
+            }
+            .sheet(isPresented: $showNotifications) {
+                NotificationSettingsSheet()
+                    .presentationDetents([.large])
             }
             .confirmationDialog("Sign out of Slate?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) { Task { await model.signOut() } }

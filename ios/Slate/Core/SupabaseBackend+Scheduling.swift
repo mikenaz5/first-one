@@ -493,6 +493,10 @@ extension SupabaseBackend {
             ("nothing_due", .paymentNotDue),
             ("already_paid", .alreadyPaid),
             ("not_deliverable", .notDeliverable),
+            ("conversation_closed", .conversationClosed),
+            ("message_too_long", .messageTooLong),
+            ("invalid_message", .invalidMessage),
+            ("rate_limited", .rateLimited),
         ]
         for entry in known where text.contains(entry.token) {
             return entry.error

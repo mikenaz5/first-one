@@ -50,6 +50,7 @@ extension AppModel {
         if let latest = try? await backend.loadBookings(for: session.userID) { bookings = latest }
         if let latest = try? await backend.loadPayments(for: session.userID) { payments = latest }
         contractsByBooking = [:]
+        bookingsChanged()
     }
 
     // MARK: - Paying

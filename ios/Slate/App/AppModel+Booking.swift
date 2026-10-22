@@ -48,6 +48,7 @@ extension AppModel {
         }
         payments = (try? await backend.loadPayments(for: session.userID)) ?? payments
         contractsByBooking[signed.booking.id] = signed.contract
+        bookingsChanged()
         if signed.booking.status == .confirmed {
             afterConfirmed(signed.booking, contract: signed.contract)
         }
@@ -76,6 +77,7 @@ extension AppModel {
             }
             removeCalendarEvent(for: booking)
             contractsByBooking[booking.id] = nil
+            bookingsChanged()
             await settleRefunds(for: booking.id)
             return result
         } catch {
@@ -88,22 +90,21 @@ extension AppModel {
 
     // MARK: - Deep links
 
-    /// Handles `slate://book/<handle>` (open a creator's page) and `slate://booking/<id>` (from a calendar event).
+    /// Handles `slate://book/<handle>` (open a creator's page), `slate://booking/<id>` (from a calendar event or a
+    /// notification), `slate://messages/<id>` (a message notification) and `slate://stripe/…` (back from Stripe).
     func handle(url: URL) {
-        guard url.scheme == AppConfig.urlScheme else { return }
-        switch url.host {
-        case "book":
-            let handle = url.lastPathComponent.lowercased()
-            guard !handle.isEmpty, handle != "/" else { return }
+        guard let link = AppLink(url: url) else { return }
+        switch link {
+        case .creatorPage(let handle):
             pendingBookingHandle = handle
             Task { await openPendingBookingLinkIfNeeded() }
-        case "booking":
-            selectedTab = .bookings
-        case "stripe":
+        case .booking(let id):
+            if let id { openBooking(id) } else { selectedTab = .bookings }
+        case .messages(let id):
+            if let id { openConversation(id) } else { selectedTab = .messages }
+        case .stripeReturn:
             // Back from Stripe's setup pages: see where the account stands now.
             Task { await refreshPaymentAccount() }
-        default:
-            break
         }
     }
 

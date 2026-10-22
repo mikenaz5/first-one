@@ -15,9 +15,20 @@ extension AppModel {
     /// Runs once the account has loaded and the person is in the app.
     func afterAccountLoaded() {
         calendarAccess = calendar.access
-        Task { await syncCalendar() }
-        Task { await openPendingBookingLinkIfNeeded() }
-        Task { await settlePendingRefunds() }
+        startupTasks = [
+            Task { await syncCalendar() },
+            Task { await openPendingBookingLinkIfNeeded() },
+            Task { await settlePendingRefunds() },
+            Task { await prepareNotifications() },
+        ]
+    }
+
+    /// Returns once everything started by loading the account has finished. For tests.
+    func waitForStartupWork() async {
+        for task in startupTasks { await task.value }
+        startupTasks = []
+        await reminderSync.idle()
+        await conversationSync.idle()
     }
 
     // MARK: - Packages

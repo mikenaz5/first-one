@@ -8,12 +8,20 @@
 //   STRIPE_WEBHOOK_SECRET   whsec_… from the webhook endpoint you add in the Stripe dashboard
 //   PLATFORM_FEE_BPS        optional, defaults to 0 (the platform takes nothing)
 //   APP_URL_SCHEME          optional, defaults to "slate"
+// For push notifications (send-push):
+//   APNS_KEY_P8             the contents of the AuthKey_XXXX.p8 file from your Apple developer account
+//   APNS_KEY_ID             that key's ID
+//   APNS_TEAM_ID            your Apple developer Team ID
+//   APNS_TOPIC              the app's bundle identifier, e.g. com.example.slate
+//   PUSH_CRON_SECRET        optional: a long random secret the scheduler can send instead of the service role key
 // Supabase provides SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY itself.
 
 import Stripe from "npm:stripe@17";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DbError } from "./payments.ts";
-import type { Deps, HttpResult } from "./payments.ts";
+import type { Db, Deps, HttpResult } from "./payments.ts";
+import { createApnsSender } from "./apns.ts";
+import type { PushDeps } from "./push.ts";
 
 let cached: Deps | null = null;
 
@@ -83,3 +91,37 @@ export function respond(result: HttpResult): Response {
 
 export const unauthorized = (): Response => respond({ status: 401, body: { error: "unauthorized" } });
 export const notAllowed = (): Response => respond({ status: 405, body: { error: "method_not_allowed" } });
+
+function adminDb(): Db {
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+  return {
+    async rpc(fn, args) {
+      const { data, error } = await admin.rpc(fn, args ?? {});
+      if (error) throw new DbError(`${error.message} ${error.code ?? ""} ${error.details ?? ""}`);
+      return data;
+    },
+  };
+}
+
+/** Everything send-push needs, or null when APNs isn't set up (the function then answers 503 and touches nothing). */
+export function makePushDeps(): PushDeps | null {
+  const keyPem = Deno.env.get("APNS_KEY_P8");
+  const keyId = Deno.env.get("APNS_KEY_ID");
+  const teamId = Deno.env.get("APNS_TEAM_ID");
+  const topic = Deno.env.get("APNS_TOPIC");
+  if (!keyPem || !keyId || !teamId || !topic) return null;
+  return {
+    db: adminDb(),
+    // Deno's fetch speaks HTTP/2 to Apple, which APNs requires.
+    apns: createApnsSender({ keyPem, keyId, teamId, topic }, (url, init) => fetch(url, init)),
+    now: () => new Date(),
+    log: (message, detail) => console.error(message, detail ?? ""),
+  };
+}
+
+/** Who may call send-push: the service role key, or PUSH_CRON_SECRET. */
+export function pushSecrets(): (string | undefined)[] {
+  return [Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), Deno.env.get("PUSH_CRON_SECRET")];
+}

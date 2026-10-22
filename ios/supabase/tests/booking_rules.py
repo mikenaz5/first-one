@@ -13,6 +13,7 @@ import os
 import pathlib
 import sys
 import threading
+import time
 import uuid
 from zoneinfo import ZoneInfo
 
@@ -968,6 +969,604 @@ ths = [threading.Thread(target=prepare, args=(i,)) for i in range(8)]
 [t.start() for t in ths]
 [t.join() for t in ths]
 check("eight simultaneous prepares share one payment", len(set(ids)) == 1 and len(payments_of(pp["id"], "deposit")) == 1, ids)
+
+
+# ---- 11c. messaging and notifications -------------------------------------------
+GOLDEN_NOTIFY = HERE.parents[1] / "SlateTests" / "Fixtures" / "notification_rules.json"
+
+
+def send(uid, bid, body, client_id=None, role="authenticated"):
+    res = sql_as(uid, "select id, sender_id, kind, body, client_id from send_message(%s, %s, %s)", (bid, body, client_id), role=role)
+    if isinstance(res, str):
+        return res
+    row = res[0][0]
+    return dict(id=row[0], sender=row[1], kind=row[2], body=row[3], client_id=row[4])
+
+
+def messages_of(bid):
+    a.execute("select kind, event, body, sender_id, data from messages where booking_id = %s order by created_at, id", (bid,))
+    return a.fetchall()
+
+
+def events_of(bid):
+    return [m[1] if m[0] == "system" else "text" for m in messages_of(bid)]
+
+
+def outbox(user=None, kind=None, booking=None):
+    q, args = "select kind, data, user_id, sent_at, attempts, last_error, id from push_outbox where true", []
+    for col, val in (("user_id", user), ("kind", kind), ("booking_id", booking)):
+        if val is not None:
+            q += f" and {col} = %s"
+            args.append(val)
+    a.execute(q + " order by created_at, kind, id", args)
+    return a.fetchall()
+
+
+def convos(uid):
+    res = sql_as(uid, "select booking_id, last_kind, last_event, last_body, last_sender_id, unread_count from list_conversations()")
+    return [] if isinstance(res, str) else res[0]
+
+
+def claim_all():
+    """Everything due, claimed the way send-push would (200 at a time)."""
+    out = []
+    while True:
+        batch = svc_call("push_claim", 200)
+        out += batch
+        if not batch:
+            return out
+
+
+def prefs(uid, **changes):
+    if changes:
+        return sql_as(uid, "select save_notification_preferences(%s)", (Json(changes),))[0][0][0]
+    return sql_as(uid, "select get_notification_preferences()")[0][0][0]
+
+
+print("\n[messages: sending and reading]")
+MC, MC_PKG = make_creator("msgco")
+carol, dave, erin = new_user(), new_user(), new_user()
+m1 = book(carol, at(D[20], 10), pkg=MC_PKG, client_name="Carol Diaz")
+check("(set-up) a booking exists", isinstance(m1, dict), m1)
+check("a booking's conversation starts with a line saying it was booked", events_of(m1["id"]) == ["booked"], messages_of(m1["id"]))
+first = messages_of(m1["id"])[0]
+check("...which carries the package and time for the app to word", first[4].get("packageName") == "Session" and first[4].get("timeZone") == TZ and "startAt" in first[4], first[4])
+creator_rows = outbox(MC, "new_booking", m1["id"])
+check("the creator is told about the new booking, with the facts to word it", len(creator_rows) == 1 and creator_rows[0][1]["role"] == "creator"
+      and creator_rows[0][1]["clientName"] == "Carol Diaz" and creator_rows[0][1]["pendingDeposit"] is True and creator_rows[0][1]["depositCents"] == 50000, creator_rows)
+check("the client isn't told about their own booking", len(outbox(carol)) == 0)
+
+s1 = send(carol, m1["id"], "Hi! Could we shoot outdoors?")
+check("a client can write to the creator", isinstance(s1, dict) and s1["kind"] == "text" and s1["sender"] == carol and s1["body"] == "Hi! Could we shoot outdoors?", s1)
+pushed = outbox(MC, "message", m1["id"])
+check("the creator is notified, with the sender's name and the words", len(pushed) == 1 and pushed[0][1]["senderName"] == "Carol Diaz"
+      and pushed[0][1]["preview"] == "Hi! Could we shoot outdoors?" and pushed[0][1]["role"] == "creator", pushed)
+s2 = send(MC, m1["id"], "Absolutely, the park by the lake is great at golden hour.")
+check("the creator can reply", isinstance(s2, dict) and s2["sender"] == MC, s2)
+pushed = outbox(carol, "message", m1["id"])
+check("the client is notified, with the creator's name", len(pushed) == 1 and pushed[0][1]["senderName"] == "Msgco" and pushed[0][1]["role"] == "client", pushed)
+check("nobody is notified of their own message", len(outbox(MC, "message", m1["id"])) == 1 and len(outbox(carol, "message", m1["id"])) == 1)
+
+check("both people read the same conversation", sql_as(carol, "select count(*) from list_messages(%s)", (m1["id"],))[0][0][0] == 3
+      and sql_as(MC, "select count(*) from list_messages(%s)", (m1["id"],))[0][0][0] == 3)
+check("a stranger can't write to it", err(send(dave, m1["id"], "hello"), "not_found"))
+check("...can't read it", sql_as(dave, "select count(*) from list_messages(%s)", (m1["id"],))[0][0][0] == 0
+      and sql_as(dave, "select count(*) from messages where booking_id = %s", (m1["id"],))[0][0][0] == 0)
+check("...and doesn't see it in their list", convos(dave) == [])
+check("signed-out callers can't send or list", isinstance(send(None, m1["id"], "hi", role="anon"), str)
+      and isinstance(sql_as(None, "select * from list_conversations()", role="anon"), str))
+check("nobody can write a message directly", isinstance(sql_as(carol, "insert into messages (booking_id, sender_id, kind, body) values (%s, %s, 'text', 'forged')", (m1["id"], MC)), str))
+check("nobody can pass a system line off as theirs", isinstance(sql_as(carol, "insert into messages (booking_id, kind, event) values (%s, 'system', 'cancelled')", (m1["id"],)), str))
+check("nobody can edit or delete a message", sql_as(carol, "update messages set body = 'changed'")[1] == 0 and sql_as(carol, "delete from messages")[1] == 0
+      and sql_as(MC, "update messages set body = 'changed'")[1] == 0)
+
+print("\n[messages: what counts as a message]")
+check("an empty message is refused", err(send(carol, m1["id"], ""), "invalid_message"))
+check("so is one of only spaces and line breaks", err(send(carol, m1["id"], "  \n\t \r\n "), "invalid_message"))
+check("so is one of only control characters", err(send(carol, m1["id"], "\x01\x07\x7f"), "invalid_message"))
+check("a message over 2,000 characters is refused", err(send(carol, m1["id"], "x" * 2001), "message_too_long"))
+check("2,000 characters is fine", isinstance(send(carol, m1["id"], "y" * 2000), dict))
+check("2,000 emoji count as 2,000 characters, not bytes", isinstance(send(carol, m1["id"], "📸" * 2000), dict) and err(send(carol, m1["id"], "📸" * 2001), "message_too_long"))
+check("a missing body is refused", err(send(carol, m1["id"], None), "invalid_message"))
+cases = []
+if GOLDEN_NOTIFY.exists():
+    cases = json.loads(GOLDEN_NOTIFY.read_text())["messageCleaning"]
+for case in cases:
+    a.execute("select message_clean(%s)", (case["input"],))
+    got = a.fetchone()[0]
+    check(f"cleaning {case['input']!r} gives {case['expected']!r}", got == case["expected"], got)
+check("what's stored is the cleaned text", send(carol, m1["id"], "  hello\r\nthere\x07  ")["body"] == "hello\nthere")
+
+print("\n[messages: sending twice, and too often]")
+cid = str(uuid.uuid4())
+t1 = send(erin, m1["id"], "ignored", cid)  # erin isn't a party
+check("(set-up) a stranger with a client id is still refused", err(t1, "not_found"))
+before = len(messages_of(m1["id"]))
+d1 = send(carol, m1["id"], "Sending with a retry token", cid)
+d2 = send(carol, m1["id"], "Sending with a retry token", cid)
+check("sending the same message again returns the first, not a copy", isinstance(d1, dict) and d1 == d2 and len(messages_of(m1["id"])) == before + 1, (d1, d2))
+check("...and notifies only once", len([r for r in outbox(MC, "message", m1["id"]) if r[1]["preview"] == "Sending with a retry token"]) == 1)
+d3 = send(MC, m1["id"], "Same token, different person", cid)
+check("another person using the same token is a new message", isinstance(d3, dict) and d3["id"] != d1["id"], d3)
+
+RC, RC_PKG = make_creator("ratelimit", deposit=0, account=False)
+hurried = new_user()
+rl = book(hurried, at(D[20], 10), pkg=RC_PKG, client_name="Hurried")
+sent = [send(hurried, rl["id"], f"message {i}") for i in range(20)]
+check("twenty messages in a minute go through", all(isinstance(s, dict) for s in sent), [s for s in sent if isinstance(s, str)][:1])
+check("the twenty-first is refused", err(send(hurried, rl["id"], "message 21"), "rate_limited"))
+check("...but the other person can still reply", isinstance(send(RC, rl["id"], "Slow down!"), dict))
+rl_token = str(uuid.uuid4())
+a.execute("update messages set created_at = created_at - interval '2 minutes' where sender_id = %s", (hurried,))
+check("after a minute they can write again", isinstance(send(hurried, rl["id"], "back", rl_token), dict))
+for i in range(19):
+    send(hurried, rl["id"], f"again {i}")
+check("(set-up) at the limit again", err(send(hurried, rl["id"], "one too many"), "rate_limited"))
+check("a retry of a message that was already saved is answered even then", send(hurried, rl["id"], "back", rl_token)["client_id"] == rl_token)
+
+print("\n[messages: unread counts and the conversation list]")
+UC, UC_PKG = make_creator("unreadco", deposit=0, account=False)
+frank = new_user()
+u = book(frank, at(D[21], 10), pkg=UC_PKG, client_name="Frank")
+check("a new conversation has nothing unread (system lines never count)", [c[5] for c in convos(frank)] == [0] and [c[5] for c in convos(UC)] == [0], (convos(frank), convos(UC)))
+send(frank, u["id"], "one")
+send(frank, u["id"], "two")
+send(frank, u["id"], "three")
+check("each message from the other person is unread", [c[5] for c in convos(UC)] == [3])
+check("your own messages aren't unread to you", [c[5] for c in convos(frank)] == [0])
+check("the list shows the latest line", convos(UC)[0][1:4] == ("text", None, "three"), convos(UC))
+sql_as(UC, "select mark_conversation_read(%s)", (u["id"],))
+check("reading a conversation clears it", [c[5] for c in convos(UC)] == [0])
+check("...for the reader only", [c[5] for c in convos(frank)] == [0])
+send(UC, u["id"], "got them")
+check("a reply makes it unread for the other person", [c[5] for c in convos(frank)] == [1])
+send(frank, u["id"], "four")
+check("writing back counts as having read what came before", [c[5] for c in convos(frank)] == [0] and [c[5] for c in convos(UC)] == [1])
+check("a stranger can't mark it read", err(sql_as(dave, "select mark_conversation_read(%s)", (u["id"],)), "not_found"))
+check("marking read twice changes nothing", sql_as(UC, "select mark_conversation_read(%s)", (u["id"],)) is not None and [c[5] for c in convos(UC)] == [0])
+a.execute("select unread_message_count(%s), unread_message_count(%s)", (UC, frank))
+check("the badge count is the sum over conversations", a.fetchone() == (0, 0))
+send(frank, u["id"], "badge test")
+a.execute("select unread_message_count(%s)", (UC,))
+check("...and counts new ones", a.fetchone()[0] == 1)
+check("the app can't ask for anyone's badge", isinstance(sql_as(UC, "select unread_message_count(%s)", (UC,)), str))
+
+older = book(frank, at(D[22], 10), pkg=MC_PKG, client_name="Frank")
+send(frank, older["id"], "hello again")
+listing = convos(frank)
+check("conversations are newest first", [c[0] for c in listing] == [older["id"], u["id"]], [c[0] for c in listing])
+rows = sql_as(frank, "select count(*) from list_messages(%s, null, 2)", (u["id"],))[0][0][0]
+check("a limit returns that many", rows == 2)
+newest = [r[0] for r in sql_as(frank, "select body from list_messages(%s, null, 2)", (u["id"],))[0]]
+check("...the newest, still in time order", newest == ["four", "badge test"], newest)
+a.execute("select created_at from messages where booking_id = %s and body = 'one'", (u["id"],))
+since = a.fetchone()[0]
+after = [r[0] for r in sql_as(frank, "select body from list_messages(%s, %s)", (u["id"], since))[0]]
+check("'since' returns only what came after", after[0] == "two" and "one" not in after and after[-1] == "badge test", after)
+
+print("\n[messages: closed conversations]")
+CC2, CC2_PKG = make_creator("closedco")
+gina = new_user()
+gone = book(gina, at(D[23], 10), pkg=CC2_PKG, client_name="Gina")
+send(gina, gone["id"], "before it lapsed")
+lapse(gone["id"])
+check("a lapsed hold's conversation isn't listed", convos(gina) == [] and convos(CC2) == [], (convos(gina), convos(CC2)))
+check("...and can't be written to", err(send(gina, gone["id"], "anyone there?"), "conversation_closed"))
+svc_call("expire_holds")
+check("...still true once the hold is formally expired", err(send(CC2, gone["id"], "hello?"), "conversation_closed") and convos(gina) == [])
+cancelled_chat = book(gina, at(D[23], 13), pkg=CC2_PKG, client_name="Gina")
+cancel(gina, cancelled_chat["id"])
+check("a cancelled booking's conversation stays open, for refund questions", isinstance(send(gina, cancelled_chat["id"], "When will the refund arrive?"), dict)
+      and cancelled_chat["id"] in [c[0] for c in convos(CC2)])
+
+print("\n[notifications: settings]")
+check("everything is on until someone says otherwise", prefs(erin) == dict(bookings=True, contracts=True, payments=True, messages=True, reminders=True), prefs(erin))
+check("saving one setting leaves the others", prefs(erin, messages=False) == dict(bookings=True, contracts=True, payments=True, messages=False, reminders=True))
+check("settings are kept per person", prefs(dave)["messages"] is True and prefs(erin)["messages"] is False)
+check("a setting can be switched back", prefs(erin, messages=True)["messages"] is True)
+check("unknown keys are ignored", prefs(erin, bogus=False) == dict(bookings=True, contracts=True, payments=True, messages=True, reminders=True))
+check("settings can't be read or written directly", isinstance(sql_as(erin, "select * from notification_preferences"), str)
+      and isinstance(sql_as(erin, "insert into notification_preferences (user_id) values (%s)", (erin,)), str))
+check("signed-out callers have none", isinstance(sql_as(None, "select get_notification_preferences()", role="anon"), str))
+
+PC, PC_PKG = make_creator("prefsco")
+heidi = new_user()
+prefs(PC, messages=False)
+pm = book(heidi, at(D[24], 10), pkg=PC_PKG, client_name="Heidi")
+send(heidi, pm["id"], "will you see this?")
+check("a muted kind queues nothing", len(outbox(PC, "message")) == 0)
+check("...while other kinds still do", len(outbox(PC, "new_booking")) == 1)
+send(PC, pm["id"], "reply")
+check("muting is per person", len(outbox(heidi, "message")) == 1)
+prefs(PC, messages=True)
+send(heidi, pm["id"], "and now?")
+check("switching it back on resumes", len(outbox(PC, "message")) == 1)
+prefs(PC, bookings=False)
+book(heidi, at(D[24], 13), pkg=PC_PKG, client_name="Heidi")
+check("muting 'bookings' stops new-booking notifications (only the one from before is queued)", len(outbox(PC, "new_booking")) == 1)
+prefs(PC, bookings=True)
+
+print("\n[notifications: a booking's life becomes messages and notifications]")
+LC, LC_PKG = make_creator("lifeco", price=200000, deposit=50000)
+ivy = new_user()
+life = book(ivy, at(D[25], 10), pkg=LC_PKG, client_name="Ivy Park")
+check("held: just the booked line, and a heads-up to the creator that a deposit is awaited", events_of(life["id"]) == ["booked"]
+      and [r[1]["pendingDeposit"] for r in outbox(LC, "new_booking", life["id"])] == [True])
+check("held: no contract, payment or other notification yet", {r[0] for r in outbox(booking=life["id"])} == {"new_booking"})
+pay(life["id"])
+check("paying the deposit adds 'deposit paid' then 'contract signed'", events_of(life["id"]) == ["booked", "deposit_paid", "contract_signed"], events_of(life["id"]))
+dep = [m for m in messages_of(life["id"]) if m[1] == "deposit_paid"][0]
+check("...with the amount for the app to word", dep[4] == {"amountCents": 50000, "currency": "USD"}, dep[4])
+check("the creator is told the payment arrived", [r[1] for r in outbox(LC, "payment_received", life["id"])] == [dict(
+    bookingId=life["id"], role="creator", paymentKind="deposit", amountCents=50000, currency="USD", clientName="Ivy Park", packageName="Session")],
+    outbox(LC, "payment_received", life["id"]))
+check("the client is told too", [(r[1]["role"], r[1]["paymentKind"], r[1]["creatorName"]) for r in outbox(ivy, "payment_received", life["id"])] == [("client", "deposit", "Lifeco")])
+check("both are told the contract is signed, each with the other's name", sorted((r[2], r[1]["role"], r[1]["otherName"]) for r in outbox(booking=life["id"]) if r[0] == "contract_signed")
+      == sorted([(LC, "creator", "Ivy Park"), (ivy, "client", "Lifeco")]))
+check("those are the only notifications so far", sorted(r[0] for r in outbox(booking=life["id"])) == sorted(["new_booking", "payment_received", "payment_received", "contract_signed", "contract_signed"]))
+n_before = len(outbox(booking=life["id"]))
+svc_call("payment_record_success", payments_of(life["id"], "deposit")[0][5], 50000, "ch_again", "apple_pay")
+check("Stripe repeating itself says nothing new", len(outbox(booking=life["id"])) == n_before and events_of(life["id"]) == ["booked", "deposit_paid", "contract_signed"])
+
+move_to(life["id"], -3)
+check("(set-up) the creator marks it delivered", isinstance(sql_as(LC, "select mark_delivered(%s)", (life["id"],)), tuple))
+check("delivery adds a line with the balance due", events_of(life["id"])[-1] == "delivered" and messages_of(life["id"])[-1][4] == {"balanceCents": 150000, "currency": "USD"}, messages_of(life["id"])[-1])
+bd = outbox(ivy, "balance_due", life["id"])
+check("the client is told the balance is due", len(bd) == 1 and bd[0][1] == dict(bookingId=life["id"], role="client", creatorName="Lifeco", packageName="Session", balanceCents=150000, currency="USD"), bd)
+check("the creator isn't told about their own action", len(outbox(LC, "balance_due")) == 0)
+pay(life["id"], kind="balance")
+check("paying the balance adds its line", events_of(life["id"])[-1] == "balance_paid" and messages_of(life["id"])[-1][4]["amountCents"] == 150000)
+check("...and notifies both", sorted((r[2], r[1]["paymentKind"]) for r in outbox(booking=life["id"]) if r[0] == "payment_received" and r[1]["paymentKind"] == "balance")
+      == sorted([(LC, "balance"), (ivy, "balance")]))
+check("the booking is complete, and still open to messages", booking_row(life["id"])["status"] == "completed" and isinstance(send(ivy, life["id"], "Thank you!"), dict))
+
+# Nothing owed after delivery.
+FC, FC_PKG = make_creator("fullpaidco", price=50000, deposit=50000)
+jon = new_user()
+fp = book(jon, at(D[25], 10), pkg=FC_PKG, client_name="Jon")
+pay(fp["id"])
+move_to(fp["id"], -3)
+sql_as(FC, "select mark_delivered(%s)", (fp["id"],))
+check("delivering a fully paid booking adds the line but asks for no money", events_of(fp["id"])[-1] == "delivered" and len(outbox(jon, "balance_due")) == 0 and booking_row(fp["id"])["status"] == "completed")
+
+# No deposit.
+NC, NC_PKG = make_creator("freeco", deposit=0, account=False)
+kim = new_user()
+free_b = book(kim, at(D[25], 10), pkg=NC_PKG, client_name="Kim")
+check("with no deposit, the contract is signed at once and no payment is announced", events_of(free_b["id"]) == ["booked", "contract_signed"]
+      and sorted(r[0] for r in outbox(booking=free_b["id"])) == ["contract_signed", "contract_signed", "new_booking"]
+      and [r[1]["pendingDeposit"] for r in outbox(NC, "new_booking")] == [False], events_of(free_b["id"]))
+
+print("\n[notifications: cancelling]")
+XC, XC_PKG = make_creator("cancelco", policy="moderate")
+leo, mia = new_user(), new_user()
+c1 = book(leo, at(D[26], 10), pkg=XC_PKG, client_name="Leo")
+pay(c1["id"])
+move_to(c1["id"], 100)
+cancel(leo, c1["id"])
+last = messages_of(c1["id"])[-1]
+check("a client cancelling adds a line saying who and how much comes back", last[1] == "cancelled" and last[4] == {"byCreator": False, "refundCents": 25000, "currency": "USD"}, last)
+bc = outbox(XC, "booking_cancelled", c1["id"])
+check("the creator is told, with the client's name and the refund", len(bc) == 1 and bc[0][1]["role"] == "creator" and bc[0][1]["byName"] == "Leo"
+      and bc[0][1]["refundCents"] == 25000 and bc[0][1]["packageName"] == "Session", bc)
+check("the client isn't told about their own cancellation", len(outbox(leo, "booking_cancelled")) == 0)
+c2 = book(mia, at(D[27], 10), pkg=XC_PKG, client_name="Mia")
+pay(c2["id"])
+move_to(c2["id"], 10)
+check("(set-up) the creator cancels", cancel(XC, c2["id"]) == "ok")
+bc2 = outbox(mia, "booking_cancelled", c2["id"])
+check("the client is told, with the creator's name and a full refund", len(bc2) == 1 and bc2[0][1]["role"] == "client" and bc2[0][1]["byName"] == "Cancelco"
+      and bc2[0][1]["refundCents"] == 50000, bc2)
+check("the line says the creator cancelled", messages_of(c2["id"])[-1][4]["byCreator"] is True)
+c3 = book(leo, at(D[28], 10), pkg=XC_PKG, client_name="Leo")
+cancel(leo, c3["id"])
+check("cancelling an unpaid hold refunds nothing", messages_of(c3["id"])[-1][4]["refundCents"] == 0
+      and [r[1]["refundCents"] for r in outbox(XC, "booking_cancelled", c3["id"])] == [0])
+
+print("\n[notifications: payments that came to nothing say nothing]")
+NP, NP_PKG = make_creator("quietco")
+nia = new_user()
+q1 = book(nia, at(D[29], 10), pkg=NP_PKG, client_name="Nia")
+qp = svc_call("payment_prepare", nia, q1["id"], "deposit", 0)
+svc_call("payment_attach_intent", qp["payment_id"], "pi_quiet_1")
+cancel(nia, q1["id"])
+n0 = len(outbox(booking=q1["id"]))
+res = svc_call("payment_record_success", "pi_quiet_1", 50000, "ch_q", "apple_pay")
+check("(set-up) money arrives for a cancelled booking and is refunded", res["action"] == "refund_required")
+check("no 'deposit paid' line, no 'payment received', no 'contract signed'", "deposit_paid" not in events_of(q1["id"]) and "contract_signed" not in events_of(q1["id"])
+      and len(outbox(booking=q1["id"])) == n0 and not [r for r in outbox(booking=q1["id"]) if r[0] in ("payment_received", "contract_signed")])
+q2 = book(nia, at(D[30], 10), pkg=NP_PKG, client_name="Nia")
+pay(q2["id"])
+pays_before = len([r for r in outbox(booking=q2["id"]) if r[0] == "payment_received"])
+a.execute("insert into payments (booking_id, kind, amount_cents, currency_code, status, stripe_payment_intent_id) values (%s,'deposit',50000,'USD','failed','pi_quiet_dup')", (q2["id"],))
+svc_call("payment_record_success", "pi_quiet_dup", 50000, "ch_qd", "apple_pay")
+check("a duplicate payment, refunded at once, isn't announced either", len([r for r in outbox(booking=q2["id"]) if r[0] == "payment_received"]) == pays_before == 2
+      and events_of(q2["id"]).count("deposit_paid") == 1)
+
+q3 = book(nia, at(D[31], 10), pkg=NP_PKG, client_name="Nia")
+qp3 = svc_call("payment_prepare", nia, q3["id"], "deposit", 0)
+svc_call("payment_attach_intent", qp3["payment_id"], "pi_quiet_late")
+lapse(q3["id"])
+svc_call("expire_holds")
+check("an expired hold says nothing and has no conversation", events_of(q3["id"]) == ["booked"] and q3["id"] not in [c[0] for c in convos(nia)])
+svc_call("payment_record_success", "pi_quiet_late", 50000, "ch_ql", "apple_pay")
+check("paid late with the time free: honoured, and announced then", booking_row(q3["id"])["status"] == "confirmed"
+      and events_of(q3["id"]) == ["booked", "deposit_paid", "contract_signed"] and q3["id"] in [c[0] for c in convos(nia)])
+
+print("\n[notifications: settings applied to events]")
+SC, SC_PKG = make_creator("settingsco")
+omar = new_user()
+prefs(SC, payments=False)
+prefs(omar, contracts=False)
+s_b = book(omar, at(D[32], 10), pkg=SC_PKG, client_name="Omar")
+pay(s_b["id"])
+kinds = lambda uid: sorted(r[0] for r in outbox(uid, booking=s_b["id"]))
+check("a creator who muted payments still hears of bookings and contracts", kinds(SC) == ["contract_signed", "new_booking"], kinds(SC))
+check("a client who muted contracts still hears of payments", kinds(omar) == ["payment_received"], kinds(omar))
+check("muting doesn't touch the conversation itself", events_of(s_b["id"]) == ["booked", "deposit_paid", "contract_signed"])
+
+print("\n[notifications: shoot reminders]")
+rules = json.loads(GOLDEN_NOTIFY.read_text()) if GOLDEN_NOTIFY.exists() else {}
+if rules:
+    a.execute("select app_reminder_leads(), app_message_max_length()")
+    leads, maxlen = a.fetchone()
+    check("the reminder times match the app's", leads == rules["reminderLeadMinutes"], leads)
+    check("the message limit matches the app's", maxlen == rules["maxMessageLength"], maxlen)
+
+nat, ola, pat, quin, ron, sam = [new_user() for _ in range(6)]
+RDAY = D[36]
+
+
+def confirmed(client, hours_ahead, hours_made_ago=72, pay_it=True):
+    """A booking with its own creator (so the moved times can't collide), made `hours_made_ago` hours ago."""
+    creator_id, pkg = make_creator("rm" + uuid.uuid4().hex[:8])
+    b = book(client, at(RDAY, 10), pkg=pkg, client_name="Client " + client[:4])
+    if pay_it:
+        pay(b["id"])
+    a.execute("update bookings set created_at = now() - (%s || ' hours')::interval where id = %s", (hours_made_ago, b["id"]))
+    move_to(b["id"], hours_ahead)
+    return b, creator_id
+
+
+def reminders(booking_id):
+    return [r for r in outbox(booking=booking_id) if r[0] == "shoot_reminder"]
+
+
+r1, r1c = confirmed(nat, 23)
+check("nothing is due until the run happens", len(reminders(r1["id"])) == 0)
+queued = svc_call("enqueue_due_reminders")
+check("a run queues the day-before reminder for both people", queued >= 2 and sorted((r[2], r[1]["role"], r[1]["leadMinutes"]) for r in reminders(r1["id"]))
+      == sorted([(r1c, "creator", 1440), (nat, "client", 1440)]), reminders(r1["id"]))
+rr = {r[1]["role"]: r[1] for r in reminders(r1["id"])}
+check("...each naming the other person", rr["creator"]["otherName"].startswith("Client") and rr["client"]["otherName"].startswith("Rm") and rr["client"]["packageName"] == "Session")
+check("...with the time and zone to word it", "startAt" in rr["client"] and rr["client"]["timeZone"] == TZ)
+check("running again queues nothing more", svc_call("enqueue_due_reminders") == 0 and len(reminders(r1["id"])) == 2)
+
+r2, _ = confirmed(ola, 1.5)
+svc_call("enqueue_due_reminders")
+check("an hour and a half out: the two-hour reminder, not the day-before one", sorted({r[1]["leadMinutes"] for r in reminders(r2["id"])}) == [120], reminders(r2["id"]))
+check("...for both people", len(reminders(r2["id"])) == 2)
+
+r3, _ = confirmed(pat, 11)
+svc_call("enqueue_due_reminders")
+check("eleven hours out is too late for the day-before reminder (it's only valid until half its lead is left)", len(reminders(r3["id"])) == 0, reminders(r3["id"]))
+r3b, _ = confirmed(pat, 13)
+svc_call("enqueue_due_reminders")
+check("thirteen hours out is still within it", len(reminders(r3b["id"])) == 2)
+
+r4, _ = confirmed(quin, 23, hours_made_ago=0)
+svc_call("enqueue_due_reminders")
+check("a booking made after the reminder time doesn't get that reminder (you just booked it)", len(reminders(r4["id"])) == 0)
+
+r5, _ = confirmed(ron, 23, pay_it=False)
+svc_call("enqueue_due_reminders")
+check("a held booking gets none", booking_row(r5["id"])["status"] == "held" and len(reminders(r5["id"])) == 0)
+
+r6, _ = confirmed(sam, 23)
+cancel(sam, r6["id"])
+svc_call("enqueue_due_reminders")
+check("a cancelled booking gets none", booking_row(r6["id"])["status"] == "cancelled" and len(reminders(r6["id"])) == 0)
+
+r7, _ = confirmed(nat, 23)
+a.execute("update bookings set start_at = now() - interval '1 hour', end_at = now() + interval '30 minutes', blocked_until = now() + interval '1 hour' where id = %s", (r7["id"],))
+svc_call("enqueue_due_reminders")
+check("a shoot that has already started gets none", len(reminders(r7["id"])) == 0)
+
+r8, r8c = confirmed(ola, 23, hours_made_ago=72)
+# (muting has to happen before the run)
+a.execute("delete from push_outbox where booking_id = %s", (r8["id"],))
+prefs(r8c, reminders=False)
+svc_call("enqueue_due_reminders")
+check("a person who muted reminders gets none, the other still does", [r[2] for r in reminders(r8["id"])] == [ola], reminders(r8["id"]))
+
+r9, _ = confirmed(pat, 23)
+svc_call("enqueue_due_reminders")
+claimed = claim_all()
+check("reminders for a coming shoot are claimed for sending", len([c for c in claimed if c["booking_id"] == r9["id"] and c["kind"] == "shoot_reminder"]) == 2)
+r10, r10c = confirmed(sam, 23)
+svc_call("enqueue_due_reminders")
+cancel(r10c, r10["id"])
+claimed = claim_all()
+check("a reminder for a booking cancelled after it was queued is not sent", not any(c["booking_id"] == r10["id"] and c["kind"] == "shoot_reminder" for c in claimed))
+check("...and is closed as stale", len(reminders(r10["id"])) == 2 and all(r[3] is not None and r[5] == "stale" for r in reminders(r10["id"])), reminders(r10["id"]))
+
+print("\n[notifications: devices]")
+tok = lambda: uuid.uuid4().hex + uuid.uuid4().hex
+t_a = tok()
+reg = sql_as(nat, "select register_device(%s, 'sandbox')", (t_a,))
+check("a device can be registered", not isinstance(reg, str), reg)
+a.execute("select user_id, environment from device_tokens where token = %s", (t_a,))
+check("...and is stored for them", a.fetchone() == (nat, "sandbox"))
+upper = sql_as(nat, "select register_device(%s, 'production')", (t_a.upper(),))
+a.execute("select count(*) from device_tokens where user_id = %s", (nat,))
+check("a token is stored in lower case", not isinstance(upper, str) and a.fetchone()[0] == 1, upper)
+a.execute("select environment from device_tokens where token = %s", (t_a,))
+check("registering again updates its environment", a.fetchone()[0] == "production")
+check("a token that isn't hex is refused", err(sql_as(nat, "select register_device('not-a-token', 'sandbox')"), "invalid_token"))
+check("a short token is refused", err(sql_as(nat, "select register_device('abcd', 'sandbox')"), "invalid_token"))
+check("an unknown environment is refused", err(sql_as(nat, "select register_device(%s, 'staging')", (tok(),)), "invalid_environment"))
+check("signed-out callers can't register", isinstance(sql_as(None, "select register_device(%s, 'sandbox')", (tok(),), role="anon"), str))
+sql_as(ola, "select register_device(%s, 'sandbox')", (t_a,))
+a.execute("select user_id from device_tokens where token = %s", (t_a,))
+check("a phone signed in by someone else moves to them", a.fetchone()[0] == ola)
+sql_as(nat, "select unregister_device(%s)", (t_a,))
+a.execute("select count(*) from device_tokens where token = %s", (t_a,))
+check("nobody can unregister another person's device", a.fetchone()[0] == 1)
+sql_as(ola, "select unregister_device(%s)", (t_a,))
+a.execute("select count(*) from device_tokens where token = %s", (t_a,))
+check("you can unregister your own", a.fetchone()[0] == 0)
+many = [tok() for _ in range(13)]
+for t in many:
+    sql_as(pat, "select register_device(%s, 'sandbox')", (t,))
+    time.sleep(0.01)
+a.execute("select token from device_tokens where user_id = %s order by last_seen_at desc", (pat,))
+kept = [r[0] for r in a.fetchall()]
+check("a person keeps at most their ten newest devices", len(kept) == 10 and kept == list(reversed(many))[:10], len(kept))
+check("device tokens can't be read or written directly", isinstance(sql_as(pat, "select * from device_tokens"), str) and isinstance(sql_as(pat, "insert into device_tokens (token, user_id, environment) values (%s, %s, 'sandbox')", (tok(), pat)), str))
+
+print("\n[notifications: the sending queue]")
+QU = new_user()
+sql_as(QU, "select register_device(%s, 'sandbox')", (tok(),))
+dead_a, dead_b = tok(), tok()
+sql_as(QU, "select register_device(%s, 'production')", (dead_a,))
+a.execute("delete from push_outbox")
+for i in range(5):
+    a.execute("select push_enqueue(%s, 'message', null, %s, %s)", (QU, Json(dict(senderName="Q", preview=f"m{i}", role="client")), f"q{i}"))
+    time.sleep(0.005)
+first_claim = svc_call("push_claim", 3)
+check("a claim returns at most the limit, oldest first", [c["data"]["preview"] for c in first_claim] == ["m0", "m1", "m2"], first_claim)
+check("...each with the person's devices", all(len(c["devices"]) == 2 for c in first_claim) and {d["environment"] for d in first_claim[0]["devices"]} == {"sandbox", "production"})
+check("...an attempt count", all(c["attempts"] == 1 for c in first_claim))
+second_claim = svc_call("push_claim", 10)
+check("a second claim doesn't get rows the first is holding", [c["data"]["preview"] for c in second_claim] == ["m3", "m4"], second_claim)
+check("...and a third finds nothing", svc_call("push_claim", 10) == [])
+svc_call("push_complete", first_claim[0]["id"], True, None, [])
+a.execute("select sent_at is not null, locked_until is null from push_outbox where id = %s", (first_claim[0]["id"],))
+check("a delivered notification is closed", a.fetchone() == (True, True))
+svc_call("push_complete", first_claim[1]["id"], False, "APNs said 503", [])
+a.execute("select sent_at, last_error, send_after > now(), locked_until from push_outbox where id = %s", (first_claim[1]["id"],))
+row = a.fetchone()
+check("a failed one is kept, with why, and tried again later", row[0] is None and row[1] == "APNs said 503" and row[2] is True and row[3] is None, row)
+check("...but not until its pause is over", all(c["id"] != first_claim[1]["id"] for c in svc_call("push_claim", 10)))
+a.execute("update push_outbox set send_after = now() - interval '1 second' where id = %s", (first_claim[1]["id"],))
+again = [c for c in svc_call("push_claim", 10) if c["id"] == first_claim[1]["id"]]
+check("then it is claimed again, counted as the second attempt", len(again) == 1 and again[0]["attempts"] == 2, again)
+for _ in range(3):
+    svc_call("push_complete", first_claim[1]["id"], False, "again", [])
+    a.execute("update push_outbox set send_after = now() - interval '1 second' where id = %s", (first_claim[1]["id"],))
+    svc_call("push_claim", 10)
+a.execute("select attempts from push_outbox where id = %s", (first_claim[1]["id"],))
+check("after five attempts it is given up on", a.fetchone()[0] == 5)
+svc_call("push_complete", first_claim[1]["id"], False, "again", [])
+a.execute("update push_outbox set send_after = now() - interval '1 second' where id = %s", (first_claim[1]["id"],))
+check("...and never claimed again", all(c["id"] != first_claim[1]["id"] for c in svc_call("push_claim", 10)))
+
+other_owner = new_user()
+sql_as(other_owner, "select register_device(%s, 'sandbox')", (dead_b,))
+svc_call("push_complete", first_claim[2]["id"], True, None, [dead_a, dead_b])
+a.execute("select token from device_tokens where token in (%s, %s)", (dead_a, dead_b))
+check("dead tokens are forgotten, but only the recipient's own", [r[0] for r in a.fetchall()] == [dead_b])
+
+NOD = new_user()
+a.execute("select push_enqueue(%s, 'message', null, '{}'::jsonb, 'nod1')", (NOD,))
+nod_claim = [c for c in svc_call("push_claim", 50) if c["user_id"] == NOD]
+check("a person with no devices still comes back, with an empty list, so the sender can close it", len(nod_claim) == 1 and nod_claim[0]["devices"] == [])
+
+a.execute("delete from push_outbox")
+a.execute("delete from conversation_reads")
+BADGE = new_user()
+bgb = book(BADGE, at(D[34], 10), pkg=NC_PKG, client_name="Badge")
+send(NC, bgb["id"], "one")
+send(NC, bgb["id"], "two")
+a.execute("select push_enqueue(%s, 'message', %s, '{}'::jsonb, 'badge1')", (BADGE, bgb["id"]))
+badges = [c["badge"] for c in svc_call("push_claim", 50) if c["user_id"] == BADGE]
+check("each claim carries the person's unread count for the app icon", len(badges) >= 1 and set(badges) == {2}, badges)
+
+a.execute("select push_enqueue(%s, 'message', null, '{}'::jsonb, 'dupe-key')", (QU,))
+a.execute("select push_enqueue(%s, 'message', null, '{}'::jsonb, 'dupe-key')", (QU,))
+a.execute("select count(*) from push_outbox where dedupe_key = 'dupe-key'")
+check("queuing the same thing twice queues it once", a.fetchone()[0] == 1)
+
+a.execute("insert into push_outbox (user_id, kind, sent_at, created_at) values (%s, 'message', now() - interval '20 days', now() - interval '21 days')", (QU,))
+a.execute("insert into push_outbox (user_id, kind, sent_at, created_at) values (%s, 'message', now() - interval '1 day', now() - interval '2 days')", (QU,))
+a.execute("insert into push_outbox (user_id, kind, created_at, attempts) values (%s, 'message', now() - interval '30 days', 5)", (QU,))
+check("pruning removes old rows, sent or abandoned, and keeps recent ones", svc_call("push_prune") == 2)
+
+print("\n[notifications: who may call what]")
+for fn, args in [("push_claim", (10,)), ("push_complete", (str(uuid.uuid4()), True, None, [])), ("push_prune", ()), ("enqueue_due_reminders", ()),
+                 ("push_enqueue", (QU, "message", None, Json({}), "x")), ("unread_message_count", (QU,))]:
+    marks = ", ".join(["%s"] * len(args))
+    check(f"{fn} is closed to signed-in users", isinstance(sql_as(QU, f"select {fn}({marks})", args), str))
+    check(f"{fn} is closed to signed-out callers", isinstance(sql_as(None, f"select {fn}({marks})", args, role="anon"), str))
+check("the queue can't be read or changed by anyone signed in", isinstance(sql_as(QU, "select * from push_outbox"), str)
+      and isinstance(sql_as(QU, "delete from push_outbox"), str) and isinstance(sql_as(LC, "select * from conversation_reads"), str))
+check("the trigger functions can't be called", isinstance(sql_as(QU, "select bookings_notify_created()"), str))
+
+print("\n[messages and queue: simultaneous callers]")
+SR, SR_PKG = make_creator("simulco", deposit=0, account=False)
+sim = new_user()
+sb = book(sim, at(D[37], 10), pkg=SR_PKG, client_name="Sim")
+same_token = str(uuid.uuid4())
+sent_ids = [None] * 8
+gate3 = threading.Barrier(8)
+
+
+def send_same(i):
+    c, k = as_user(sim)
+    gate3.wait()
+    try:
+        k.execute("select id from send_message(%s, 'only once please', %s)", (sb["id"], same_token))
+        sent_ids[i] = k.fetchone()[0]
+    except psycopg2.Error as e:
+        sent_ids[i] = first_line(e)
+    c.close()
+
+
+ths = [threading.Thread(target=send_same, args=(i,)) for i in range(8)]
+[t.start() for t in ths]
+[t.join() for t in ths]
+check("eight copies of one message sent at once are all answered with the same message", len(set(sent_ids)) == 1 and not str(sent_ids[0]).startswith("ERR"), sent_ids)
+a.execute("select count(*) from messages where booking_id = %s and kind = 'text'", (sb["id"],))
+check("...and only one is stored", a.fetchone()[0] == 1)
+check("...and only one notification is queued", len(outbox(SR, "message", sb["id"])) == 1)
+
+a.execute("delete from push_outbox")
+for i in range(30):
+    a.execute("select push_enqueue(%s, 'message', null, '{}'::jsonb, %s)", (QU, f"sim{i}"))
+pulled = [None] * 4
+gate4 = threading.Barrier(4)
+
+
+def pull(i):
+    c, k = as_user(None, "service_role")
+    gate4.wait()
+    try:
+        k.execute("select push_claim(10)")
+        pulled[i] = [row["id"] for row in k.fetchone()[0]]
+    except psycopg2.Error as e:
+        pulled[i] = [first_line(e)]
+    c.close()
+
+
+ths = [threading.Thread(target=pull, args=(i,)) for i in range(4)]
+[t.start() for t in ths]
+[t.join() for t in ths]
+flat = [x for batch in pulled for x in batch]
+check("four senders claiming at once never get the same notification", len(flat) == len(set(flat)) and all("ERR" not in x for x in flat), pulled)
+check("...and between them take what is due, ten at a time", sorted(len(b) for b in pulled) == [10, 10, 10, 0] or sum(len(b) for b in pulled) == 30, [len(b) for b in pulled])
+
+print("\n[notifications: deleting an account]")
+gone_user = new_user()
+GC, GC_PKG = make_creator("goneco", deposit=0, account=False)
+gb = book(gone_user, at(D[35], 10), pkg=GC_PKG, client_name="Goner")
+send(gone_user, gb["id"], "I'll delete my account soon")
+sql_as(gone_user, "select register_device(%s, 'sandbox')", (tok(),))
+a.execute("delete from auth.users where id = %s", (gone_user,))
+a.execute("select body, sender_id from messages where booking_id = %s and kind = 'text'", (gb["id"],))
+check("the other person keeps what was said, now from nobody in particular", a.fetchall() == [("I'll delete my account soon", None)])
+check("...but can't write to someone who is gone", err(send(GC, gb["id"], "Are you there?"), "conversation_closed"))
+a.execute("select count(*) from device_tokens where user_id = %s", (gone_user,))
+check("their devices and settings are removed", a.fetchone()[0] == 0)
 
 
 # ---- 12. concurrency -----------------------------------------------------------

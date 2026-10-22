@@ -255,6 +255,12 @@ extension LocalBackend {
             try? write(previousContracts, to: contractsURL)
             throw error
         }
+        // The conversation starts with what just happened. A failure here must not undo a booking that succeeded.
+        try? appendSystemMessage(
+            .booked, bookingID: bookingID,
+            data: MessageEventData(packageName: package.name, startAt: request.startAt, timeZone: schedule.settings.timeZoneID), at: now
+        )
+        if !isHeld { try? appendSystemMessage(.contractSigned, bookingID: bookingID, at: now) }
         return SignedBooking(booking: booking, contract: contract)
     }
 
