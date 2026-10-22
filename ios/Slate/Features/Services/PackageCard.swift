@@ -11,6 +11,8 @@ struct PackageCard: View {
 
     let package: ServicePackage
     var style: Style = .client
+    /// For a company's service that only some people take: who, in words.
+    var offeredBy: String?
 
     private var visibleDeliverables: [String] { Array(package.deliverables.prefix(3)) }
     private var hiddenDeliverableCount: Int { max(0, package.deliverables.count - 3) }
@@ -32,6 +34,9 @@ struct PackageCard: View {
                 TagChip(title: "Delivered in \(DurationText.turnaround(days: package.turnaroundDays))", symbol: "shippingbox")
                 if !package.addOns.isEmpty {
                     TagChip(title: package.addOns.count == 1 ? "1 add-on" : "\(package.addOns.count) add-ons", symbol: "plus.circle")
+                }
+                if let offeredBy {
+                    TagChip(title: offeredBy, symbol: "person.2")
                 }
             }
 

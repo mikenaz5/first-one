@@ -115,11 +115,17 @@ enum ContractPDF {
         }
 
         draw("Signatures", font: .systemFont(ofSize: 20, weight: .bold), spacingAfter: 4)
-        draw("\(contract.title), between \(creatorName) and \(clientName).", font: .systemFont(ofSize: 11), color: .darkGray, spacingAfter: 14)
+        draw("\(contract.title), between \(contract.providerLegalName ?? creatorName) and \(clientName).", font: .systemFont(ofSize: 11), color: .darkGray, spacingAfter: 14)
 
         for role in [SignerRole.client, .creator] {
             guard let signature = contract.signature(for: role) else { continue }
-            draw("\(role.title): \(signature.signedName)", font: .systemFont(ofSize: 13, weight: .semibold), spacingAfter: 6)
+            draw("\(role.title): \(signature.signedName)", font: .systemFont(ofSize: 13, weight: .semibold), spacingAfter: signature.onBehalfOf == nil ? 6 : 2)
+            if let company = signature.onBehalfOf {
+                // A company's contract is signed for the company by a person, who signs with their title.
+                var line = "For \(company)"
+                if let title = signature.signerTitle, !title.isEmpty { line += ", \(title)" }
+                draw(line, font: .systemFont(ofSize: 11), color: .darkGray, spacingAfter: 6)
+            }
 
             let box = CGRect(x: margin, y: y, width: 260, height: 66)
             UIColor(white: 0.97, alpha: 1).setFill()

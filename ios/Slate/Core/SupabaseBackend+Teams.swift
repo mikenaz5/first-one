@@ -113,7 +113,8 @@ extension SupabaseBackend {
         var displayName: String
         var handle: String?
         var avatarPath: String?
-        var isSigner: Bool
+        /// Null for everyone who is not the signer, as the database writes it.
+        var isSigner: Bool?
 
         enum CodingKeys: String, CodingKey {
             case role, title, listed, bookable, handle
@@ -696,7 +697,8 @@ extension SupabaseBackend {
             ("invalid_input", .invalidInput),
             ("billing_not_configured", .billingUnavailable),
         ]
-        for entry in known where text.contains(entry.token) { return entry.error }
+        // The longest token first: `signer_role_not_allowed` contains `not_allowed`.
+        for entry in known.sorted(by: { $0.token.count > $1.token.count }) where text.contains(entry.token) { return entry.error }
         if text.contains("not_found") { return SlateError.notFound }
         return nil
     }
@@ -750,7 +752,7 @@ extension SupabaseBackend {
             userID: id, role: OrgRole(rawValue: row.role) ?? .viewer, title: row.title ?? "", listed: row.listed,
             bookable: row.bookable, shareBps: row.shareBps, joinedAt: row.joinedAt, displayName: row.displayName,
             handle: row.handle, avatarURL: try row.avatarPath.map { try publicURL(bucket: "avatars", path: $0) },
-            isSigner: row.isSigner
+            isSigner: row.isSigner ?? false
         )
     }
 

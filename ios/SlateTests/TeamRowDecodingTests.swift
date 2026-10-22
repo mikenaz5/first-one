@@ -247,7 +247,10 @@ final class TeamRowDecodingTests: XCTestCase {
 
         let options: [SupabaseBackend.OptionRow] = try load("assignment_options")
         XCTAssertEqual(Set(options.map(\.displayName)), ["Cal R", "Kim T"])
-        XCTAssertTrue(options.allSatisfy(\.free))
+        let byName = Dictionary(uniqueKeysWithValues: options.map { ($0.displayName, $0) })
+        XCTAssertEqual(byName["Cal R"]?.free, true)
+        XCTAssertEqual(byName["Kim T"]?.free, false, "The database says who can't take it, and why")
+        XCTAssertEqual(byName["Kim T"]?.reason, "Not available")
 
         let assigned = try backend.makeBooking(try load("assign_booking"))
         XCTAssertNotNil(assigned.assignedTo)

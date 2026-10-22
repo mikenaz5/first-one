@@ -37,9 +37,9 @@ struct EditProfileSheet: View {
                         .listRowBackground(Color.clear)
                 }
 
-                Section("Name") {
-                    TextField("Your name or studio", text: $draft.displayName)
-                        .textContentType(.name)
+                Section(original.kind == .company ? "Company name" : "Name") {
+                    TextField(original.kind == .company ? "Company name" : "Your name or studio", text: $draft.displayName)
+                        .textContentType(original.kind == .company ? .organizationName : .name)
                         .frame(minHeight: Metrics.minTapTarget)
                 }
 

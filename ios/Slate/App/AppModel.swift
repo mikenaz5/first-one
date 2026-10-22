@@ -333,9 +333,11 @@ final class AppModel {
         }
     }
 
-    func isHandleAvailable(_ handle: String) async throws -> Bool {
+    /// Whether a link name is free. For the account on screen its own name counts as free; for one being started
+    /// (`forNewAccount`) nothing does.
+    func isHandleAvailable(_ handle: String, forNewAccount: Bool = false) async throws -> Bool {
         guard let session else { throw SlateError.notSignedIn }
-        return try await backend.isHandleAvailable(handle, excluding: ownerID ?? session.userID)
+        return try await backend.isHandleAvailable(handle, excluding: forNewAccount ? UUID() : (ownerID ?? session.userID))
     }
 
     // MARK: - Profile

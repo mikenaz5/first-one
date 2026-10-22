@@ -104,7 +104,7 @@ struct HandleField: View {
         try? await Task.sleep(for: .milliseconds(450)) // Wait for typing to pause.
         guard !Task.isCancelled else { return }
         do {
-            let free = try await model.isHandleAvailable(draft.handle)
+            let free = try await model.isHandleAvailable(draft.handle, forNewAccount: draft.isNewAccount)
             guard !Task.isCancelled else { return }
             draft.handleStatus = free ? .available : .taken
         } catch {

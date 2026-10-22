@@ -28,6 +28,11 @@ final class BookingModel {
 
     let creator: CreatorProfile
     let package: ServicePackage
+    /// For a company: the people a client could book directly, and who offers this package among them.
+    private(set) var team: [PublicTeamMember]
+    private var offeredBy: [UUID] = []
+    /// The person the client chose, or nil to go to whoever is free.
+    private(set) var selectedMemberID: UUID?
 
     private(set) var phase: Phase = .loading
     private(set) var days: [DaySlots] = []
@@ -55,9 +60,11 @@ final class BookingModel {
     private var schedule: CreatorSchedule?
     private var now = Date()
 
-    init(creator: CreatorProfile, package: ServicePackage, signerName: String = "") {
+    init(creator: CreatorProfile, package: ServicePackage, signerName: String = "", team: [PublicTeamMember] = [], memberID: UUID? = nil) {
         self.creator = creator
         self.package = package
+        self.team = team
+        selectedMemberID = memberID
         capture = SignatureCapture(fullName: signerName)
     }
 
@@ -78,6 +85,13 @@ final class BookingModel {
 
     var referenceDate: Date { now }
 
+    /// The people who could take this booking, when the client may choose one.
+    var choosableTeam: [PublicTeamMember] {
+        offeredBy.isEmpty ? team : team.filter { offeredBy.contains($0.userID) }
+    }
+
+    var canChoosePerson: Bool { creator.kind == .company && !choosableTeam.isEmpty }
+
     /// Whatever has to change before the person can sign, in plain words. Nil when they can.
     var signBlocker: String? {
         if selectedSlot == nil { return "Choose a time first." }
@@ -95,7 +109,10 @@ final class BookingModel {
     func load(using model: AppModel, showSpinner: Bool = true) async {
         if showSpinner { phase = .loading }
         do {
-            let loaded = try await model.loadSchedule(for: creator.id)
+            if creator.kind == .company, offeredBy.isEmpty {
+                offeredBy = (try? await model.backend.loadPackageMembers(packageID: package.id)) ?? []
+            }
+            let loaded = try await model.loadSchedule(for: creator, package: package, memberID: selectedMemberID)
             schedule = loaded
             formatter = SlotFormatter(settings: loaded.settings)
             now = Date()
@@ -153,6 +170,16 @@ final class BookingModel {
         if phase == .ready, days.isEmpty { phase = .noAvailability }
     }
 
+    /// Switches between a named person and whoever is free. Their open times differ, so the times are worked out again.
+    func selectMember(_ id: UUID?, using model: AppModel) async {
+        guard id != selectedMemberID else { return }
+        selectedMemberID = id
+        selectedSlot = nil
+        notice = nil
+        invalidateContract()
+        await load(using: model, showSpinner: false)
+    }
+
     func selectDay(_ day: CalendarDay) {
         notice = nil
         invalidateContract()
@@ -173,7 +200,8 @@ final class BookingModel {
             packageID: package.id,
             addOnIDs: Array(selectedAddOnIDs),
             startAt: slot.start,
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            memberID: selectedMemberID
         )
     }
 

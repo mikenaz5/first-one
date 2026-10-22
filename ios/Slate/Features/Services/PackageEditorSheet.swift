@@ -9,6 +9,9 @@ struct PackageEditorSheet: View {
     @State private var isSaving = false
     @State private var saved = false
     @State private var confirmDelete = false
+    /// For a company's service: who takes it. Empty means everyone who takes bookings.
+    @State private var offeredBy: Set<UUID> = []
+    @State private var offeredLoaded = false
 
     init(package: ServicePackage) {
         _draft = State(initialValue: PackageDraft(package: package))
@@ -23,6 +26,7 @@ struct PackageEditorSheet: View {
                 deliverablesSection
                 addOnsSection
                 contractSection
+                offeredBySection
                 visibilitySection
                 problemsSection
 
@@ -46,7 +50,7 @@ struct PackageEditorSheet: View {
                     } else {
                         Button("Save") { Task { await save() } }
                             .fontWeight(.semibold)
-                            .disabled(!draft.canSave || (!draft.isNew && !draft.hasChanges))
+                            .disabled(!draft.canSave || (!draft.isNew && !draft.hasChanges && !membersChanged))
                     }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -54,7 +58,12 @@ struct PackageEditorSheet: View {
                     Button("Done") { UIApplication.dismissKeyboard() }
                 }
             }
-            .interactiveDismissDisabled(draft.hasChanges || isSaving)
+            .interactiveDismissDisabled(draft.hasChanges || membersChanged || isSaving)
+            .onAppear {
+                guard !offeredLoaded else { return }
+                offeredLoaded = true
+                offeredBy = originalOffered
+            }
             .sensoryFeedback(.success, trigger: saved)
             .sheet(item: $editingAddOn) { addOn in
                 AddOnEditorSheet(
@@ -276,6 +285,43 @@ struct PackageEditorSheet: View {
         }
     }
 
+    private var originalOffered: Set<UUID> { Set(model.packageMembers[draft.original.id] ?? []) }
+    private var membersChanged: Bool { offeredLoaded && offeredBy != originalOffered }
+
+    /// A company's service goes to everyone who takes bookings, or to the people chosen here.
+    @ViewBuilder
+    private var offeredBySection: some View {
+        let people = model.teamMembers.filter { $0.bookable && $0.role.canTakeBookings }
+        if model.isCompanyActive, !people.isEmpty {
+            Section {
+                Toggle("Everyone who takes bookings", isOn: Binding(
+                    get: { offeredBy.isEmpty },
+                    set: { everyone in offeredBy = everyone ? [] : Set(people.map(\.userID)) }
+                ))
+                .frame(minHeight: Metrics.minTapTarget)
+                if !offeredBy.isEmpty {
+                    ForEach(people) { person in
+                        Toggle(person.displayName, isOn: Binding(
+                            get: { offeredBy.contains(person.userID) },
+                            set: { on in
+                                if on {
+                                    offeredBy.insert(person.userID)
+                                } else if offeredBy.count > 1 {
+                                    offeredBy.remove(person.userID)
+                                }
+                            }
+                        ))
+                        .frame(minHeight: Metrics.minTapTarget)
+                    }
+                }
+            } header: {
+                Text("Offered by")
+            } footer: {
+                Text("Clients who book this are matched with someone from this list, and can book any of them by name.")
+            }
+        }
+    }
+
     private var visibilitySection: some View {
         Section {
             Toggle("Visible to clients", isOn: $draft.isPublished)
@@ -340,7 +386,11 @@ struct PackageEditorSheet: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            try await model.savePackage(draft.makePackage())
+            let package = draft.makePackage()
+            try await model.savePackage(package)
+            if model.isCompanyActive, membersChanged {
+                try await model.setPackageMembers(Array(offeredBy), for: package)
+            }
             saved = true
             dismiss()
         } catch {

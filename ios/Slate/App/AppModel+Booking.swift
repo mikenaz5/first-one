@@ -22,6 +22,17 @@ extension AppModel {
         )
     }
 
+    /// The schedule for booking a package. A company's comes from its team: with a person named, only theirs.
+    func loadSchedule(for creator: CreatorProfile, package: ServicePackage, memberID: UUID?) async throws -> CreatorSchedule {
+        guard creator.kind == .company else { return try await loadSchedule(for: creator.id) }
+        let now = Date()
+        let team = try await backend.loadTeamSchedule(
+            packageID: package.id, memberID: memberID,
+            from: now.addingTimeInterval(-86_400), to: now.addingTimeInterval(86_400 * 740)
+        )
+        return team.asSchedule
+    }
+
     /// Whether the signed-in person may book this creator's packages. Nobody books themselves, or a company they work for.
     func canBook(creatorID: UUID) -> Bool {
         let isOwn = creatorID == session?.userID || accounts.companies.contains { $0.organizationID == creatorID }

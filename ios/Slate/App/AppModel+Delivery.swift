@@ -13,7 +13,7 @@ extension AppModel {
     /// What the signed-in person has to do about their bookings right now.
     var attentionItems: [AttentionItem] {
         guard let session else { return [] }
-        return AttentionList.make(bookings: bookings, userID: session.userID, now: clock())
+        return AttentionList.make(bookings: visibleBookings, userID: session.userID, now: clock())
     }
 
     func review(for booking: Booking) -> Review? { reviewsByBooking[booking.id] }

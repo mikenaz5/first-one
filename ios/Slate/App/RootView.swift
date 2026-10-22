@@ -19,7 +19,7 @@ struct RootView: View {
                 WelcomeView()
                     .transition(.opacity)
             case .onboarding:
-                OnboardingFlow()
+                AccountChoiceFlow()
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .opacity
@@ -36,6 +36,9 @@ struct RootView: View {
         .onOpenURL { model.handle(url: $0) }
         .sheet(item: $model.presentedPage) { page in
             ClientPageSheet(page: page)
+        }
+        .sheet(item: $model.presentedInvite) { offer in
+            InviteOfferSheet(offer: offer)
         }
         .onChange(of: scenePhase) { _, phase in
             // Pick up calendar changes and new bookings whenever the app comes back.
@@ -119,7 +122,7 @@ private struct ClientPageSheet: View {
 
     var body: some View {
         NavigationStack {
-            CreatorPageView(profile: page.profile, portfolio: page.portfolio, packages: page.packages, mode: .client)
+            CreatorPageView(profile: page.profile, portfolio: page.portfolio, packages: page.packages, team: page.team, mode: .client)
                 .navigationTitle(page.profile.displayName)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

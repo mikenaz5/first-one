@@ -17,12 +17,25 @@ struct ServicesView: View {
 
     private let rowInsets = EdgeInsets(top: Space.s, leading: Space.page, bottom: Space.s, trailing: Space.page)
 
+    /// A role that can't change services still sees them.
+    private var canManage: Bool { model.can(.servicesManage) }
+
+    /// A card that opens something, or just shows its state to a role that can't use it.
+    @ViewBuilder
+    private func card<Content: View>(opensFor allowed: Bool, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        if allowed {
+            Button(action: action) { content() }
+                .buttonStyle(PressableTileStyle())
+        } else {
+            content()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    Button { showAvailability = true } label: { AvailabilityCard() }
-                        .buttonStyle(PressableTileStyle())
+                    card(opensFor: model.can(.companyEdit), action: { showAvailability = true }) { AvailabilityCard() }
                         .listRowInsets(rowInsets)
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -33,11 +46,13 @@ struct ServicesView: View {
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
 
-                    Button { showPayments = true } label: { PaymentsCard() }
-                        .buttonStyle(PressableTileStyle())
-                        .listRowInsets(rowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+                    if model.can(.paymentsConnect) {
+                        Button { showPayments = true } label: { PaymentsCard() }
+                            .buttonStyle(PressableTileStyle())
+                            .listRowInsets(rowInsets)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
                 }
 
                 Section {
@@ -48,37 +63,42 @@ struct ServicesView: View {
                             .listRowBackground(Color.clear)
                     } else {
                         ForEach(model.packages) { package in
-                            Button { editing = PackageEditorTarget(package: package) } label: {
-                                PackageCard(package: package, style: .owner)
+                            card(opensFor: canManage, action: { editing = PackageEditorTarget(package: package) }) {
+                                PackageCard(package: package, style: .owner, offeredBy: offeredByLine(package))
                             }
-                            .buttonStyle(PressableTileStyle())
                             .listRowInsets(rowInsets)
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = package }
-                                Button(package.isPublished ? "Hide" : "Show", systemImage: package.isPublished ? "eye.slash" : "eye") {
-                                    Task { await model.setPublished(package, !package.isPublished) }
+                                if canManage {
+                                    Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = package }
+                                    Button(package.isPublished ? "Hide" : "Show", systemImage: package.isPublished ? "eye.slash" : "eye") {
+                                        Task { await model.setPublished(package, !package.isPublished) }
+                                    }
+                                    .tint(.orange)
                                 }
-                                .tint(.orange)
                             }
                             .swipeActions(edge: .leading) {
-                                Button("Duplicate", systemImage: "plus.square.on.square") {
-                                    Task { await model.duplicate(package) }
+                                if canManage {
+                                    Button("Duplicate", systemImage: "plus.square.on.square") {
+                                        Task { await model.duplicate(package) }
+                                    }
+                                    .tint(.indigo)
                                 }
-                                .tint(.indigo)
                             }
                             .contextMenu {
-                                Button("Edit", systemImage: "pencil") { editing = PackageEditorTarget(package: package) }
-                                Button("Duplicate", systemImage: "plus.square.on.square") {
-                                    Task { await model.duplicate(package) }
+                                if canManage {
+                                    Button("Edit", systemImage: "pencil") { editing = PackageEditorTarget(package: package) }
+                                    Button("Duplicate", systemImage: "plus.square.on.square") {
+                                        Task { await model.duplicate(package) }
+                                    }
+                                    Button(package.isPublished ? "Hide from clients" : "Show to clients",
+                                           systemImage: package.isPublished ? "eye.slash" : "eye") {
+                                        Task { await model.setPublished(package, !package.isPublished) }
+                                    }
+                                    Divider()
+                                    Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = package }
                                 }
-                                Button(package.isPublished ? "Hide from clients" : "Show to clients",
-                                       systemImage: package.isPublished ? "eye.slash" : "eye") {
-                                    Task { await model.setPublished(package, !package.isPublished) }
-                                }
-                                Divider()
-                                Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = package }
                             }
                         }
                     }
@@ -96,9 +116,14 @@ struct ServicesView: View {
             .navigationTitle("Services")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("New package", systemImage: "plus") {
-                        editing = PackageEditorTarget(package: model.makeNewPackage())
+                ToolbarItem(placement: .topBarLeading) {
+                    AccountButton()
+                }
+                if canManage {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("New package", systemImage: "plus") {
+                            editing = PackageEditorTarget(package: model.makeNewPackage())
+                        }
                     }
                 }
             }
@@ -130,6 +155,13 @@ struct ServicesView: View {
             .sensoryFeedback(trigger: model.packages.count) { old, new in new > old ? .success : .warning }
             .sensoryFeedback(.selection, trigger: model.packages.map(\.isPublished))
         }
+    }
+
+    /// For a company's service: who it is offered by, when that isn't everyone who takes bookings.
+    private func offeredByLine(_ package: ServicePackage) -> String? {
+        guard model.isCompanyActive, let chosen = model.packageMembers[package.id], !chosen.isEmpty else { return nil }
+        let names = chosen.compactMap { model.member(withID: $0)?.displayName }
+        return names.isEmpty ? nil : "Offered by " + names.joined(separator: ", ")
     }
 
     private var emptyState: some View {
@@ -243,7 +275,9 @@ struct ContractsCard: View {
                         .foregroundStyle(.secondary)
                 }
                 if !model.hasCreatorSignature {
-                    Text("Add your signature so clients can sign and book you.")
+                    Text(model.isCompanyActive
+                         ? "Name who signs for the company so clients can sign and book."
+                         : "Add your signature so clients can sign and book you.")
                         .font(.footnote)
                         .foregroundStyle(Color.slateWarning)
                 }

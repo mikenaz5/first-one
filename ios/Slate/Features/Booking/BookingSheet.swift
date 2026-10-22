@@ -13,8 +13,8 @@ struct BookingSheet: View {
     /// Grows with the text, so a time like "10:30 AM" never wraps in its button.
     @ScaledMetric(relativeTo: .subheadline) private var slotMinWidth = Metrics.timeSlotMinWidth
 
-    init(creator: CreatorProfile, package: ServicePackage) {
-        _booking = State(initialValue: BookingModel(creator: creator, package: package))
+    init(creator: CreatorProfile, package: ServicePackage, team: [PublicTeamMember] = [], memberID: UUID? = nil) {
+        _booking = State(initialValue: BookingModel(creator: creator, package: package, team: team, memberID: memberID))
     }
 
     private var canBook: Bool { model.canBook(creatorID: booking.creator.id) }
@@ -78,6 +78,9 @@ struct BookingSheet: View {
                 if !canBook {
                     Banner(text: "This is your own package. Clients book it from your page.", symbol: "person.crop.circle.badge.exclamationmark", tint: .slateWarning)
                 }
+                if booking.canChoosePerson {
+                    personSection
+                }
                 if let notice = booking.notice {
                     Banner(text: notice, symbol: "exclamationmark.triangle.fill", tint: .slateWarning)
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -132,6 +135,35 @@ struct BookingSheet: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Who
+
+    /// A company's booking goes to whoever is free, or to the person the client picks.
+    private var personSection: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader("With")
+            Picker(selection: Binding(
+                get: { booking.selectedMemberID },
+                set: { id in Task { await booking.selectMember(id, using: model) } }
+            )) {
+                Text("Anyone available").tag(UUID?.none)
+                ForEach(booking.choosableTeam) { person in
+                    Text(person.displayName).tag(UUID?.some(person.userID))
+                }
+            } label: {
+                Label("Who", systemImage: "person.2")
+            }
+            .pickerStyle(.menu)
+            .frame(minHeight: Metrics.minTapTarget)
+            .padding(.horizontal, Space.l)
+            .background(Color.slateCard, in: RoundedRectangle(cornerRadius: Radius.l, style: .continuous))
+            Text(booking.selectedMemberID == nil
+                 ? "We'll match you with whoever is free at the time you choose."
+                 : "Only this person's open times are shown.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
     }
 
     // MARK: Add-ons

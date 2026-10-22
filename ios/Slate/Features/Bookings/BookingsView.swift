@@ -13,21 +13,23 @@ struct BookingsView: View {
     @State private var scope: Scope = .upcoming
     @State private var pendingCancel: Booking?
     @State private var calendarMessage: String?
+    @State private var assignTarget: Booking?
+    @State private var showTeamCalendar = false
 
     private var upcoming: [Booking] {
         let now = Date()
-        return model.bookings.filter { $0.isUpcoming(at: now) }.sorted { $0.startAt < $1.startAt }
+        return model.visibleBookings.filter { $0.isUpcoming(at: now) }.sorted { $0.startAt < $1.startAt }
     }
 
     /// The shoot is over but the booking isn't: work to deliver, or a balance to pay.
     private var followUp: [Booking] {
         let now = Date()
-        return model.bookings.filter { $0.needsFollowUp(at: now) }.sorted { $0.startAt < $1.startAt }
+        return model.visibleBookings.filter { $0.needsFollowUp(at: now) }.sorted { $0.startAt < $1.startAt }
     }
 
     private var past: [Booking] {
         let now = Date()
-        return model.bookings.filter { !$0.isOpen(at: now) }.sorted { $0.startAt > $1.startAt }
+        return model.visibleBookings.filter { !$0.isOpen(at: now) }.sorted { $0.startAt > $1.startAt }
     }
 
     private var visible: [Booking] { scope == .upcoming ? followUp + upcoming : past }
@@ -44,6 +46,20 @@ struct BookingsView: View {
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: Space.s, leading: Space.page, bottom: Space.s, trailing: Space.page))
+                }
+
+                if scope == .upcoming, model.can(.bookingsAssign), !model.assignmentQueue.isEmpty {
+                    Section {
+                        ForEach(model.assignmentQueue) { booking in
+                            Button { assignTarget = booking } label: { AssignmentQueueRow(booking: booking) }
+                                .buttonStyle(.plain)
+                                .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
+                        }
+                    } header: {
+                        Text("Needs a person")
+                    } footer: {
+                        Text("Nobody has these yet. Choose who takes each one.")
+                    }
                 }
 
                 if visible.isEmpty {
@@ -80,6 +96,18 @@ struct BookingsView: View {
             .slatePageBackground()
             .navigationTitle("Bookings")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    AccountButton()
+                }
+                if model.isCompanyActive, model.can(.calendarViewTeam) {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Team calendar", systemImage: "calendar.day.timeline.left") { showTeamCalendar = true }
+                    }
+                }
+            }
+            .sheet(item: $assignTarget) { booking in AssignSheet(booking: booking) }
+            .sheet(isPresented: $showTeamCalendar) { TeamCalendarSheet() }
             .navigationDestination(for: UUID.self) { id in
                 BookingDetailView(bookingID: id)
             }
@@ -98,11 +126,14 @@ struct BookingsView: View {
     private func rows(_ items: [Booking]) -> some View {
         ForEach(items) { booking in
             NavigationLink(value: booking.id) {
-                BookingRow(booking: booking, isMine: model.isMine(booking), summary: model.paymentSummary(for: booking))
+                BookingRow(
+                    booking: booking, isMine: model.isMine(booking), summary: model.paymentSummary(for: booking),
+                    assignee: model.isMine(booking) ? model.assigneeName(for: booking) : nil
+                )
             }
             .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                if booking.canCancel(at: Date()) {
+                if booking.canCancel(at: Date()), model.canManage(booking) {
                     Button("Cancel", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
                 }
             }
@@ -120,7 +151,7 @@ struct BookingsView: View {
                         Task { await addToCalendar(booking) }
                     }
                 }
-                if booking.canCancel(at: Date()) {
+                if booking.canCancel(at: Date()), model.canManage(booking) {
                     Button("Cancel booking", systemImage: "xmark.circle", role: .destructive) { pendingCancel = booking }
                 }
             }
@@ -144,13 +175,20 @@ struct BookingRow: View {
     let booking: Booking
     let isMine: Bool
     var summary: PaymentSummary?
+    /// For a company's booking: who has it ("You", a name), when that is known.
+    var assignee: String?
 
     private var formatter: SlotFormatter { SlotFormatter(timeZone: booking.timeZone) }
     private var startDay: CalendarDay { CalendarDay(booking.startAt, calendar: formatter.calendar) }
 
     private var otherParty: String {
         if booking.creatorID == booking.clientID { return "Test booking (you)" }
-        if isMine { return booking.clientName.isEmpty ? "Client" : "Client: \(booking.clientName)" }
+        if isMine {
+            let client = booking.clientName.isEmpty ? "Client" : "Client: \(booking.clientName)"
+            if booking.isWaitingForAssignment { return "\(client) · Needs a person" }
+            if let assignee { return "\(client) · \(assignee)" }
+            return client
+        }
         return "with \(booking.creatorName)"
     }
 
@@ -211,6 +249,7 @@ struct BookingDetailView: View {
     @State private var addedToCalendar = false
     /// Bumped when the shoot starts, so the delivery section appears without the person leaving the screen.
     @State private var shootStarted = 0
+    @State private var assignTarget: Booking?
 
     private var booking: Booking? { model.bookings.first { $0.id == bookingID } }
 
@@ -298,8 +337,15 @@ struct BookingDetailView: View {
             }
 
             Section("People") {
-                LabeledContent("Creator", value: booking.creatorName)
+                LabeledContent(model.accounts.companies.contains { $0.organizationID == booking.creatorID } ? "Company" : "Creator", value: booking.creatorName)
                 LabeledContent("Client", value: booking.clientName.isEmpty ? "Client" : booking.clientName)
+                if model.isMine(booking), booking.creatorID != model.session?.userID {
+                    LabeledContent("Assigned to", value: booking.isWaitingForAssignment ? "Needs a person" : (model.assigneeName(for: booking) ?? "Nobody"))
+                    if model.canAssign(booking), booking.canCancel(at: Date()) {
+                        Button(booking.assignedTo == nil ? "Assign…" : "Reassign…") { assignTarget = booking }
+                            .frame(minHeight: Metrics.minTapTarget)
+                    }
+                }
             }
 
             if !booking.notes.isEmpty {
@@ -319,12 +365,13 @@ struct BookingDetailView: View {
                     }
                     .disabled(addedToCalendar || model.hasCalendarEvent(for: booking))
                 }
-                if booking.canCancel(at: Date()) {
+                if booking.canCancel(at: Date()), model.canManage(booking) {
                     Button("Cancel booking", role: .destructive) { pendingCancel = booking }
                         .frame(minHeight: Metrics.minTapTarget)
                 }
             }
         }
+        .sheet(item: $assignTarget) { target in AssignSheet(booking: target) }
         .cancelFlow($pendingCancel)
         .task(id: booking.status) { await model.loadReview(for: booking) }
         .task(id: booking.startAt) { await waitForShootToStart(booking) }

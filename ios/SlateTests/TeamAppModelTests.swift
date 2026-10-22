@@ -33,12 +33,19 @@ final class TeamAppModelTests: XCTestCase {
     /// Maya signs in and finishes setting up her own profile.
     private func makeReady() async throws {
         await model.signInAsDemo()
+        XCTAssertNotNil(model.session, "Signing in failed: \(model.alert?.message ?? "no message")")
         let draft = ProfileDraft()
         draft.displayName = "Maya Chen"
-        draft.handle = "maya"
+        // Not "maya": on-device mode keeps a few short handles as already taken, to show that state.
+        draft.handle = "mayachen"
         draft.specialties = [.weddings]
-        try await model.completeOnboarding(draft: draft, portfolio: [])
-        XCTAssertEqual(model.phase, .ready)
+        do {
+            try await model.completeOnboarding(draft: draft, portfolio: [])
+        } catch {
+            XCTFail("Finishing onboarding failed: \(String(reflecting: error))")
+            throw error
+        }
+        XCTAssertEqual(model.phase, .ready, "Load error: \(model.loadErrorMessage ?? "none")")
     }
 
     private func companyDraft(_ name: String = "Northlight Films", handle: String = "northlight") -> OrganizationDraft {

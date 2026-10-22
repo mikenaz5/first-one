@@ -63,6 +63,43 @@ extension AppModel {
     /// Bookings waiting for someone to be put on them, for the badge on the company's home.
     var unassignedCount: Int { assignmentQueue.count }
 
+    /// Who a company booking is with, for its row. Nil outside a company or while it waits for someone.
+    func assigneeName(for booking: Booking) -> String? {
+        guard let assignee = booking.assignedTo, booking.creatorID != assignee else { return nil }
+        if assignee == session?.userID { return "You" }
+        return member(withID: assignee)?.displayName ?? "A teammate"
+    }
+
+    /// Whether the person may choose who takes this booking: their role in the company it belongs to allows it.
+    func canAssign(_ booking: Booking) -> Bool {
+        guard let company = accounts.companies.first(where: { $0.organizationID == booking.creatorID }) else { return false }
+        return company.state == .active && company.role.allows(.bookingsAssign)
+    }
+
+    /// Whether the person may cancel, deliver and otherwise run this booking: it is theirs, or their role in the company
+    /// it belongs to lets them (everything for a Manager and up; their own bookings for a Creator).
+    func canManage(_ booking: Booking) -> Bool {
+        guard let me = session?.userID else { return false }
+        if booking.clientID == me || booking.creatorID == me { return true }
+        guard let company = accounts.companies.first(where: { $0.organizationID == booking.creatorID }) else {
+            return booking.assignedTo == me
+        }
+        if company.role.allows(.bookingsManage) { return true }
+        return booking.assignedTo == me && company.role.allows(.bookingsManageAssigned)
+    }
+
+    /// The company's people as a client would see them, for previewing its page.
+    var publicTeam: [PublicTeamMember] {
+        teamMembers
+            .filter { $0.listed && $0.bookable }
+            .map {
+                PublicTeamMember(
+                    userID: $0.userID, displayName: $0.displayName, handle: $0.handle, avatarURL: $0.avatarURL,
+                    bio: "", specialties: [], title: $0.title
+                )
+            }
+    }
+
     // MARK: - Switching accounts
 
     /// Moves to the person's own account or one of their companies, the way Apple's apps switch accounts.

@@ -5,10 +5,8 @@ struct ProfileView: View {
     @Environment(AppModel.self) private var model
 
     @State private var showEditor = false
-    @State private var showNotifications = false
     @State private var showPreview = false
-    @State private var confirmSignOut = false
-    @State private var confirmDelete = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -22,9 +20,14 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") { showEditor = true }
-                        .disabled(model.profile == nil)
+                ToolbarItem(placement: .topBarLeading) {
+                    AccountButton()
+                }
+                if model.can(.companyEdit) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Edit") { showEditor = true }
+                            .disabled(model.profile == nil)
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -34,14 +37,8 @@ struct ProfileView: View {
                                 Label("Share booking link", systemImage: "square.and.arrow.up")
                             }
                         }
-                        Button("Notifications", systemImage: "bell") { showNotifications = true }
                         Divider()
-                        Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right") {
-                            confirmSignOut = true
-                        }
-                        Button("Delete account…", systemImage: "trash", role: .destructive) {
-                            confirmDelete = true
-                        }
+                        Button("Settings", systemImage: "gearshape") { showSettings = true }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
@@ -51,7 +48,10 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $showPreview) {
                 if let profile = model.profile {
-                    CreatorPageView(profile: profile, portfolio: model.portfolio, packages: model.publishedPackages, mode: .preview)
+                    CreatorPageView(
+                        profile: profile, portfolio: model.portfolio, packages: model.publishedPackages,
+                        team: model.publicTeam, mode: .preview
+                    )
                         .navigationTitle("Client view")
                         .navigationBarTitleDisplayMode(.inline)
                 }
@@ -61,17 +61,8 @@ struct ProfileView: View {
                     EditProfileSheet(profile: profile)
                 }
             }
-            .sheet(isPresented: $showNotifications) {
-                NotificationSettingsSheet()
-                    .presentationDetents([.large])
-            }
-            .confirmationDialog("Sign out of Slate?", isPresented: $confirmSignOut, titleVisibility: .visible) {
-                Button("Sign Out", role: .destructive) { Task { await model.signOut() } }
-            }
-            .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Delete Account", role: .destructive) { Task { await model.deleteAccount() } }
-            } message: {
-                Text("This permanently deletes your profile and portfolio. This can't be undone.")
+            .navigationDestination(isPresented: $showSettings) {
+                SettingsView()
             }
         }
     }
@@ -88,10 +79,17 @@ struct CreatorPageView: View {
     let profile: CreatorProfile
     let portfolio: [PortfolioItem]
     var packages: [ServicePackage] = []
+    /// For a company's page: the people a client can book directly.
+    var team: [PublicTeamMember] = []
     let mode: Mode
 
     @Environment(AppModel.self) private var model
-    @State private var bookingTarget: ServicePackage?
+    @State private var bookingTarget: BookingTarget?
+    /// A person the client has chosen to book directly. Nil means whoever is free.
+    @State private var chosenMember: UUID?
+
+    /// Editing tools show only on your own page, and only to a role that may change it.
+    private var canEditPage: Bool { mode == .owner && model.can(.companyEdit) }
 
     var body: some View {
         ScrollView {
@@ -105,15 +103,18 @@ struct CreatorPageView: View {
 
                 header
 
-                if mode == .owner, let completeness = model.completeness, !completeness.isComplete {
+                if canEditPage, let completeness = model.completeness, !completeness.isComplete {
                     CompletenessCard(completeness: completeness)
                 }
 
                 if mode != .owner {
+                    if !team.isEmpty {
+                        teamSection
+                    }
                     packagesSection
                 }
 
-                PortfolioSection(items: portfolio, isOwner: mode == .owner)
+                PortfolioSection(items: portfolio, isOwner: canEditPage)
 
                 ReviewsSection(creatorID: profile.id, isOwner: mode == .owner)
             }
@@ -128,9 +129,45 @@ struct CreatorPageView: View {
             await model.loadReviews(for: profile.id)
         }
         .slatePageBackground()
-        .sheet(item: $bookingTarget) { package in
-            BookingSheet(creator: profile, package: package)
+        .sheet(item: $bookingTarget) { target in
+            BookingSheet(creator: profile, package: target.package, team: team, memberID: target.memberID)
         }
+    }
+
+    private var chosenName: String {
+        team.first(where: { $0.userID == chosenMember })?.displayName ?? "them"
+    }
+
+    private struct BookingTarget: Identifiable {
+        let package: ServicePackage
+        let memberID: UUID?
+        var id: UUID { package.id }
+    }
+
+    /// A company's people. Choosing one books them directly; leaving it alone books whoever is free.
+    private var teamSection: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeader("Book a person")
+            ScrollView(.horizontal) {
+                HStack(spacing: Space.m) {
+                    ForEach(team) { person in
+                        TeamPersonTile(person: person, isChosen: chosenMember == person.userID) {
+                            withAnimation(.slateSnappy) {
+                                chosenMember = chosenMember == person.userID ? nil : person.userID
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, Space.xxs)
+            }
+            .scrollIndicators(.hidden)
+            Text(chosenMember == nil
+                 ? "Or choose a service below and we'll match you with whoever is free."
+                 : "Choose a service below to book \(chosenName).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .sensoryFeedback(.selection, trigger: chosenMember)
     }
 
     private var packagesSection: some View {
@@ -145,7 +182,7 @@ struct CreatorPageView: View {
             } else {
                 ForEach(packages) { package in
                     Button {
-                        bookingTarget = package
+                        bookingTarget = BookingTarget(package: package, memberID: chosenMember)
                     } label: {
                         PackageCard(package: package, style: .client)
                     }
@@ -200,6 +237,54 @@ struct CreatorPageView: View {
         }
         .frame(maxWidth: .infinity)
         .card(padding: Space.xl)
+    }
+}
+
+// MARK: - Team
+
+/// One person on a company's page, to choose when booking.
+private struct TeamPersonTile: View {
+    let person: PublicTeamMember
+    let isChosen: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: Space.s) {
+                AvatarView(name: person.displayName, url: person.avatarURL, size: Metrics.avatarM)
+                    .overlay(alignment: .bottomTrailing) {
+                        if isChosen {
+                            Image(systemName: "checkmark.circle.fill")
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(Color.slateOnAccent, Color.accentColor)
+                                .font(.title3)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                VStack(spacing: Space.xxs) {
+                    Text(person.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                    if !person.title.isEmpty {
+                        Text(person.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+            }
+            .frame(minWidth: Metrics.avatarL, minHeight: Metrics.minTapTarget)
+            .padding(.vertical, Space.m)
+            .padding(.horizontal, Space.s)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.l, style: .continuous)
+                    .fill(Color.slateCard)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.l, style: .continuous)
+                    .strokeBorder(isChosen ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: Radius.l, style: .continuous))
+        }
+        .buttonStyle(PressableTileStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isChosen ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(isChosen ? "Tap to book whoever is free instead" : "Books \(person.displayName) directly")
     }
 }
 

@@ -40,6 +40,9 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
 struct OnboardingFlow: View {
     @Environment(AppModel.self) private var model
 
+    /// Goes back to the choice of account type. Nil when there is nothing to go back to.
+    var onBack: (() -> Void)?
+
     @State private var draft = ProfileDraft()
     @State private var pendingPortfolio: [NewPortfolioItem] = []
     @State private var position: OnboardingStep? = .identity
@@ -85,7 +88,7 @@ struct OnboardingFlow: View {
         VStack(spacing: Space.s) {
             HStack {
                 Button {
-                    go(to: previousStep)
+                    if step == .identity { onBack?() } else { go(to: previousStep) }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.body.weight(.semibold))
@@ -93,8 +96,8 @@ struct OnboardingFlow: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Back")
-                .opacity(step == .identity ? 0 : 1)
-                .disabled(step == .identity || isSaving)
+                .opacity(step == .identity && onBack == nil ? 0 : 1)
+                .disabled((step == .identity && onBack == nil) || isSaving)
 
                 Spacer()
 

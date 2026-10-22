@@ -17,6 +17,9 @@ final class ProfileDraft {
     /// A newly chosen photo. Nil means "keep what's there".
     var avatarJPEG: Data?
     var avatarURL: URL?
+    /// True for an account that doesn't exist yet (a company being started). Its link is checked against every
+    /// account, including the person's own, because it will be a different one.
+    var isNewAccount = false
 
     var handleStatus: HandleStatus = .idle
     /// The handle we suggested from the name; once the person edits it, we stop overwriting it.

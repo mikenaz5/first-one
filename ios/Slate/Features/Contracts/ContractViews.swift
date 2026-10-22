@@ -326,6 +326,11 @@ struct SignatureRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text("\(signature.role.title): \(signature.signedName)").font(.subheadline.weight(.semibold))
+            if let companyLine {
+                Text(companyLine)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             Group {
                 if signature.method == .drawn, let data = signature.imagePNG, let image = UIImage(data: data) {
                     Image(uiImage: image)
@@ -352,6 +357,13 @@ struct SignatureRow: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// "For Northlight Films LLC, Owner", when this was signed for a company.
+    private var companyLine: String? {
+        guard let company = signature.onBehalfOf else { return nil }
+        guard let title = signature.signerTitle, !title.isEmpty else { return "For \(company)" }
+        return "For \(company), \(title)"
     }
 
     private var methodText: String {

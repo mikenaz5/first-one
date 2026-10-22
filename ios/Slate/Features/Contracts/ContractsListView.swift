@@ -9,13 +9,31 @@ struct ContractsListView: View {
     @State private var pendingDelete: ContractTemplate?
     @State private var isAdding = false
 
+    /// A Creator or Viewer reads the company's contracts; an Owner or Admin writes them.
+    private var canEditTemplates: Bool { model.can(.templatesManage) }
+
     var body: some View {
         List {
+            if let organization = model.organization {
+                Section {
+                    NavigationLink {
+                        SignerPickerView()
+                    } label: {
+                        CompanySignerRow(organization: organization)
+                    }
+                    .disabled(!model.can(.signerDesignate))
+                } footer: {
+                    Text("A contract is signed for the company by one named person, who counter-signs it as soon as the client has signed and paid. Contracts already signed keep the signer they were signed with.")
+                }
+            }
+
             Section {
                 Button { showSignature = true } label: { SignatureStatusRow() }
                     .buttonStyle(.plain)
             } footer: {
-                Text("Clients sign when they book, and your saved signature is applied to the same contract so it's signed by both of you straight away. You can change it any time; contracts already signed keep the signature they were signed with.")
+                Text(model.isCompanyActive
+                     ? "If you're named as the company's signer, this is the signature that goes on its contracts. Each person keeps their own."
+                     : "Clients sign when they book, and your saved signature is applied to the same contract so it's signed by both of you straight away. You can change it any time; contracts already signed keep the signature they were signed with.")
             }
 
             Section {
@@ -30,19 +48,25 @@ struct ContractsListView: View {
                 ForEach(model.contractTemplates) { template in
                     Button { editing = template } label: { TemplateRow(template: template) }
                         .buttonStyle(.plain)
+                        .disabled(!canEditTemplates)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = template }
+                            if canEditTemplates {
+                                Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = template }
+                            }
                         }
                         .contextMenu {
-                            Button("Edit", systemImage: "pencil") { editing = template }
-                            Divider()
-                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = template }
+                            if canEditTemplates {
+                                Button("Edit", systemImage: "pencil") { editing = template }
+                                Divider()
+                                Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = template }
+                            }
                         }
                 }
             } header: {
                 Text("Your contracts")
             }
 
+            if canEditTemplates {
             Section {
                 Menu {
                     ForEach(StarterTemplates.kinds) { kind in
@@ -57,6 +81,7 @@ struct ContractsListView: View {
                 .disabled(isAdding)
             } footer: {
                 Text(StarterTemplates.disclaimer)
+            }
             }
         }
         .navigationTitle("Contracts")
@@ -120,20 +145,57 @@ private struct TemplateRow: View {
     }
 }
 
+/// Who signs for the company, in the list of contracts.
+struct CompanySignerRow: View {
+    @Environment(AppModel.self) private var model
+    let organization: Organization
+
+    var body: some View {
+        let signer = model.teamMembers.first { $0.isSigner }
+        HStack(spacing: Space.m) {
+            Image(systemName: signer == nil ? "exclamationmark.triangle.fill" : "building.2.crop.circle")
+                .font(.title3)
+                .foregroundStyle(signer == nil ? Color.slateWarning : Color.accentColor)
+                .frame(minWidth: Metrics.iconColumn)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text("Signs for \(organization.name)").font(.headline)
+                if let signer {
+                    Text(organization.signerTitle.isEmpty ? signer.displayName : "\(signer.displayName) · \(organization.signerTitle)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not chosen yet. Clients can't book until someone is.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.slateWarning)
+                }
+            }
+        }
+        .frame(minHeight: Metrics.minTapTarget)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct SignatureStatusRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: Space.m) {
-            Image(systemName: model.hasCreatorSignature ? "signature" : "exclamationmark.triangle.fill")
+            // For a company this is the person's own signature, which only matters if they sign for it.
+            let ready = model.creatorSignature != nil || model.isCompanyActive
+            Image(systemName: model.creatorSignature != nil ? "signature" : (model.isCompanyActive ? "signature" : "exclamationmark.triangle.fill"))
                 .font(.title3)
-                .foregroundStyle(model.hasCreatorSignature ? Color.accentColor : Color.slateWarning)
+                .foregroundStyle(ready ? Color.accentColor : Color.slateWarning)
                 .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
-                Text("Your signature").font(.headline)
+                Text(model.isCompanyActive ? "My signature" : "Your signature").font(.headline)
                 if let signature = model.creatorSignature {
                     Text("\(signature.signedName) · \(signature.method == .drawn ? "drawn" : "typed")")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if model.isCompanyActive {
+                    Text("Add yours if you'll sign for the company.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
