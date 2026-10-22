@@ -8,6 +8,9 @@
 //   STRIPE_WEBHOOK_SECRET   whsec_… from the webhook endpoint you add in the Stripe dashboard
 //   PLATFORM_FEE_BPS        optional, defaults to 0 (the platform takes nothing)
 //   APP_URL_SCHEME          optional, defaults to "slate"
+// For seat billing (billing-session, billing-sync):
+//   STRIPE_SEAT_PRICE_ID    the id of the Stripe Price for one seat for one month (price_…); billing is off without it
+//   BILLING_TRIAL_DAYS      optional, free-trial days for a company's first plan, defaults to 14 (0 for none)
 // For push notifications (send-push):
 //   APNS_KEY_P8             the contents of the AuthKey_XXXX.p8 file from your Apple developer account
 //   APNS_KEY_ID             that key's ID
@@ -21,6 +24,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { DbError } from "./payments.ts";
 import type { Db, Deps, HttpResult } from "./payments.ts";
 import { createApnsSender } from "./apns.ts";
+import type { BillingDeps } from "./billing.ts";
 import type { PushDeps } from "./push.ts";
 
 let cached: Deps | null = null;
@@ -67,6 +71,34 @@ export function makeDeps(): Deps {
     log: (message, detail) => console.error(message, detail ?? ""),
   };
   return cached;
+}
+
+/** Everything the billing functions need, or null when no seat price is configured. */
+export function makeBillingDeps(): BillingDeps | null {
+  const seatPriceId = Deno.env.get("STRIPE_SEAT_PRICE_ID");
+  if (!seatPriceId) return null;
+  const base = makeDeps();
+  const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { httpClient: Stripe.createFetchHttpClient() });
+  const trial = Number(Deno.env.get("BILLING_TRIAL_DAYS") ?? "14");
+  return {
+    db: base.db,
+    stripe: {
+      customers: { create: (params, options) => stripe.customers.create(params as never, options) },
+      checkout: { sessions: { create: (params, options) => stripe.checkout.sessions.create(params as never, options) } },
+      billingPortal: { sessions: { create: (params) => stripe.billingPortal.sessions.create(params as never) } },
+      subscriptions: {
+        retrieve: (id) => stripe.subscriptions.retrieve(id) as never,
+        cancel: (id) => stripe.subscriptions.cancel(id),
+      },
+      subscriptionItems: { update: (id, params, options) => stripe.subscriptionItems.update(id, params as never, options) },
+    },
+    config: {
+      functionsBaseUrl: base.config.functionsBaseUrl,
+      seatPriceId,
+      trialDays: Number.isFinite(trial) && trial > 0 ? Math.floor(trial) : 0,
+    },
+    log: base.log,
+  };
 }
 
 /** The signed-in person, from their own JWT. Never trust a user id sent in a request body. */

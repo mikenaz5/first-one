@@ -51,6 +51,8 @@ a.execute(stubs)
 for f in sorted(MIG.glob("*.sql")):
     a.execute(f.read_text())
     print("applied", f.name)
+# These suites are about roles and bookings, not about paying for seats (billing_rules.py is).
+a.execute("update app_settings set value = value || '{\"required\": false}'::jsonb where key = 'billing'")
 
 
 # ---- helpers ----------------------------------------------------------------

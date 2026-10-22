@@ -12,6 +12,8 @@
 //
 // Only erasable TypeScript syntax is used (no enums or parameter properties) so Node can run it directly.
 
+import { handleBillingEvent } from "./billing.ts";
+
 // ---------------------------------------------------------------------------
 // Shapes
 // ---------------------------------------------------------------------------
@@ -437,7 +439,9 @@ async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
       return;
     }
     default:
-      return; // Events we don't care about are acknowledged and ignored.
+      // Subscription events belong to seat billing; anything else we don't care about is acknowledged and ignored.
+      await handleBillingEvent(deps, event);
+      return;
   }
 }
 

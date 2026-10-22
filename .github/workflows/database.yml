@@ -2,8 +2,8 @@ name: Database
 
 # Runs the booking, payment and messaging rules against a real Postgres: no double-booking (including 30 clients racing
 # for one slot), working hours, blackouts, buffers, server-side pricing, contracts, payments, refunds, conversations,
-# the notification queue and row level security. Two more scripts cover company accounts: roles, invites, seats and who can
-# see and change what, then company services, assignment, contracts and the upgrade from one person. A second job type-checks and tests the Edge Function logic with Node (no Stripe or
+# the notification queue and row level security. Three more scripts cover company accounts: roles, invites, seats and who can
+# see and change what; company services, assignment, contracts and the upgrade from one person; and seat billing. A second job type-checks and tests the Edge Function logic with Node (no Stripe or
 # Apple account needed).
 
 on:
@@ -56,6 +56,7 @@ jobs:
       - run: python ios/supabase/tests/booking_rules.py
       - run: python ios/supabase/tests/team_rules.py
       - run: python ios/supabase/tests/company_rules.py
+      - run: python ios/supabase/tests/billing_rules.py
 
   edge-functions:
     runs-on: ubuntu-latest
