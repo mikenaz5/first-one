@@ -215,7 +215,7 @@ extension View {
 // MARK: - Large symbols
 
 private struct HeroSymbolStyle: ViewModifier {
-    @ScaledMetric(relativeTo: .largeTitle) private var scaled: CGFloat
+    @ScaledMetric(relativeTo: .largeTitle) private var scaled: CGFloat = 56
     private let size: CGFloat
     private let weight: Font.Weight
 
