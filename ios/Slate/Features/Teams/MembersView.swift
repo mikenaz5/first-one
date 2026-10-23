@@ -134,6 +134,9 @@ struct MembersView: View {
 
     private func removalMessage(for member: TeamMember) -> String {
         var parts = ["\(member.displayName) loses access to the company. Their upcoming bookings go back to the queue to be given to someone else."]
+        if member.isSigner {
+            parts.append("They sign contracts for the company, so until you choose someone else clients can't book.")
+        }
         if let removalPlan {
             parts.append(removalPlan.billingSentence(periodEnd: model.organization?.plan.periodEnd))
         }

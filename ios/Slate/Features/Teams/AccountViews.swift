@@ -18,7 +18,7 @@ struct AccountButton: View {
             showSwitcher = true
         } label: {
             HStack(spacing: Space.xs) {
-                AvatarView(name: name, url: model.profile?.avatarURL, size: 30)
+                AvatarView(name: name, url: model.profile?.avatarURL, size: Metrics.avatarXS)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)

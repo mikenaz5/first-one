@@ -482,13 +482,13 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 
 | Where | Change |
 |---|---|
-| **Account switcher** | At the top of Profile, a tappable header like the Apple ID row in Settings: avatar, name, and the current account ("Personal" or the company with the person's role). It opens a sheet listing Personal and each company, with a checkmark on the current one. Switching changes what every tab shows. The choice is remembered per device. |
-| **Settings, Team** (company only) | A grouped section: Members, Invites, Company settings, Billing (Owner), Activity (Owner, Admin). Rows a role can't use are hidden, not disabled. |
-| **Members** | A list of people with role and title. Swipe actions: **Change role** and **Remove** (trailing), and a context menu with the same. Roles the actor can't set are not offered. |
-| **Home** | Adds a "Needs assignment" card for people who can assign, and a team snapshot for Viewers. |
-| **Bookings** | Adds a **Team** segment: the team calendar with a filter chip per member (8.10). Rows show the assigned member. |
+| **Account switcher** | *As built:* a small avatar button at the top left of Home, Bookings, Services and Profile (like the account button in Apple's apps) opens a sheet listing Personal and each company with the person's role, a checkmark on the current one, and "Upgrade to a company" or "Start a new company". Switching changes what every tab shows. The choice is remembered per device. |
+| **Settings, Team** | *As built:* Settings is pushed from Profile ▸ ⋯. The Team section (for the company on screen; an individual sees "Upgrade to a company" there) has Members, Team calendar, Company settings, Billing (Owner), Activity (Owner, Admin) and My hours here, then Leave company. Rows a role can't use are hidden, not disabled. |
+| **Members** | A list of people with role and title, with pending invites underneath. Swipe actions: **Remove** and **Role** (trailing), **Details** (leading), and a context menu with the same. Roles the actor can't set are not offered. Invites swipe to **Revoke** or get a **New link**. |
+| **Home** | Adds a "Needs a person" card for people who can assign, and a Team calendar row for anyone who can see it (Viewers included). The plan's state shows as a banner. |
+| **Bookings** | *As built:* a "Needs a person" section for people who can assign, and a **Team calendar** button in the toolbar that opens the calendar in a sheet (a day strip per person, a filter chip per member; 8.10). Rows show who has each booking. |
 | **Services** | Company services with an "Offered by" line (everyone, or the chosen members). Templates are managed here by Owner and Admin. |
-| **Profile** | The company profile editor, designated signer, Stripe Connect for the company (Owner), and the split ledger setting (Owner). |
+| **Profile** | The company page and its editor (Owner, Admin). The designated signer, the split ledger and going back to an individual account are under Settings ▸ Company settings; Stripe Connect for the company is under Services ▸ Payments (Owner). |
 
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
@@ -562,7 +562,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R10 | **Cross-company data exposure.** A role check missed in one function, or an owner id trusted from the client, could show one company's bookings or contracts to another. | Permissions are enforced in the database (row level security and function checks), never from the client. Tests try every permission with every role, plus a member of another company, and assert the refusal. |
 | R11 | **An upgrade leaves records split between a person and a company,** which can confuse accounting. | The upgrade summary says what moves and what stays. Records show whether they are Personal or the company's. The company's reports cover only the company. |
 | R12 | **A removed designated signer halts bookings.** | Removing or demoting the signer is warned about before it happens, and the company shows a banner until a new signer is chosen. |
-| R13 | **A company booking in manual mode can sit unassigned** while the client has paid. | Manual-mode capacity is limited (8.9), unassigned bookings are on the Managers' needs-assignment list, and a reminder fires before the shoot if still unassigned. |
+| R13 | **A company booking in manual mode can sit unassigned** while the client has paid. | Manual-mode capacity is limited (8.9) and unassigned bookings are on the Managers' needs-assignment list (Home and Bookings). *Not built:* a reminder before the shoot if it is still unassigned. |
 | R14 | **Seat counts disagree between Slate and Stripe.** | Seats billed are computed in one place from active members and the floor. Stripe's webhook is the record of what was charged, and the Owner's screen shows both. |
 
 ## 13. Open questions

@@ -99,6 +99,13 @@ struct SettingsView: View {
                     row("calendar.day.timeline.left", "Team calendar")
                 }
             }
+            if model.can(.reportsView) {
+                NavigationLink {
+                    ReportsView()
+                } label: {
+                    row("chart.bar", "Reports")
+                }
+            }
             if model.can(.companyEdit) {
                 NavigationLink {
                     CompanySettingsView()

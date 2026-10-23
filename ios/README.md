@@ -206,6 +206,52 @@ Until then the app still builds and runs. Notification settings explain that thi
 
 To use it on a device you must register the App Group once: in your developer account add an **App Group** (default `group.com.example.slate`, set by `APP_GROUP_ID` in `Config/App.xcconfig`; change it there, in one place, if you change the bundle ID), and let Xcode add it to both the app and the *SlateWidgets* target (both entitlements files already ask for it). Without the group the app still builds and runs; the widget simply has nothing to show.
 
+## Companies and teams
+
+**Two kinds of account.** After Sign in with Apple a new person chooses **Just me** (an individual freelancer: everything described above) or **My company** (a team). Someone who opens a company invite link first goes straight to the invite instead. An individual can move up later, from the account switcher or Settings, without losing anything: their services and contract templates move to the company, while their profile, portfolio, bookings and every signed contract stay where they are.
+
+**Switching accounts.** The avatar at the top of Home, Bookings, Services and Profile opens an account sheet, the way Apple's apps switch accounts: the person's own account, each company they work for, and ways to upgrade or start a company. What a tab shows follows the account: services, hours, contract templates, the portfolio and the payment account belong to the account on screen, while bookings, payments and messages always belong to the person (a company's bookings show under the company, and the jobs it gives you also show under yours). The app opens on the account you last used.
+
+**Settings ▸ Team** (Profile ▸ ⋯ ▸ Settings) has, for the company on screen and as far as the role allows: **Members** (swipe to change a role or remove someone, tap for their team profile; pending invites below, swipe to revoke or replace a lost link), **Team calendar**, **Company settings** (the name on contracts, how bookings are assigned, who signs, payout splitting, going back to an individual account, closing), **Billing**, **Activity** (who changed bookings, contracts, prices and the team), and **My hours here**.
+
+**Roles.** Five, one per person per company, enforced by the database and hidden in the app when a role cannot use something:
+
+| | Owner | Admin | Manager | Creator | Viewer |
+|---|---|---|---|---|---|
+| Billing, payments setup, payout splitting, delete the company | ✓ | | | | |
+| Company profile, invite and manage the team, services, contract templates, choose the signer, activity log | ✓ | ✓ | | | |
+| Assign and manage bookings | ✓ | ✓ | ✓ | | |
+| See all bookings and reports | ✓ | ✓ | ✓ | | ✓ |
+| Manage their own calendar and assigned bookings | ✓ | ✓ | ✓ | ✓ | |
+| See the team and its calendar | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+An Admin can invite and manage Managers, Creators and Viewers but not other Admins or the Owner. Exactly one Owner; ownership is handed over, never dropped. A company whose plan has lapsed is read only (the Owner can still pay and close it).
+
+**Where the rules live.** Every question of the form "may this person act for that owner?" goes through `acts_for()` and `provider_access()` in SQL (`20261027000000_organizations.sql`, `20261028000000_company_booking.sql`), and is mirrored by `OrgRole`, `OrgPermission` and `RoleRules` in Swift and `LocalBackend.permits`. The matrix is `SlateTests/Fixtures/team_permissions.json`, checked by both the Swift tests and `team_rules.py`. A company is a `creator_profiles` row of kind `company` plus an `organizations` row, so its id is a profile id and packages, templates, hours, bookings and the payment account are found by it exactly as a person's are; `memberships`, `invites` (only a hash of the token is kept) and `activity_log` hang off it.
+
+**Booking a company.** A client books the company (the booking is then given to a person) or books a named person. The company chooses how: **automatically** (default: whoever is free with the fewest upcoming bookings, ties to whoever joined first) or **by a manager**, in which case a time is offered only while there are more free people than bookings already waiting, and the booking appears under *Needs a person* on Home and Bookings. A person's hours at the company can only narrow the company's. Nobody is ever in two places: a booking blocks the person it is *assigned to*, so a person's own page and their company's are one calendar (the `bookings_no_double_booking` exclusion constraint is on `assigned_to`, and `Booking.occupant` is the same idea in Swift), and a person's own calendar busy time counts too. The same decision is made by `TeamAvailability` (Swift, for the screen and the on-device backend) and `team_availability()` / `create_booking()` (SQL).
+
+**Contracts** are made in the company's legal name and countersigned by one **designated signer** (an Owner or Admin, or another role the Owner allows) the moment the client has signed and the deposit is paid. Who signs, and the title they sign with, are fixed when the client signs, so changing the signer never touches a contract already made. The signed PDF says "For Northlight Films LLC, Owner".
+
+**Payments** go to the company's own Stripe Connect account (the Owner sets it up under Services ▸ Payments). With splitting on, the Owner sets a share per person and each booking records it for reports; Slate makes no transfers to members.
+
+**Numbers you can change.** Seat minimum (10, the billing floor: a team of four is billed for ten) and maximum (250), how long an invite lives (7 days) and the grace period after a failed payment (7 days) are rows in `app_settings`, read by the app through `team_config()`. To change one, update the row, for example `update app_settings set value = '{"minimum": 5, "maximum": 100}' where key = 'seats';`. The seat maximum counts invites that are still pending. On-device the same numbers come from `TeamConfig.standard`.
+
+### Turning on seat billing
+
+A company pays for seats with one Stripe Billing subscription (no In-App Purchase). Until you do this, a company can be set up but takes no members and no bookings.
+
+1. In Stripe, make a Product with a recurring monthly Price per unit (one seat) and copy the price id.
+2. `supabase secrets set STRIPE_SEAT_PRICE_ID=price_...` (billing stays off without it).
+3. Deploy `billing-session` (with JWT verification: it is the Owner asking), and `billing-redirect` and `billing-sync` with `--no-verify-jwt`.
+4. Point the existing Stripe webhook (`stripe-webhook`) at `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted` as well as the payment events. Only the webhook's signed events can record a plan.
+5. Run `billing-sync` on a schedule (every 15 minutes is plenty; call it like `send-push`, with the service role key or `PUSH_CRON_SECRET`). It pushes seat changes to Stripe (a seat added is charged at once, one removed lowers the next invoice), ends the plans of closed companies and makes companies past their grace period read only.
+6. To run without billing at all (a private deployment), set `billing` to `{"required": false, "grace_days": 7}`.
+
+**Never exercised:** Stripe Billing itself (Checkout, the portal, the webhook events, proration), the Supabase calls behind the team screens against a live project, and a second real phone joining through an invite link. The SQL is tested against a real Postgres and the Swift decodes the rows that Postgres actually returned (`SlateTests/Fixtures/team_rows.json`, written by `supabase/tests/dump_team_rows.py` and checked in CI so it cannot drift).
+
+**On a device with no server,** billing is unavailable (the Billing screen says so), and since there is no second phone, *Invite ▸ Add pretend teammate* adds someone by name to try roles, assignment and the calendar alone. Signed in as one person, `LocalBackend.actAs` (used by the tests) is how other team members' views are checked.
+
 ## Layout
 
 ```
@@ -219,18 +265,21 @@ ios/
     Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
     Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer), notifications (NotificationService)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments, Delivery (files and reviews), Messages, Notifications
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments, Delivery (files and reviews), Messages, Notifications, Teams (account choice, switcher, settings, members, invites, calendar, billing, activity)
     Resources/                Asset catalog (accent color, app icon)
   SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF, payments)
     Fixtures/contract_golden.json   Contract text both SQL and Swift must reproduce exactly
     Fixtures/refund_golden.json     Refund amounts both SQL and Swift must agree on
     Fixtures/notification_rules.json  Message tidying, the message limit and reminder times both must agree on
     Fixtures/delivery_rules.json    Which delivery links are accepted, note and review limits, and reviewer names, both must agree on
+    Fixtures/team_permissions.json  What each company role may do; Swift and Postgres both check it
+    Fixtures/seat_rules.json        Seats billed and the effect of adding or removing someone; Swift and Postgres both check it
+    Fixtures/team_rows.json         What the team functions really return, written by dump_team_rows.py from a real Postgres
   supabase/
     migrations/               Schema, security and the booking, contract, payment, messaging and delivery functions
-    tests/                    Postgres rule tests (booking_rules.py)
-    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts) and send-push (_shared/push.ts, apns.ts)
-    function-tests/           Node tests and type-check for the payment and push logic
+    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
+    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) and the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts)
+    function-tests/           Node tests and type-check for the payment, push and billing logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.

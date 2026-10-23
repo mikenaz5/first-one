@@ -38,6 +38,8 @@ enum Radius {
 enum Metrics {
     /// Apple's minimum comfortable touch target.
     static let minTapTarget: CGFloat = 44
+    /// The account button in a navigation bar.
+    static let avatarXS: CGFloat = 30
     static let avatarS: CGFloat = 44
     static let avatarM: CGFloat = 72
     static let avatarL: CGFloat = 112
@@ -66,6 +68,10 @@ enum Metrics {
     static let dayChipWidth: CGFloat = 56
     static let dayChipHeight: CGFloat = 68
     static let timeSlotMinWidth: CGFloat = 96
+
+    /// The bar that shows a person's day on the team calendar, and the colour keys beside it.
+    static let dayStripHeight: CGFloat = 22
+    static let legendKey: CGFloat = 14
 
     /// The signature pad, a typed signature's preview, and a signature shown on a signed contract.
     static let signaturePadHeight: CGFloat = 150

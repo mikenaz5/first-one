@@ -306,7 +306,7 @@ private struct Legend: View {
 
     private func key(_ color: Color, _ title: String) -> some View {
         HStack(spacing: Space.xs) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous).fill(color).frame(width: 14, height: 14)
+            RoundedRectangle(cornerRadius: Radius.s / 3, style: .continuous).fill(color).frame(width: Metrics.legendKey, height: Metrics.legendKey)
             Text(title)
         }
     }
@@ -335,7 +335,7 @@ private struct MemberDayCard: View {
 
             if let axis, layout.working != nil || !layout.bookings.isEmpty {
                 DayStrip(layout: layout, axis: axis)
-                    .frame(height: 22)
+                    .frame(height: Metrics.dayStripHeight)
                     .accessibilityHidden(true)
                 HStack {
                     Text(formatter.time(axis.start))
