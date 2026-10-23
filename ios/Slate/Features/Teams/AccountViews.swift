@@ -78,6 +78,7 @@ struct AccountSwitcherSheet: View {
                 } header: {
                     Text("Accounts")
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     if canUpgrade {
@@ -99,7 +100,10 @@ struct AccountSwitcherSheet: View {
                          ? "Upgrading moves your services and contracts to a company with a team. Your profile, bookings and signed contracts stay as they are."
                          : "A company has its own page, team, services and calendar. Your own account stays as it is.")
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -252,7 +256,7 @@ struct InviteOfferSheet: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.slatePrimary)
                         .controlSize(.large)
                         .disabled(!canJoin)
 

@@ -54,6 +54,7 @@ struct ServicesView: View {
                             .listRowBackground(Color.clear)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     if model.packages.isEmpty {
@@ -109,6 +110,7 @@ struct ServicesView: View {
                         .padding(.horizontal, Space.page)
                         .listRowInsets(EdgeInsets())
                 }
+                    .listRowBackground(Color.slateCard)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)

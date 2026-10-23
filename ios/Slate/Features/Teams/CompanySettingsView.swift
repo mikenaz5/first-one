@@ -41,6 +41,8 @@ struct CompanySettingsView: View {
                 endingSection(organization)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Company settings")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -97,6 +99,7 @@ struct CompanySettingsView: View {
                 Text("Every new contract is made in this name. Contracts already signed keep the name they were signed under.")
             }
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func signerLine(_ signer: TeamMember?, _ organization: Organization) -> String {
@@ -135,6 +138,7 @@ struct CompanySettingsView: View {
         } footer: {
             Text("A client can always book a named person directly. This is for bookings made with the company.")
         }
+            .listRowBackground(Color.slateCard)
         .disabled(!model.can(.companyEdit))
         .sensoryFeedback(.selection, trigger: organization.assignmentMode)
     }
@@ -181,6 +185,7 @@ struct CompanySettingsView: View {
                  ? "A contract is signed for the company by one named person, who counter-signs it as soon as the client has signed and paid. Owners can always sign; choose which other roles can be named."
                  : "A contract is signed for the company by one named person, who counter-signs it as soon as the client has signed and paid.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     @ViewBuilder
@@ -226,6 +231,7 @@ struct CompanySettingsView: View {
             } footer: {
                 Text("Clients pay the company's own Stripe account. With splitting on, you set each person's share and Slate keeps a ledger of what each is owed; the company pays them out itself.")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -244,6 +250,7 @@ struct CompanySettingsView: View {
                      ? "Going back to an individual account needs nothing upcoming on the calendar."
                      : "To go back to an individual account, remove everyone else from the team first.")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -333,6 +340,7 @@ struct SignerPickerView: View {
             } footer: {
                 Text("Shown under their name when they sign for the company, for example \"Owner\" or \"Managing Director\".")
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 ForEach(eligible) { member in
@@ -367,6 +375,7 @@ struct SignerPickerView: View {
             } footer: {
                 Text("They need a signature saved in Slate. Each person adds their own, under Services ▸ Contracts.")
             }
+                .listRowBackground(Color.slateCard)
 
             if model.creatorSignature == nil {
                 Section {
@@ -377,8 +386,11 @@ struct SignerPickerView: View {
                             .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Contract signer")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -429,6 +441,7 @@ struct MyHoursView: View {
             } footer: {
                 Text("Your own hours can be shorter than the company's, never longer: you can't be booked when the company is closed.")
             }
+                .listRowBackground(Color.slateCard)
 
             if !useCompanyHours {
                 Section("My hours") {
@@ -436,8 +449,11 @@ struct MyHoursView: View {
                         MyDayRow(weekday: weekday, days: $days)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("My hours")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

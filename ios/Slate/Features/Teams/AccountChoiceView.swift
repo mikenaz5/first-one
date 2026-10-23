@@ -81,7 +81,7 @@ struct AccountChoiceView: View {
             .frame(maxWidth: Metrics.readableWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .slatePageBackground()
+        .slateGlowBackground()
     }
 }
 
@@ -104,7 +104,7 @@ private struct ChoiceCard: View {
                 HStack(spacing: Space.m) {
                     Image(systemName: symbol)
                         .font(.title)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.slateAccentText)
                         .frame(minWidth: Metrics.iconColumn)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: Space.xxs) {

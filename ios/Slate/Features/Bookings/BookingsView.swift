@@ -47,6 +47,7 @@ struct BookingsView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: Space.s, leading: Space.page, bottom: Space.s, trailing: Space.page))
                 }
+                    .listRowBackground(Color.slateCard)
 
                 if scope == .upcoming, model.can(.bookingsAssign), !model.assignmentQueue.isEmpty {
                     Section {
@@ -60,6 +61,7 @@ struct BookingsView: View {
                     } footer: {
                         Text("Nobody has these yet. Choose who takes each one.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
 
                 if visible.isEmpty {
@@ -74,10 +76,12 @@ struct BookingsView: View {
                         }
                         .listRowBackground(Color.clear)
                     }
+                        .listRowBackground(Color.slateCard)
                 } else {
                     if scope == .upcoming {
                         if !followUp.isEmpty {
                             Section("Needs attention") { rows(followUp) }
+                                .listRowBackground(Color.slateCard)
                         }
                         if !upcoming.isEmpty {
                             Section {
@@ -85,9 +89,11 @@ struct BookingsView: View {
                             } header: {
                                 if !followUp.isEmpty { Text("Upcoming") }
                             }
+                                .listRowBackground(Color.slateCard)
                         }
                     } else {
                         Section { rows(past) }
+                            .listRowBackground(Color.slateCard)
                     }
                 }
             }
@@ -197,7 +203,7 @@ struct BookingRow: View {
             VStack(spacing: 0) {
                 Text(formatter.monthShort(startDay).uppercased())
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.slateAccentText)
                 Text("\(startDay.day)")
                     .font(.title2.weight(.bold))
                     .monospacedDigit()
@@ -278,11 +284,13 @@ struct BookingDetailView: View {
                 }
                 LabeledContent("Status", value: booking.effectiveStatus(at: Date()).title)
             }
+                .listRowBackground(Color.slateCard)
 
             Section("Payment") {
                 PaymentStatusCard(booking: booking)
                     .padding(.vertical, Space.xs)
             }
+                .listRowBackground(Color.slateCard)
 
             DeliverySection(booking: booking, tick: shootStarted)
 
@@ -294,6 +302,7 @@ struct BookingDetailView: View {
                     LabeledContent(addOn.name, value: money(addOn.priceCents))
                 }
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 LabeledContent("Total", value: money(booking.totalCents))
@@ -304,6 +313,7 @@ struct BookingDetailView: View {
             } footer: {
                 Text("The deposit confirms the booking. The balance is due once the final files are delivered and confirmed. \(booking.cancellationPolicy.summary).")
             }
+                .listRowBackground(Color.slateCard)
 
             PaymentHistorySection(booking: booking)
 
@@ -315,6 +325,7 @@ struct BookingDetailView: View {
                         .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                 }
             }
+                .listRowBackground(Color.slateCard)
 
             if model.canMessage(booking) {
                 Section("Messages") {
@@ -328,12 +339,13 @@ struct BookingDetailView: View {
                             if unread > 0 {
                                 Text("\(unread) new")
                                     .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(Color.slateAccentText)
                             }
                         }
                         .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
             }
 
             Section("People") {
@@ -347,9 +359,11 @@ struct BookingDetailView: View {
                     }
                 }
             }
+                .listRowBackground(Color.slateCard)
 
             if !booking.notes.isEmpty {
                 Section("Notes") { Text(booking.notes) }
+                    .listRowBackground(Color.slateCard)
             }
 
             Section {
@@ -370,7 +384,10 @@ struct BookingDetailView: View {
                         .frame(minHeight: Metrics.minTapTarget)
                 }
             }
+                .listRowBackground(Color.slateCard)
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .sheet(item: $assignTarget) { target in AssignSheet(booking: target) }
         .cancelFlow($pendingCancel)
         .task(id: booking.status) { await model.loadReview(for: booking) }

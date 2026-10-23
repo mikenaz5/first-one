@@ -73,6 +73,7 @@ struct MessagesView: View {
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
         .scrollContentBackground(.hidden)

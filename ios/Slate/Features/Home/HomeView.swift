@@ -137,7 +137,7 @@ private struct SetupCard: View {
                 Text(setupButtonTitle)
                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
         }
         .card()
@@ -291,7 +291,7 @@ private struct LinkCard: View {
             Label("Share", systemImage: "square.and.arrow.up")
                 .frame(minHeight: Metrics.buttonLabelHeight)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.slateOutline)
     }
 
     private var openButton: some View {
@@ -301,7 +301,7 @@ private struct LinkCard: View {
             Label("Open as a client", systemImage: "person.crop.circle.badge.checkmark")
                 .frame(minHeight: Metrics.buttonLabelHeight)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.slateOutline)
     }
 
     var body: some View {

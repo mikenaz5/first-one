@@ -360,6 +360,8 @@ struct LocationPickerSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .searchable(text: $search.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "City or town")
             .navigationTitle("Home base")
             .navigationBarTitleDisplayMode(.inline)

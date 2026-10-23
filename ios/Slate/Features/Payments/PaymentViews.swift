@@ -56,7 +56,7 @@ struct PayButton: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.slatePrimary)
                 .controlSize(.large)
                 .disabled(model.isPaying)
                 Text("Demo mode: no card is charged.").font(.footnote).foregroundStyle(.secondary)
@@ -170,6 +170,7 @@ struct PaymentHistorySection: View {
                     Text("Demo mode: these payments are pretend. No money moved.")
                 }
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -312,7 +313,7 @@ struct HeldBookingView: View {
                         .disabled(booking.isSubmitting)
                     } else {
                         Button("Choose another time") { dismiss() }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.slatePrimary)
                             .controlSize(.large)
                     }
                 }
@@ -383,6 +384,7 @@ struct PaymentSetupSheet: View {
                     .padding(.vertical, Space.xs)
                     .accessibilityElement(children: .combine)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 if !account.isSimulated {
                     Section {
@@ -403,6 +405,7 @@ struct PaymentSetupSheet: View {
                     } footer: {
                         Text("Stripe collects your identity and bank details on its own pages. Slate never sees them. Stripe charges its normal processing fee on each payment; Slate adds no fee.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
 
                 Section("How you get paid") {
@@ -411,7 +414,10 @@ struct PaymentSetupSheet: View {
                     Label("Cancellations refund by the policy on each package, and always in full if you cancel.", systemImage: "arrow.uturn.backward")
                         .font(.subheadline)
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Payments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

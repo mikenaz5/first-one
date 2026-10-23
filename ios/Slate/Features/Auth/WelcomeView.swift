@@ -37,12 +37,16 @@ struct WelcomeView: View {
             Spacer(minLength: Space.xxl)
 
             VStack(alignment: .leading, spacing: Space.m) {
+                // The mark: a violet rounded tile, the way the reference's logo sits on its splash screen.
                 Image(systemName: "camera.aperture")
-                    .heroSymbol(44, weight: .light)
-                    .foregroundStyle(Color.accentColor)
+                    .heroSymbol(34, weight: .regular)
+                    .foregroundStyle(Color.slateOnAccent)
+                    .frame(width: Metrics.avatarM, height: Metrics.avatarM)
+                    .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: Radius.l, style: .continuous))
                     .accessibilityHidden(true)
 
-                Text("Get booked.\nGet signed.\nGet paid.")
+                // The last line is the accent, like "connection" in the reference's headline.
+                (Text("Get booked.\nGet signed.\n") + Text("Get paid.").foregroundStyle(Color.slateAccentText))
                     .font(SlateFont.display)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -82,8 +86,7 @@ struct WelcomeView: View {
                     Button("Continue with a demo account") {
                         Task { await model.signInAsDemo() }
                     }
-                    .font(.subheadline)
-                    .frame(minHeight: Metrics.minTapTarget)
+                    .buttonStyle(.slateOutline)
                 }
                 #endif
 
@@ -132,11 +135,13 @@ private struct FeatureRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.m) {
+            // An icon tile: a violet outline symbol on a dark rounded square with a thin border, as in the reference's categories.
             Image(systemName: symbol)
                 .font(.title3)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.slateAccentText)
                 .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
-                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+                .background(Color.slateFill, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.m, style: .continuous).strokeBorder(Color.slateHairline, lineWidth: 1))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(title).font(.headline)
@@ -156,14 +161,14 @@ private struct AmbientBackground: View {
         ZStack {
             Color.slateBackground
             Circle()
-                .fill(Color.accentColor.opacity(0.28))
-                .frame(width: 360, height: 360)
-                .blur(radius: 80)
+                .fill(Color.slateGlow.opacity(0.55))
+                .frame(width: 380, height: 380)
+                .blur(radius: 90)
                 .offset(x: drift ? 90 : -90, y: drift ? -230 : -170)
             Circle()
-                .fill(Color.pink.opacity(0.18))
+                .fill(Color.accentColor.opacity(0.22))
                 .frame(width: 300, height: 300)
-                .blur(radius: 80)
+                .blur(radius: 90)
                 .offset(x: drift ? -110 : 110, y: drift ? 260 : 200)
         }
         .ignoresSafeArea()

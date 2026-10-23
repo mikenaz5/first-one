@@ -208,7 +208,7 @@ struct BookingSheet: View {
                 VStack(spacing: Space.m) {
                     Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Button("Try Again") { Task { await booking.load(using: model) } }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.slateOutline)
                 }
                 .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
 
@@ -347,7 +347,7 @@ struct BookingSheet: View {
                 Text(buttonTitle)
                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
             .disabled(booking.selectedSlot == nil || !canBook || booking.phase != .ready)
 
@@ -548,7 +548,7 @@ struct BookingConfirmationView: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.slateOutline)
                     .controlSize(.large)
                     .disabled(calendarState == .adding || calendarState == .added)
 
@@ -559,7 +559,7 @@ struct BookingConfirmationView: View {
                     Button(action: onDone) {
                         Text("Done").frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.slatePrimary)
                     .controlSize(.large)
                 }
             }

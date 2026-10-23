@@ -104,7 +104,7 @@ private struct LoadFailedView: View {
             Button("Try Again") {
                 Task { await model.retryLoad() }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
 
             Button("Sign Out", role: .destructive) {

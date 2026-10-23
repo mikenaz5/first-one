@@ -27,6 +27,7 @@ struct ContractTemplateEditor: View {
                     TextField("Contract title", text: $draft.title)
                         .frame(minHeight: Metrics.minTapTarget)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     ForEach($draft.clauses) { $clause in
@@ -50,6 +51,7 @@ struct ContractTemplateEditor: View {
                 } footer: {
                     Text("Use Insert field to add details that fill in automatically for each booking, like the client's name, the date and the price. Tap Edit to reorder or delete sections.")
                 }
+                    .listRowBackground(Color.slateCard)
 
                 if !problems.isEmpty {
                     Section {
@@ -61,8 +63,11 @@ struct ContractTemplateEditor: View {
                     } header: {
                         Text("To finish")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Edit Contract")
             .navigationBarTitleDisplayMode(.inline)

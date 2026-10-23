@@ -193,7 +193,7 @@ struct TeamCalendarView: View {
                         }
                         Spacer(minLength: Space.s)
                         if model.can(.bookingsAssign), entry.bookingID != nil {
-                            Text("Assign").font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
+                            Text("Assign").font(.subheadline.weight(.semibold)).foregroundStyle(Color.slateAccentText)
                         }
                     }
                     .frame(minHeight: Metrics.minTapTarget)

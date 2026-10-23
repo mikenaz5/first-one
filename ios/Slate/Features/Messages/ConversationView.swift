@@ -94,7 +94,7 @@ private struct ConversationContent: View {
                     Text(problem)
                 } actions: {
                     Button("Try Again") { Task { await conversation.load() } }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.slatePrimary)
                 }
             } else {
                 thread(rows)

@@ -14,6 +14,7 @@ struct NotificationSettingsView: View {
             } footer: {
                 Text(statusFooter)
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 ForEach(NotificationCategory.allCases) { category in
@@ -36,6 +37,7 @@ struct NotificationSettingsView: View {
                     Text("On this phone Slate can only schedule shoot reminders. The other kinds need a Slate server, which this build isn't connected to.")
                 }
             }
+                .listRowBackground(Color.slateCard)
 
             if let problem = model.pushRegistrationProblem {
                 Section {
@@ -43,8 +45,11 @@ struct NotificationSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: scenePhase) {
@@ -126,14 +131,14 @@ struct NotificationsPromptCard: View {
                 } label: {
                     Text("Turn On").frame(minHeight: Metrics.buttonLabelHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.slatePrimary)
 
                 Button {
                     withAnimation(.slateSmooth) { model.dismissNotificationPrompt() }
                 } label: {
                     Text("Not Now").frame(minHeight: Metrics.buttonLabelHeight)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.slateOutline)
             }
         }
         .card()

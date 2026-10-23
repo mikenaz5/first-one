@@ -1,9 +1,11 @@
 import SwiftUI
 import UIKit
 
-// The single source of truth for Slate's look. Everything here is built from system
-// fonts, system colors and SF Symbols, so Light/Dark Mode, Dynamic Type and the OS's own
-// visual refreshes (for example Liquid Glass bars) apply without extra work.
+// The single source of truth for Slate's look. The look comes from the product owner's reference: a near-black page,
+// deep violet-black cards with a thin violet-grey border, one violet accent, rounded rectangles and pills. It is dark
+// first (the app opens in Dark Mode; Settings can switch to Light or follow the system), and every color here has a
+// Light counterpart. Type is the system font in semantic text styles and icons are SF Symbols, so Dynamic Type and the
+// OS's own refreshes (bars, Liquid Glass) apply without extra work.
 //
 // Rules of thumb:
 //  - Use the tokens below instead of literals.
@@ -50,6 +52,8 @@ enum Metrics {
 
     /// Height of the label inside a `.large` button, so buttons with different contents come out the same height.
     static let buttonLabelHeight: CGFloat = 28
+    /// Height of Slate's own filled and outlined buttons.
+    static let buttonHeight: CGFloat = 50
     /// Width of the leading icon in a row or card, so titles line up down a screen.
     static let iconColumn: CGFloat = 28
 
@@ -84,15 +88,21 @@ enum Metrics {
 // Semantic colors. They resolve to system colors, so they adapt to Light/Dark Mode and
 // to Increase Contrast. The brand accent lives in the asset catalog (`AccentColor`).
 extension ShapeStyle where Self == Color {
-    /// Page background behind grouped content.
-    static var slateBackground: Color { Color(.systemGroupedBackground) }
+    /// Page background behind grouped content: near black in Dark Mode, a pale lavender in Light.
+    static var slateBackground: Color { .adaptive(light: 0xF6F4FC, dark: 0x04050C) }
     /// Card surface on top of `slateBackground`.
-    static var slateCard: Color { Color(.secondarySystemGroupedBackground) }
+    static var slateCard: Color { .adaptive(light: 0xFFFFFF, dark: 0x0E0F1C) }
     /// Surface for elements that sit on a card.
-    static var slateRaised: Color { Color(.tertiarySystemGroupedBackground) }
-    /// Subtle fill for chips and inactive controls.
-    static var slateFill: Color { Color(.tertiarySystemFill) }
-    static var slateHairline: Color { Color(.separator) }
+    static var slateRaised: Color { .adaptive(light: 0xF0ECFA, dark: 0x16172B) }
+    /// Fill for chips, tiles and inactive controls.
+    static var slateFill: Color { .adaptive(light: 0xEAE5F7, dark: 0x1B1C31) }
+    /// The thin violet-grey line around cards, chips and outlined buttons.
+    static var slateHairline: Color { .adaptive(light: 0xDAD3EE, dark: 0x3B334F) }
+    /// The accent as text and small symbols. The accent itself is tuned to carry white text on a button; as words on a dark
+    /// card it is a little faint (about 4 : 1), so words use this lighter violet (about 6.5 : 1). In Light Mode they are the same.
+    static var slateAccentText: Color { .adaptive(light: 0x7A3FE8, dark: 0xA97BFF) }
+    /// The deep violet the page glows with behind a welcome screen.
+    static var slateGlow: Color { .adaptive(light: 0xC9B6FF, dark: 0x5B2FD6) }
     // Status colors are used for text as well as symbols. The system green, orange and red are too light on a white page
     // to read as small text (about 2 to 3.5 : 1), so in Light Mode these are darker versions that reach at least 4.5 : 1,
     // and in Dark Mode they are the system colors, which are bright enough on black.
@@ -109,12 +119,28 @@ extension ShapeStyle where Self == Color {
     static var slateInk: Color { Color(red: 0.08, green: 0.12, blue: 0.35) }
 }
 
-private extension Color {
+extension Color {
     /// One color for Light Mode, another for Dark Mode.
-    static func adaptive(light: (Double, Double, Double), dark: UIColor) -> Color {
+    fileprivate static func adaptive(light: (Double, Double, Double), dark: UIColor) -> Color {
         Color(UIColor { traits in
             traits.userInterfaceStyle == .dark ? dark : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
         })
+    }
+
+    /// The same, from `0xRRGGBB` numbers.
+    fileprivate static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in UIColor(rgb: traits.userInterfaceStyle == .dark ? dark : light) })
+    }
+}
+
+private extension UIColor {
+    convenience init(rgb: UInt32) {
+        self.init(
+            red: CGFloat((rgb >> 16) & 0xFF) / 255,
+            green: CGFloat((rgb >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }
 
@@ -171,10 +197,9 @@ struct CardStyle: ViewModifier {
                 case .outlined: shape.fill(Color.clear)
                 }
             }
+            // Every card has the thin violet-grey line the reference gives its cards.
             .overlay {
-                if kind == .outlined {
-                    shape.strokeBorder(Color.slateHairline, lineWidth: 1)
-                }
+                shape.strokeBorder(Color.slateHairline, lineWidth: 1)
             }
     }
 }
@@ -187,6 +212,117 @@ extension View {
     /// Full-screen grouped page background that extends under the bars.
     func slatePageBackground() -> some View {
         background(Color.slateBackground.ignoresSafeArea())
+    }
+}
+
+// MARK: - Buttons
+
+/// Slate's two buttons, as in the reference: a violet rounded rectangle with white text for the main action, and a violet
+/// outline for the one beside it. Both are as wide as the space they're given, at least `Metrics.buttonHeight` tall.
+struct SlatePrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SlateButtonBody(configuration: configuration, filled: true)
+    }
+}
+
+struct SlateOutlineButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SlateButtonBody(configuration: configuration, filled: false)
+    }
+}
+
+extension ButtonStyle where Self == SlatePrimaryButtonStyle {
+    static var slatePrimary: SlatePrimaryButtonStyle { SlatePrimaryButtonStyle() }
+}
+
+extension ButtonStyle where Self == SlateOutlineButtonStyle {
+    static var slateOutline: SlateOutlineButtonStyle { SlateOutlineButtonStyle() }
+}
+
+private struct SlateButtonBody: View {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let configuration: ButtonStyleConfiguration
+    let filled: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.m, style: .continuous)
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(filled ? Color.slateOnAccent : Color.slateAccentText)
+            .frame(maxWidth: .infinity, minHeight: Metrics.buttonHeight)
+            .background {
+                if filled { shape.fill(Color.accentColor) }
+            }
+            .overlay {
+                if !filled { shape.strokeBorder(Color.accentColor, lineWidth: 1.5) }
+            }
+            .contentShape(shape)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .slateSnappy, value: configuration.isPressed)
+    }
+}
+
+// MARK: - Glow
+
+extension View {
+    /// The page with a deep violet glow at the top, for welcome and first-run screens, where the reference shows its
+    /// hero image. Static; behind the content and hidden from VoiceOver.
+    func slateGlowBackground() -> some View {
+        background {
+            ZStack(alignment: .top) {
+                Color.slateBackground
+                RadialGradient(
+                    colors: [Color.slateGlow.opacity(0.55), Color.slateGlow.opacity(0)],
+                    center: .top, startRadius: 0, endRadius: 520
+                )
+                .frame(height: 560)
+            }
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+// MARK: - Appearance
+
+/// Which appearance the app uses. The reference look is dark, so that is the default; Settings can change it.
+enum AppearancePreference: String, CaseIterable, Identifiable {
+    case dark, light, system
+
+    static let storageKey = "slate.appearance"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dark: "Dark"
+        case .light: "Light"
+        case .system: "Match system"
+        }
+    }
+
+    /// Nil follows the system.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .dark: .dark
+        case .light: .light
+        case .system: nil
+        }
+    }
+
+    init(stored: String) { self = AppearancePreference(rawValue: stored) ?? .dark }
+}
+
+/// The few controls UIKit draws that SwiftUI can't restyle: segmented controls take the accent.
+enum SlateAppearance {
+    static func apply() {
+        let accent = UIColor(named: "AccentColor") ?? .systemPurple
+        let segmented = UISegmentedControl.appearance()
+        segmented.selectedSegmentTintColor = accent
+        segmented.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
     }
 }
 

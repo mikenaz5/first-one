@@ -65,6 +65,7 @@ struct SpecialtyChip: View {
                 .frame(minHeight: Metrics.minTapTarget)
                 .foregroundStyle(isSelected ? Color.slateOnAccent : Color.primary)
                 .background(isSelected ? Color.accentColor : Color.slateFill, in: Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.slateHairline, lineWidth: 1))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -90,6 +91,7 @@ struct TagChip: View {
         .padding(.horizontal, Space.m)
         .padding(.vertical, Space.s)
         .background(Color.slateFill, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.slateHairline, lineWidth: 1))
     }
 }
 

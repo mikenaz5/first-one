@@ -38,6 +38,7 @@ struct DeliverySection: View {
                     Text("Check that everything is there before you confirm. If something is missing or wrong, tell \(model.counterpartName(for: booking)) instead.")
                 }
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -97,7 +98,7 @@ struct DeliverySection: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.slatePrimary)
                 .controlSize(.large)
                 .disabled(isConfirming)
             }
@@ -127,9 +128,9 @@ struct DeliverySection: View {
                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
         }
         if summary.link == nil {
-            button.buttonStyle(.borderedProminent).controlSize(.large)
+            button.buttonStyle(.slatePrimary).controlSize(.large)
         } else {
-            button.buttonStyle(.bordered).controlSize(.large)
+            button.buttonStyle(.slateOutline).controlSize(.large)
         }
     }
 
@@ -216,6 +217,7 @@ struct ShareDeliverySheet: View {
                         Text("A share link from Dropbox, Google Drive, WeTransfer, Frame.io or wherever you keep final files. Anyone with the link can open it, so use one that's private to \(clientName).")
                     }
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     TextField("Password, expiry date, where to start…", text: $note, axis: .vertical)
@@ -227,6 +229,7 @@ struct ShareDeliverySheet: View {
                         Text("Notes can be up to \(DeliveryRules.noteMaxLength) characters.").foregroundStyle(Color.slateDanger)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     Label(booking.balanceCents > 0
@@ -236,7 +239,10 @@ struct ShareDeliverySheet: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle(isReplacing ? "Replace link" : "Share final files")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -27,14 +27,18 @@ struct BillingView: View {
                     }
                     .listRowBackground(Color.clear)
                 }
+                    .listRowBackground(Color.slateCard)
             } else {
                 Section {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
                         .listRowBackground(Color.clear)
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Billing")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
@@ -76,6 +80,7 @@ struct BillingView: View {
         } header: {
             Text("Plan")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func seatsSection(_ overview: BillingOverview) -> some View {
@@ -93,6 +98,7 @@ struct BillingView: View {
         } footer: {
             Text("You pay for each seat. Adding someone charges the rest of this period at once; removing someone lowers your next invoice, with no refund for the period already paid. You're always billed for at least \(seats.minimum) seats.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func actionSection(_ overview: BillingOverview) -> some View {
@@ -113,6 +119,7 @@ struct BillingView: View {
                  ? "Stripe's pages let you change the card, read invoices, or cancel at the end of the period."
                  : "Stripe collects the card on its own pages. Slate never sees it.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     // MARK: Actions

@@ -25,6 +25,7 @@ struct MembersView: View {
                     SeatsSummary(organization: organization, config: model.teamConfig)
                         .listRowInsets(EdgeInsets(top: Space.m, leading: Space.l, bottom: Space.m, trailing: Space.l))
                 }
+                    .listRowBackground(Color.slateCard)
             }
 
             Section {
@@ -64,6 +65,7 @@ struct MembersView: View {
             } header: {
                 Text("People")
             }
+                .listRowBackground(Color.slateCard)
 
             if !model.teamInvites.isEmpty {
                 Section {
@@ -88,8 +90,11 @@ struct MembersView: View {
                 } footer: {
                     Text("Each link works once. If one is lost, swipe right on the invite to replace it with a new link.")
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -325,6 +330,7 @@ struct InviteSheet: View {
             } footer: {
                 Text(role.summary)
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 TextField("name@example.com", text: $email)
@@ -342,6 +348,7 @@ struct InviteSheet: View {
                     Text("Only a label, so you remember who it's for. The link works for whoever opens it, once. They join with their own Apple ID.")
                 }
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 if let planProblem {
@@ -357,7 +364,10 @@ struct InviteSheet: View {
             } header: {
                 Text("Seats")
             }
+                .listRowBackground(Color.slateCard)
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Invite someone")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -445,7 +455,7 @@ struct InviteLinkView: View {
                             Label("Share link", systemImage: "square.and.arrow.up")
                                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.slatePrimary)
                         .controlSize(.large)
 
                         HStack(spacing: Space.m) {
@@ -456,7 +466,7 @@ struct InviteLinkView: View {
                                 Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.slateOutline)
                             .controlSize(.large)
 
                             if let mail = mailURL(link) {
@@ -464,7 +474,7 @@ struct InviteLinkView: View {
                                     Label("Email", systemImage: "envelope")
                                         .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.slateOutline)
                                 .controlSize(.large)
                             }
                         }
@@ -511,7 +521,7 @@ struct InviteLinkView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.slateOutline)
             .controlSize(.large)
             .disabled(pretendName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAdding || addedPretend)
         }
@@ -602,6 +612,7 @@ struct MemberDetailSheet: View {
                     .accessibilityElement(children: .combine)
                     .listRowBackground(Color.clear)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     TextField("Lead videographer", text: $title)
@@ -622,6 +633,7 @@ struct MemberDetailSheet: View {
                          ? "A person who takes bookings can be given them, and booked directly when they're shown on the page."
                          : "Viewers see the company's work but don't take bookings.")
                 }
+                    .listRowBackground(Color.slateCard)
 
                 if showsShare {
                     Section {
@@ -634,6 +646,7 @@ struct MemberDetailSheet: View {
                     } footer: {
                         Text("Their share of each booking assigned to them. The company is paid first; Slate records the split and doesn't move the money.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
 
                 if canSign || member.isSigner {
@@ -654,6 +667,7 @@ struct MemberDetailSheet: View {
                     } footer: {
                         Text("The signer countersigns every contract the company makes. They need a signature saved in Slate first.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
 
                 if canTransfer {
@@ -663,8 +677,11 @@ struct MemberDetailSheet: View {
                     } footer: {
                         Text("The Owner handles billing and can close the company. You become an Admin.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(member.displayName)
             .navigationBarTitleDisplayMode(.inline)

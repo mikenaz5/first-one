@@ -184,7 +184,7 @@ struct ContractReviewView: View {
                 Label("Read the full contract", systemImage: "doc.text")
                     .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.slateOutline)
             .controlSize(.large)
 
             VStack(alignment: .leading, spacing: Space.m) {
@@ -214,7 +214,7 @@ struct ContractReviewView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
             .disabled(booking.signBlocker != nil || booking.isSubmitting)
 

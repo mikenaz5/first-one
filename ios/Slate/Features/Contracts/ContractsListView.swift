@@ -25,6 +25,7 @@ struct ContractsListView: View {
                 } footer: {
                     Text("A contract is signed for the company by one named person, who counter-signs it as soon as the client has signed and paid. Contracts already signed keep the signer they were signed with.")
                 }
+                    .listRowBackground(Color.slateCard)
             }
 
             Section {
@@ -35,6 +36,7 @@ struct ContractsListView: View {
                      ? "If you're named as the company's signer, this is the signature that goes on its contracts. Each person keeps their own."
                      : "Clients sign when they book, and your saved signature is applied to the same contract so it's signed by both of you straight away. You can change it any time; contracts already signed keep the signature they were signed with.")
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 if model.contractTemplates.isEmpty {
@@ -65,6 +67,7 @@ struct ContractsListView: View {
             } header: {
                 Text("Your contracts")
             }
+                .listRowBackground(Color.slateCard)
 
             if canEditTemplates {
             Section {
@@ -82,8 +85,11 @@ struct ContractsListView: View {
             } footer: {
                 Text(StarterTemplates.disclaimer)
             }
+                .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Contracts")
         .navigationBarTitleDisplayMode(.large)
         .sheet(item: $editing) { template in

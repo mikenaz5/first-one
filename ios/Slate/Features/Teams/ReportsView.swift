@@ -32,6 +32,7 @@ struct ReportsView: View {
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 LabeledContent("Bookings", value: "\(current.booked)")
@@ -41,6 +42,7 @@ struct ReportsView: View {
             } header: {
                 Text("Bookings")
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 LabeledContent("Booked", value: money(current.bookedCents))
@@ -53,6 +55,7 @@ struct ReportsView: View {
             } footer: {
                 Text("Booked is the price of every confirmed and finished booking that starts in this time; earned is the finished ones.")
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 if current.lines.isEmpty {
@@ -80,7 +83,10 @@ struct ReportsView: View {
                     Text("Owed is each person's share of the finished work they did, as it was set when the booking was given to them. Slate keeps the ledger; the company pays people itself.")
                 }
             }
+                .listRowBackground(Color.slateCard)
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.refresh() }

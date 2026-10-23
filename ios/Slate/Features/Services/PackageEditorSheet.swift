@@ -35,8 +35,11 @@ struct PackageEditorSheet: View {
                         Button("Delete package", role: .destructive) { confirmDelete = true }
                             .frame(minHeight: Metrics.minTapTarget)
                     }
+                        .listRowBackground(Color.slateCard)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(draft.isNew ? "New Package" : "Edit Package")
             .navigationBarTitleDisplayMode(.inline)
@@ -114,6 +117,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text("\(draft.summary.count)/\(PackageRules.summaryLimit)")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var pricingSection: some View {
@@ -144,6 +148,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text(depositFooter)
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var timeSection: some View {
@@ -175,6 +180,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text("Duration is the shoot itself. Clients can only book times when you have that long free.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var deliverablesSection: some View {
@@ -198,6 +204,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text("Up to \(PackageRules.deliverableLimit). Swipe to delete.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var addOnsSection: some View {
@@ -229,6 +236,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text("Clients can add these when they book. Extra time lengthens the booking.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var contractSection: some View {
@@ -274,6 +282,7 @@ struct PackageEditorSheet: View {
                 }
             }
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func addStarter(_ kind: ContractKind) async {
@@ -319,6 +328,7 @@ struct PackageEditorSheet: View {
             } footer: {
                 Text("Clients who book this are matched with someone from this list, and can book any of them by name.")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -329,6 +339,7 @@ struct PackageEditorSheet: View {
         } footer: {
             Text("Turn this off to keep a draft only you can see.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     @ViewBuilder
@@ -343,6 +354,7 @@ struct PackageEditorSheet: View {
             } header: {
                 Text("To finish")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -479,6 +491,7 @@ struct AddOnEditorSheet: View {
                     }
                     .frame(minHeight: Metrics.minTapTarget)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 if addOn.kind == .extraTime || addOn.kind == .custom {
                     Section {
@@ -494,6 +507,7 @@ struct AddOnEditorSheet: View {
                     } footer: {
                         Text("Lengthens the booking, so it blocks more of your calendar.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
 
                 if addOn.kind == .rush || addOn.kind == .custom {
@@ -510,8 +524,11 @@ struct AddOnEditorSheet: View {
                     } footer: {
                         Text("Shortens the package's turnaround. It never goes below one day.")
                     }
+                        .listRowBackground(Color.slateCard)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle(isNew ? "New Add-on" : "Edit Add-on")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

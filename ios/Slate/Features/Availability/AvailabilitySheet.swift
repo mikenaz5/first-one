@@ -32,6 +32,8 @@ struct AvailabilitySheet: View {
                 blackoutSection
                 CalendarSyncSection(note: $calendarNote)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Availability")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -82,6 +84,7 @@ struct AvailabilitySheet: View {
                  ? "Clients can book any start time that fits entirely inside these hours."
                  : "Every day is closed, so nobody can book you right now.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var rulesSection: some View {
@@ -118,6 +121,7 @@ struct AvailabilitySheet: View {
         } footer: {
             Text("The gap gives you travel and reset time. Another booking can't start until it's over.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var timeZoneSection: some View {
@@ -133,6 +137,7 @@ struct AvailabilitySheet: View {
         } footer: {
             Text("Clients see your open times in this time zone.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     // MARK: Blackout dates
@@ -162,6 +167,7 @@ struct AvailabilitySheet: View {
         } footer: {
             Text("Holidays, trips or days off. Nobody can book you on these dates.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func save() async {
@@ -279,7 +285,10 @@ struct BlackoutEditorSheet: View {
                 } footer: {
                     Text("Both dates are included.")
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Blackout dates")
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: start) { _, newStart in

@@ -67,6 +67,8 @@ struct CompanySetupView: View {
 
     private var navigationBody: some View {
         Form { fields }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(mode == .upgrade ? "Your company" : "New company")
             .navigationBarTitleDisplayMode(.inline)
@@ -132,7 +134,7 @@ struct CompanySetupView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
             .disabled(!canCreate)
             .accessibilityHint(canCreate ? "" : "Complete the required fields to continue")
@@ -155,6 +157,7 @@ struct CompanySetupView: View {
             Text("Your logo, or a photo of the team.")
                 .frame(maxWidth: .infinity)
         }
+            .listRowBackground(Color.slateCard)
 
         Section("Company name") {
             TextField("Northlight Films", text: $draft.displayName)
@@ -165,6 +168,7 @@ struct CompanySetupView: View {
                     if !legalTouched { legalName = name }
                 }
         }
+            .listRowBackground(Color.slateCard)
 
         Section {
             HandleField(draft: draft)
@@ -173,6 +177,7 @@ struct CompanySetupView: View {
         } footer: {
             HandleStatusText(draft: draft)
         }
+            .listRowBackground(Color.slateCard)
 
         Section {
             TextField("Legal name", text: Binding(
@@ -189,6 +194,7 @@ struct CompanySetupView: View {
         } footer: {
             Text("Every contract is made in this name, and signed for the company by someone you choose.")
         }
+            .listRowBackground(Color.slateCard)
 
         Section {
             SpecialtyPicker(draft: draft)
@@ -198,14 +204,17 @@ struct CompanySetupView: View {
         } footer: {
             Text("\(draft.specialties.count) of \(AppConfig.maxSpecialties) selected")
         }
+            .listRowBackground(Color.slateCard)
 
         Section("About") {
             BioField(draft: draft)
         }
+            .listRowBackground(Color.slateCard)
 
         Section("Home base") {
             LocationField(draft: draft)
         }
+            .listRowBackground(Color.slateCard)
 
         if needsOwnerName {
             Section {
@@ -217,6 +226,7 @@ struct CompanySetupView: View {
             } footer: {
                 Text("How your team sees you. You'll be the company's Owner.")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 
@@ -320,7 +330,7 @@ struct UpgradeSheet: View {
                         Text("Continue")
                             .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.slatePrimary)
                     .controlSize(.large)
                 }
                 .padding(.horizontal, Space.page)

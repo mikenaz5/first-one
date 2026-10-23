@@ -36,12 +36,14 @@ struct EditProfileSheet: View {
                         .frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section(original.kind == .company ? "Company name" : "Name") {
                     TextField(original.kind == .company ? "Company name" : "Your name or studio", text: $draft.displayName)
                         .textContentType(original.kind == .company ? .organizationName : .name)
                         .frame(minHeight: Metrics.minTapTarget)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     HandleField(draft: draft)
@@ -50,6 +52,7 @@ struct EditProfileSheet: View {
                 } footer: {
                     HandleStatusText(draft: draft)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     SpecialtyPicker(draft: draft)
@@ -59,15 +62,20 @@ struct EditProfileSheet: View {
                 } footer: {
                     Text("\(draft.specialties.count) of \(AppConfig.maxSpecialties) selected")
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section("About") {
                     BioField(draft: draft)
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section("Location") {
                     LocationField(draft: draft)
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)

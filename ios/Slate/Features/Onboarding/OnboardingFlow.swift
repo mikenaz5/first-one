@@ -127,7 +127,7 @@ struct OnboardingFlow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.slatePrimary)
             .controlSize(.large)
             .disabled(!canContinue || isSaving)
             .accessibilityHint(canContinue ? "" : "Complete the required fields to continue")

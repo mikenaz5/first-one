@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
 
+    @AppStorage(AppearancePreference.storageKey) private var appearance = AppearancePreference.dark.rawValue
     @State private var showNotifications = false
     @State private var showUpgrade = false
     @State private var showNewCompany = false
@@ -20,6 +21,22 @@ struct SettingsView: View {
                 individualTeamSection
             }
 
+            Section {
+                Picker(selection: $appearance) {
+                    ForEach(AppearancePreference.allCases) { option in
+                        Text(option.title).tag(option.rawValue)
+                    }
+                } label: {
+                    Label("Appearance", systemImage: "circle.lefthalf.filled")
+                }
+                .frame(minHeight: Metrics.minTapTarget)
+            } header: {
+                Text("Look")
+            } footer: {
+                Text("Slate is dark by default. Choose Light, or follow your iPhone's setting.")
+            }
+                .listRowBackground(Color.slateCard)
+
             Section("You") {
                 Button {
                     showNotifications = true
@@ -29,6 +46,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
+                .listRowBackground(Color.slateCard)
 
             Section {
                 Button {
@@ -46,7 +64,10 @@ struct SettingsView: View {
             } footer: {
                 Text("Deleting your account removes your own profile and portfolio. It can't be undone.")
             }
+                .listRowBackground(Color.slateCard)
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showNotifications) {
@@ -139,6 +160,7 @@ struct SettingsView: View {
         } footer: {
             Text("You're \(articleFor(organization.myRole)) \(organization.myRole.title). \(organization.myRole.summary)")
         }
+            .listRowBackground(Color.slateCard)
 
         Section {
             Button(role: .destructive) {
@@ -152,6 +174,7 @@ struct SettingsView: View {
                 Text("As the Owner, hand the company to someone else (in Members) before you can leave it.")
             }
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private var individualTeamSection: some View {
@@ -173,6 +196,7 @@ struct SettingsView: View {
         } footer: {
             Text("A company has its own page, a team with roles, shared services and one calendar. Your profile, services, bookings and contracts come with you.")
         }
+            .listRowBackground(Color.slateCard)
     }
 
     private func planNotice(_ text: String, organization: Organization) -> some View {

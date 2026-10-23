@@ -14,7 +14,7 @@ struct AssignmentQueueRow: View {
             VStack(spacing: 0) {
                 Text(formatter.monthShort(startDay).uppercased())
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.slateAccentText)
                 Text("\(startDay.day)")
                     .font(.title2.weight(.bold))
                     .monospacedDigit()
@@ -68,6 +68,7 @@ struct AssignSheet: View {
                         LabeledContent("Client", value: booking.clientName)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     if let options {
@@ -98,7 +99,10 @@ struct AssignSheet: View {
                 } footer: {
                     Text("Only people who are free for the whole booking, buffer included, can take it.")
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Assign")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

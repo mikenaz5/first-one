@@ -50,6 +50,8 @@ struct ActivityView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Activity")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }

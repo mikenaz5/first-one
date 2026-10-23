@@ -134,7 +134,7 @@ struct ReviewsSection: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: Metrics.minTapTarget)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.slateOutline)
                         .disabled(isLoadingMore)
                     }
                 }
@@ -172,6 +172,7 @@ struct ReviewSection: View {
             } header: {
                 Text(booking.clientID == model.session?.userID ? "Your review" : "Review")
             }
+                .listRowBackground(Color.slateCard)
         } else if model.canReview(booking) {
             Section {
                 Button {
@@ -189,6 +190,7 @@ struct ReviewSection: View {
             } footer: {
                 Text("How was it with \(booking.creatorName)? Your review shows on their page.")
             }
+                .listRowBackground(Color.slateCard)
         }
     }
 }
@@ -217,6 +219,7 @@ struct ReviewSheet: View {
                 } header: {
                     Text("Your rating")
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     TextField("What was it like to work with \(booking.creatorName)?", text: $text, axis: .vertical)
@@ -230,6 +233,7 @@ struct ReviewSheet: View {
                         Text("\(ReviewRules.remaining(in: text)) characters left")
                     }
                 }
+                    .listRowBackground(Color.slateCard)
 
                 Section {
                     Label("It shows as \(ReviewRules.displayName(for: booking.clientName)), with the package you booked. You can't change it after posting.",
@@ -237,7 +241,10 @@ struct ReviewSheet: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                    .listRowBackground(Color.slateCard)
             }
+            .scrollContentBackground(.hidden)
+            .slatePageBackground()
             .navigationTitle("Review")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

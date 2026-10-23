@@ -68,6 +68,7 @@ struct CalendarSyncSection: View {
                 Text("Only start and end times of your busy events are shared, never their titles, places or guests. Busy time is as fresh as the last time Slate synced, which happens when you open the app.")
             }
         }
+            .listRowBackground(Color.slateCard)
     }
 
     // MARK: Bindings
@@ -151,8 +152,11 @@ struct BusyCalendarsView: View {
                         .frame(minHeight: Metrics.minTapTarget)
                     }
                 }
+                    .listRowBackground(Color.slateCard)
             }
         }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
         .navigationTitle("Busy calendars")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { calendars = model.calendar.calendars() }

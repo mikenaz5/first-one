@@ -191,6 +191,14 @@ Until then the app still builds and runs. Notification settings explain that thi
 
 **Never exercised:** a real push to a real phone. The wording, the payload, the APNs token signing (checked against its public key), the request shape, the retry and dead-token rules and the access check on `send-push` are tested in Node; the queue, the triggers, the reminder windows and the access rules are tested in Postgres; the permission flow, reminder scheduling, registration and the conversation screens' logic are tested in Swift against a stand-in for the system's notification center. Not exercised: HTTP/2 to `api.push.apple.com`, a device token, the entitlement, the notification banner, `pg_cron`/`pg_net`, or the Deno wiring.
 
+## The look
+
+The look comes from a reference the product owner supplied (a dark marketplace app, "Creator Connect Pro"): a near-black page, deep violet-black cards with a thin violet-grey border, one violet accent, rounded-rectangle buttons (filled for the main action, outlined for the one beside it), pill chips, icon tiles, and a violet glow on the first screen. The palette was read off the reference's pixels: page `#04050C`, card `#0E0F1C`, chips and tiles `#1B1C31`, border `#3B334F`, accent `#8A4DF5` (the reference's `#9054F8`, nudged so white text on it clears 4.5 : 1), and `#A97BFF` for words in the accent.
+
+Everything is a token in `DesignSystem/DesignSystem.swift`, so a change there changes every screen: `slateBackground`, `slateCard`, `slateRaised`, `slateFill`, `slateHairline`, `slateAccentText`, `slateGlow`; `card()` (with the border); `SlatePrimaryButtonStyle` / `SlateOutlineButtonStyle` (`.slatePrimary`, `.slateOutline`); chips in `Components.swift`; `slateGlowBackground()`. The accent is the `AccentColor` asset. The app opens in **Dark Mode** whatever the phone is set to; **Settings ▸ Look** switches to Light or to the system setting, and every token has a Light value (a lavender page, white cards). Segmented controls take the accent through one UIKit appearance call (`SlateAppearance`). `skin_lists.py`-style rules are in `ios/CLAUDE.md`: lists and forms use `slateCard` rows on the page background so no system gray shows.
+
+What stayed Apple-native: the system fonts in text styles, SF Symbols, the tab bar and navigation bars (the system draws them; they pick up the accent), sheets, swipe actions and Sign in with Apple's own button.
+
 ## Polish, accessibility and the widget
 
 **What the polish pass covered.** Every screen was reviewed against Apple's Human Interface Guidelines and `CLAUDE.md`, and the findings fixed:
@@ -316,7 +324,7 @@ The payment and push logic in the Edge Functions (`_shared/payments.ts`, `push.t
 - **The Apple user ID is kept in `UserDefaults`**, not the Keychain. It's an identifier, not a secret, but Keychain is the better home.
 - **The widget is one widget.** It shows the next bookings and nothing else: no choice of what it shows, no buttons in it, no per-creator filter. It updates when the app is running and its bookings change, and on a schedule from what it already has; a booking made from another device appears only after the app next opens or refreshes (nothing wakes the app in the background to update it).
 - **Accessibility was reviewed, not tested with assistive technology.** Nobody has driven these screens with VoiceOver, Voice Control or Switch Control, at the largest accessibility text size, with Increase Contrast, or on an iPad in split view; the changes above come from reading the code against the guidelines, and the contrast figures are calculated.
-- **Dark Mode accent text is below 4.5 : 1 on dark cards.** The accent (#5E5AE6) measures about 3.3 : 1 as small text on the dark card colour, so links and accent-coloured words are a little faint there. Lightening it would take white-on-accent button text down to about 3.6 : 1, so it needs a second accent for text, which is a design call.
+- **Accent colours are tuned by calculation, not by eye.** The violet (#8A4DF5) carries white button text at about 4.7 : 1; words in the accent use a lighter violet in Dark Mode (about 6.5 : 1 on a card). Icons in the plain accent are about 4 : 1 on a dark card, which clears the 3 : 1 asked of symbols. None of it has been looked at on a screen.
 - **Profile photos are centre-cropped** to a circle. There's no crop/zoom UI yet.
 - **English only**; strings aren't localized yet.
 - **Portfolio uploads are sequential and unretried.** A failed upload during onboarding shows an alert and the person finishes from their profile.
