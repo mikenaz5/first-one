@@ -31,7 +31,7 @@ If something goes wrong:
 
 To go beyond the demo (a real backend, real Sign in with Apple, payments, push), see "Using a real Supabase project" and the "Turning on…" sections below.
 
-**What exists today:** Individual and company accounts with roles, billing and a team calendar; creator profiles and portfolios; packages, availability and booking with no double-booking; contracts signed inside the booking; Apple Pay deposits and balances through Stripe Connect, with refunds; messages and notifications; delivery by link, reviews, and a home screen widget; free client accounts (Sign in with Apple or an emailed code) that search for creators and explore a featured grid on Home; and a dark violet design. Most of it has been compiled and unit-tested by CI but has not yet been run against a live server or on a real phone (see "Status of verification" below).
+**What exists today:** Individual and company accounts with roles, billing and a team calendar; creator profiles and portfolios; packages, availability and booking with no double-booking; contracts signed inside the booking; Apple Pay deposits and balances through Stripe Connect, with refunds; messages and notifications; delivery by link, reviews, and a home screen widget; free client accounts (Sign in with Apple or an emailed code) that search for creators, explore a featured grid on Home and keep cards on file; and a dark violet design. Most of it has been compiled and unit-tested by CI but has not yet been run against a live server or on a real phone (see "Status of verification" below).
 
 ## Backend recommendation: Supabase, with Stripe Connect for money
 
@@ -281,6 +281,26 @@ A company pays for seats with one Stripe Billing subscription (no In-App Purchas
 
 **On a device with no server,** billing is unavailable (the Billing screen says so), and since there is no second phone, *Invite ▸ Add pretend teammate* adds someone by name to try roles, assignment and the calendar alone. Signed in as one person, `LocalBackend.actAs` (used by the tests) is how other team members' views are checked.
 
+## Cards on file
+
+A client can keep cards with Stripe and allow a creator, by name, to charge the balance of a booking to one. It is in the app under **Profile ▸ Payment methods** (**Cards on file**), and on each booking ("Let {creator} charge the balance to my card").
+
+- **Adding a card** opens Stripe's own page (Checkout in setup mode) in the in-app browser. Slate Pro never sees a number: the database keeps Stripe's reference to the card (`client_cards.stripe_payment_method_id`, which the app is not allowed to read, by column permission), its brand, the last four digits and the expiry. Up to five cards.
+- **Allowing a creator** (`card_grant`) is one creator, one card, one agreement, and only for a creator the person has booked. The agreement has a version (`card_consent_version()` / `CardConsent`); every allow and stop is written to an append-only record. It can be stopped at any moment (`card_revoke`), and removing a card ends every permission that used it.
+- **Charging** is `charge-saved-card`, for whoever can manage the booking (`provider_access(…, 'manage')`: a person selling alone, or at a company the Owner, Admin, Manager and the Creator it is assigned to). It asks the database (`payment_prepare_saved`, which calls `payment_prepare`) for the amount, the card and whether it is allowed, so the amount is the booking's balance and the balance is payable only once the client has confirmed their files, exactly as for Apple Pay. The creator never sees the card number or the last four digits. Money is recorded only by Stripe's signed webhook, which marks it a card payment (`metadata.saved_card`). If the bank declines, or wants the client to approve it, nothing is recorded as paid, the creator is told, and the client pays in the app. There is no automatic retry.
+- **Staying in step with Stripe.** Removing a card deletes it at Stripe first, then here. `card-sync` (called when the cards screen opens and when the person comes back from Stripe's page) compares the two lists, and the webhook's `payment_method.attached`, `.updated`, `.automatically_updated` and `.detached` events keep them in step. Deleting an account deletes its Stripe customer (and every card with it) before the account itself.
+
+### Turning on cards on file
+
+1. Stripe is already set up for payments (see above); nothing else to create. In the Stripe dashboard, leave card payments on and keep Radar's defaults on, since the Add a card page is where stolen cards get tested.
+2. Deploy `card-setup`, `card-sync`, `card-remove` and `charge-saved-card` (with JWT verification: it is the signed-in person asking), and `card-redirect` with `--no-verify-jwt` (it is only a browser redirect back to the app).
+3. Add `payment_method.attached`, `payment_method.updated`, `payment_method.automatically_updated` and `payment_method.detached` to the events the existing Stripe webhook listens for.
+4. **Have a lawyer read the agreement wording** (`CardConsent`) and the terms before launch: card networks have rules about saving a card and charging it when the person is not there (risk R25 in `SPEC.md`).
+
+**Never exercised:** Stripe Checkout in setup mode, saving and charging a real card, the webhook events, a bank asking the client to approve a charge, and the Supabase calls from the app. The SQL is tested against a real Postgres (`supabase/tests/card_rules.py`), the Edge Function logic with Node against fake Stripe and database objects (`function-tests/cards.test.ts`), and the Swift decodes the rows Postgres actually returned (`SlateTests/Fixtures/card_rows.json`, which `card_rules.py` checks, and rewrites with `--dump`).
+
+**On a device with no server,** *Add a card* adds a pretend card (a made-up number's last four, an expiry three years away) so the whole flow can be tried alone: allow a creator, stop it, remove a card, and, as the creator, charge the balance. No card is read and no money moves.
+
 ## Layout
 
 ```
@@ -304,11 +324,13 @@ ios/
     Fixtures/team_permissions.json  What each company role may do; Swift and Postgres both check it
     Fixtures/seat_rules.json        Seats billed and the effect of adding or removing someone; Swift and Postgres both check it
     Fixtures/team_rows.json         What the team functions really return, written by dump_team_rows.py from a real Postgres
+    Fixtures/card_rules.json        The card limit, the agreement's version and every expiry case; Swift and Postgres both check it
+    Fixtures/card_rows.json         What the card functions really return, written by card_rules.py --dump from a real Postgres
   supabase/
     migrations/               Schema, security and the booking, contract, payment, messaging and delivery functions
-    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
-    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) and the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts)
-    function-tests/           Node tests and type-check for the payment, push and billing logic
+    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, search_rules.py, featured_rules.py, card_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
+    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts) and the card ones (card-setup, card-sync, card-remove, card-redirect, charge-saved-card; _shared/cards.ts)
+    function-tests/           Node tests and type-check for the payment, push, billing and card logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.

@@ -230,7 +230,7 @@ private struct PermissionRow: View {
 
     var body: some View {
         let expired = permission.isExpired(at: now)
-        AdaptiveStack(spacing: Space.m) {
+        AdaptiveStack(alignment: .center, spacing: Space.m) {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(permission.creatorName).font(.headline)
                 Text("Can charge the balance to \(permission.cardTitle)")

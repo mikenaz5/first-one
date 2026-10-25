@@ -470,7 +470,7 @@ final class CardBackendTests: XCTestCase {
         let card = try await addCard()
         let maya = try await makeCreator(handle: "maya-chen", name: "Maya Chen")
         try await book()
-        let withMaya = try await book(maya, at: friday.addingTimeInterval(86_400))
+        let withMaya = try await book(maya, at: friday.addingTimeInterval(-86_400)) // Thursday: she is open Monday to Friday
         try await backend.allowCreator(dana.id, cardID: card.id, consentVersion: CardConsent.version, for: client)
 
         clock.set(withMaya.booking.endAt.addingTimeInterval(3600))

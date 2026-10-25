@@ -37,8 +37,9 @@ extension LocalBackend {
 
     // MARK: - Reading
 
+    /// In the order they were added (the file is only ever appended to), like the database's `created_at` order.
     func loadCards(for userID: UUID) async throws -> [SavedCard] {
-        readCards(userID).sorted { $0.addedAt != $1.addedAt ? $0.addedAt < $1.addedAt : $0.id.uuidString < $1.id.uuidString }
+        readCards(userID)
     }
 
     func loadCardPermissions(for userID: UUID) async throws -> [CardPermission] {
