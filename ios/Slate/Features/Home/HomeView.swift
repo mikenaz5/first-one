@@ -52,12 +52,12 @@ struct HomeView: View {
                             .transition(.opacity)
                     }
 
-                    if let nextBooking {
-                        NextBookingCard(booking: nextBooking)
+                    if model.isClientOnly {
+                        ClientSearchEntry()
                     }
 
-                    if model.isClientOnly {
-                        FindCreatorCard()
+                    if let nextBooking {
+                        NextBookingCard(booking: nextBooking)
                     }
 
                     if model.can(.companyEdit), let completeness = model.completeness, !completeness.isComplete {
@@ -71,6 +71,10 @@ struct HomeView: View {
                     if !attention.isEmpty {
                         AttentionCard(items: attention)
                             .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    if model.isClientOnly {
+                        BookAgainShelf()
                     }
                 }
                 .padding(.horizontal, Space.page)

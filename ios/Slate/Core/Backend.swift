@@ -39,6 +39,9 @@ protocol SlateBackend {
     func replaceBusyBlocks(_ blocks: [DateInterval], for creatorID: UUID) async throws
 
     // Clients
+    /// Creators a client could book (they have a published package), found by name, link name or specialty. At most
+    /// `limit` (never more than 30), best match first. Nothing for fewer than two characters.
+    func searchCreators(_ query: String, limit: Int) async throws -> [CreatorProfile]
     func loadPublicPage(handle: String) async throws -> PublicCreatorPage?
     /// Settings plus blocked time ranges (never other people's booking details).
     func loadSchedule(for creatorID: UUID, from: Date, to: Date) async throws -> CreatorSchedule

@@ -40,13 +40,6 @@ struct RootView: View {
         .sheet(item: $model.presentedInvite) { offer in
             InviteOfferSheet(offer: offer)
         }
-        .fullScreenCover(isPresented: $model.startingCreatorSetup) {
-            AccountChoiceFlow(allowClient: false, onCancel: { model.startingCreatorSetup = false })
-        }
-        .onChange(of: model.isClientOnly) { _, isClient in
-            // Finishing the setup makes them a seller, which closes it.
-            if !isClient { model.startingCreatorSetup = false }
-        }
         .onChange(of: scenePhase) { _, phase in
             // Pick up calendar changes and new bookings whenever the app comes back.
             if phase == .active, model.phase == .ready {

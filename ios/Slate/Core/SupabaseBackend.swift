@@ -108,6 +108,25 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         )
     }
 
+    private struct CreatorSearchParams: Encodable {
+        var pQuery: String
+        var pLimit: Int
+
+        enum CodingKeys: String, CodingKey {
+            case pQuery = "p_query"
+            case pLimit = "p_limit"
+        }
+    }
+
+    func searchCreators(_ query: String, limit: Int) async throws -> [CreatorProfile] {
+        guard let words = CreatorSearchRules.clean(query) else { return [] }
+        let rows: [ProfileRow] = try await client
+            .rpc("search_creators", params: CreatorSearchParams(pQuery: words, pLimit: CreatorSearchRules.clamped(limit: limit)))
+            .execute()
+            .value
+        return try rows.map(makeProfile)
+    }
+
     func requestEmailCode(_ email: String) async throws {
         guard let address = EmailCodeRules.cleanEmail(email) else { throw SlateError.invalidEmail }
         try await client.auth.signInWithOTP(email: address, shouldCreateUser: true)

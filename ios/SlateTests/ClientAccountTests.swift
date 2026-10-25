@@ -334,7 +334,7 @@ final class ClientAccountFlowTests: XCTestCase {
         XCTAssertEqual(model.visibleBookings.map(\.id), [signed.booking.id])
     }
 
-    func testAClientWhoStartsSellingKeepsTheirBookingsAndStopsBeingClientOnly() async throws {
+    func testAClientWhoGetsAProfileKeepsTheirBookingsAndStopsBeingClientOnly() async throws {
         let dana = try await makeBookableCreator()
         try await backend.signOut()
         try await signInAsSam()
@@ -343,7 +343,6 @@ final class ClientAccountFlowTests: XCTestCase {
         let preview = try await backend.previewContract(request, clientName: "Sam Client")
         let signed = try await model.book(request, signature: ContractFixtures.typedSignature(hash: preview.documentHash, name: "Sam Client"))
 
-        model.startingCreatorSetup = true
         let draft = ProfileDraft()
         draft.displayName = "Sam Client Studio"
         draft.handle = "samclient"

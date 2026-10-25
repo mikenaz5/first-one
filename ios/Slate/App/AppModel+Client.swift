@@ -13,6 +13,18 @@ extension AppModel {
         return name.split(separator: " ").first.map(String.init) ?? ""
     }
 
+    /// Creators matching what was typed, best match first. Never the person's own account or a company they work for.
+    func findCreators(_ text: String) async throws -> [CreatorProfile] {
+        let found = try await backend.searchCreators(text, limit: CreatorSearchRules.defaultLimit)
+        return found.filter { canBook(creatorID: $0.id) }
+    }
+
+    /// Signed contracts, newest shoot first.
+    var contractedBookings: [Booking] {
+        guard let id = session?.userID else { return [] }
+        return ClientActivity.contractedBookings(bookings, clientID: id)
+    }
+
     /// Opens a creator's page, over whatever the person is doing, so they can book again.
     func openCreatorPage(_ creatorID: UUID) async {
         do {

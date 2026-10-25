@@ -107,8 +107,6 @@ final class AppModel {
     var presentedPage: PublicCreatorPage?
     /// A booking link opened before the person was signed in. Welcome says so, and the page opens after sign-in.
     var pendingBookingHandle: String?
-    /// A client who chose "Start taking bookings": shows the Just me or My company setup over the app.
-    var startingCreatorSetup = false
     let calendar = CalendarService()
 
     init(

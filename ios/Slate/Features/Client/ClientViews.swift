@@ -34,110 +34,97 @@ struct ClientTabView: View {
     }
 }
 
-// MARK: - Finding a creator
+// MARK: - Home pieces
 
-/// Paste a booking link, or type a creator's name, to open their page.
-struct FindCreatorCard: View {
+/// The search field on a client's Home. It looks like one; tapping it goes to the Creators tab to search.
+struct ClientSearchEntry: View {
     @Environment(AppModel.self) private var model
 
-    @State private var text = ""
-    @State private var notALink = false
-    @State private var isOpening = false
-    @FocusState private var focused: Bool
+    var body: some View {
+        Button {
+            model.selectedTab = .services
+        } label: {
+            HStack(spacing: Space.s) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text("Search creators, or paste a link")
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.m)
+            .frame(minHeight: Metrics.minTapTarget)
+            .background(Color.slateFill, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.m, style: .continuous).strokeBorder(Color.slateHairline, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search creators")
+        .accessibilityHint("Opens the Creators tab, where you can search by name, link or what they shoot")
+    }
+}
+
+/// The creators a client has booked, a tap from booking again.
+struct BookAgainShelf: View {
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.m) {
-            Label("Have a booking link?", systemImage: "link")
-                .font(.headline)
-            Text("Paste a creator's link, or type their name, to see their packages and book.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            TextField("\(AppConfig.bookingLinkHost)/maya", text: $text)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
-                .submitLabel(.go)
-                .focused($focused)
-                .onSubmit { open() }
-                .onChange(of: text) { _, _ in notALink = false }
-                .padding(.horizontal, Space.m)
-                .frame(minHeight: Metrics.minTapTarget)
-                .background(Color.slateFill, in: RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.m, style: .continuous).strokeBorder(Color.slateHairline, lineWidth: 1))
-
-            if notALink {
-                Text("That doesn't look like a booking link or a creator's name.")
-                    .font(.footnote)
-                    .foregroundStyle(Color.slateDanger)
-            }
-
-            Button {
-                open()
-            } label: {
-                HStack {
-                    Text("Open page")
-                    if isOpening { ProgressView() }
+        if !model.creatorsBooked.isEmpty {
+            VStack(alignment: .leading, spacing: Space.m) {
+                SectionHeader("Book again")
+                ScrollView(.horizontal) {
+                    HStack(spacing: Space.m) {
+                        ForEach(model.creatorsBooked) { creator in
+                            Button {
+                                Task { await model.openCreatorPage(creator.id) }
+                            } label: {
+                                VStack(spacing: Space.s) {
+                                    AvatarView(name: creator.name, url: nil, size: Metrics.avatarL)
+                                    Text(creator.name)
+                                        .font(.footnote.weight(.medium))
+                                        .lineLimit(1)
+                                        .frame(width: Metrics.avatarL + Space.l)
+                                }
+                                .padding(.vertical, Space.xxs)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Book \(creator.name) again")
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+                .scrollIndicators(.hidden)
             }
-            .buttonStyle(.slatePrimary)
-            .controlSize(.large)
-            .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty || isOpening)
-        }
-        .card()
-    }
-
-    private func open() {
-        guard !isOpening else { return }
-        focused = false
-        isOpening = true
-        Task {
-            let found = await model.openBookingLink(text: text)
-            notALink = !found
-            if found { text = "" }
-            isOpening = false
         }
     }
 }
 
 // MARK: - Creators tab
 
-/// The creators this person has booked, so booking again is a tap, and a place to paste a link.
+/// Search for a creator, or pick up where the last booking left off.
 struct ClientCreatorsView: View {
+    private enum Phase: Equatable {
+        case idle, searching, done, failed(String)
+    }
+
     @Environment(AppModel.self) private var model
+
+    @State private var query = ""
+    @State private var results: [CreatorProfile] = []
+    @State private var phase = Phase.idle
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.xl) {
-                    FindCreatorCard()
-
-                    VStack(alignment: .leading, spacing: Space.m) {
-                        SectionHeader("Creators you've booked")
-                        if model.creatorsBooked.isEmpty {
-                            Text("Creators you book show up here, so you can book them again.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
-                                .card(.outlined)
-                        } else {
-                            VStack(spacing: 0) {
-                                ForEach(Array(model.creatorsBooked.enumerated()), id: \.element.id) { index, creator in
-                                    if index > 0 { Divider() }
-                                    Button {
-                                        Task { await model.openCreatorPage(creator.id) }
-                                    } label: {
-                                        BookedCreatorRow(creator: creator)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .card()
-                        }
+                    if CreatorSearchRules.clean(query) == nil {
+                        browse
+                    } else {
+                        searchResults
                     }
                 }
                 .padding(.horizontal, Space.page)
+                .padding(.top, Space.s)
                 .padding(.bottom, Space.xxl)
                 .frame(maxWidth: Metrics.pageWidth)
                 .frame(maxWidth: .infinity)
@@ -146,7 +133,159 @@ struct ClientCreatorsView: View {
             .slatePageBackground()
             .navigationTitle("Creators")
             .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Name, link or what they shoot")
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onSubmit(of: .search) { openIfLink() }
+            .task(id: query) { await search() }
         }
+    }
+
+    // MARK: Before searching
+
+    private var browse: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            VStack(alignment: .leading, spacing: Space.m) {
+                SectionHeader("What do you need?")
+                FlowLayout(spacing: Space.s, lineSpacing: Space.s) {
+                    ForEach(Specialty.allCases) { specialty in
+                        SpecialtyChip(specialty: specialty, isSelected: false) { query = specialty.title }
+                    }
+                }
+                Text("Or search above by a creator's name or link name. You can paste a booking link there too.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: Space.m) {
+                SectionHeader("Creators you've booked")
+                if model.creatorsBooked.isEmpty {
+                    Text("Creators you book show up here, so you can book them again.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: Metrics.placeholderCompact)
+                        .card(.outlined)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.creatorsBooked.enumerated()), id: \.element.id) { index, creator in
+                            if index > 0 { Divider() }
+                            Button {
+                                Task { await model.openCreatorPage(creator.id) }
+                            } label: {
+                                BookedCreatorRow(creator: creator)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .card()
+                }
+            }
+        }
+    }
+
+    // MARK: Results
+
+    @ViewBuilder
+    private var searchResults: some View {
+        switch phase {
+        case .idle, .searching:
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
+        case .failed(let message):
+            VStack(spacing: Space.m) {
+                Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button("Try Again") { Task { await search() } }.buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity, minHeight: Metrics.placeholderRegular)
+        case .done:
+            if results.isEmpty {
+                ContentUnavailableView {
+                    Label("No creators found", systemImage: "magnifyingglass")
+                } description: {
+                    Text("Try a name, a link name, or what they shoot, like weddings or portraits.")
+                }
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(results.enumerated()), id: \.element.id) { index, creator in
+                        if index > 0 { Divider() }
+                        Button {
+                            Task { await model.openBookingLink(text: creator.handle) }
+                        } label: {
+                            CreatorSearchRow(creator: creator)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .card()
+            }
+        }
+    }
+
+    private func search() async {
+        guard let words = CreatorSearchRules.clean(query) else {
+            results = []
+            phase = .idle
+            return
+        }
+        // A link is opened when the person presses search, not searched for.
+        if CreatorSearchRules.looksLikeLink(query) {
+            results = []
+            phase = .done
+            return
+        }
+        phase = .searching
+        do {
+            // Wait for a pause in the typing; the next letter cancels this and starts again.
+            try await Task.sleep(for: .milliseconds(300))
+            results = try await model.findCreators(words)
+            phase = .done
+        } catch is CancellationError {
+            // Replaced by a newer search.
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    private func openIfLink() {
+        guard CreatorSearchRules.looksLikeLink(query) else { return }
+        Task {
+            if await model.openBookingLink(text: query) {
+                query = ""
+            } else {
+                phase = .failed("That isn't a booking link.")
+            }
+        }
+    }
+}
+
+private struct CreatorSearchRow: View {
+    let creator: CreatorProfile
+
+    private var detail: String {
+        var parts = creator.specialties.prefix(2).map(\.title)
+        if let place = creator.location?.name, !place.isEmpty { parts.append(place) }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        HStack(spacing: Space.m) {
+            AvatarView(name: creator.displayName, url: creator.avatarURL, size: Metrics.avatarM)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text(creator.displayName).font(.headline)
+                if !detail.isEmpty {
+                    Text(detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            Spacer(minLength: Space.s)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: Metrics.minTapTarget)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens their page so you can book")
     }
 }
 
@@ -180,7 +319,7 @@ private struct BookedCreatorRow: View {
 
 // MARK: - Profile tab
 
-/// A client's Profile: who they are, how to start selling, and the account actions.
+/// A client's Profile: who they are, their contracts and payments in one place, and the account actions.
 struct ClientProfileView: View {
     @Environment(AppModel.self) private var model
 
@@ -195,6 +334,11 @@ struct ClientProfileView: View {
         return value.isEmpty ? "Your name" : value
     }
 
+    private var paidText: String {
+        let cents = ClientActivity.netPaidCents(model.payments)
+        return cents == 0 ? "" : Money.format(cents, code: model.payments.first?.currencyCode ?? Money.defaultCurrencyCode)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -206,7 +350,7 @@ struct ClientProfileView: View {
                             if let email = model.session?.email, !email.isEmpty {
                                 Text(email).font(.subheadline).foregroundStyle(.secondary)
                             }
-                            Text("Client account · free").font(.footnote).foregroundStyle(.secondary)
+                            Text("Free account").font(.footnote).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
                     }
@@ -224,17 +368,20 @@ struct ClientProfileView: View {
                     .listRowBackground(Color.slateCard)
 
                 Section {
-                    Button {
-                        model.startingCreatorSetup = true
+                    NavigationLink {
+                        ClientContractsView()
                     } label: {
-                        Label("Start taking bookings", systemImage: "camera.aperture")
-                            .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                        row("signature", "My contracts", detail: model.contractedBookings.isEmpty ? nil : "\(model.contractedBookings.count)")
                     }
-                    .buttonStyle(.plain)
+                    NavigationLink {
+                        ClientPaymentsView()
+                    } label: {
+                        row("creditcard", "Payments and receipts", detail: paidText.isEmpty ? nil : paidText)
+                    }
                 } header: {
-                    Text("Sell on Slate")
+                    Text("Your paperwork")
                 } footer: {
-                    Text("Set up a page as an individual or a company. Your bookings and contracts stay with you.")
+                    Text("Every contract you've signed and everything you've paid, with refunds, in one place.")
                 }
                     .listRowBackground(Color.slateCard)
 
@@ -247,12 +394,6 @@ struct ClientProfileView: View {
                         Label("Appearance", systemImage: "circle.lefthalf.filled")
                     }
                     .frame(minHeight: Metrics.minTapTarget)
-                } header: {
-                    Text("Look")
-                }
-                    .listRowBackground(Color.slateCard)
-
-                Section("You") {
                     Button {
                         showNotifications = true
                     } label: {
@@ -260,6 +401,8 @@ struct ClientProfileView: View {
                             .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                } header: {
+                    Text("Preferences")
                 }
                     .listRowBackground(Color.slateCard)
 
@@ -315,6 +458,128 @@ struct ClientProfileView: View {
                 Text("This permanently deletes your account. This can't be undone.")
             }
         }
+    }
+
+    private func row(_ symbol: String, _ title: String, detail: String?) -> some View {
+        HStack(spacing: Space.m) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(Color.accentColor)
+                .frame(minWidth: Metrics.iconColumn)
+                .accessibilityHidden(true)
+            Text(title)
+            Spacer(minLength: Space.s)
+            if let detail {
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .frame(minHeight: Metrics.minTapTarget)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Contracts and payments
+
+/// Every contract the client has signed.
+struct ClientContractsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        List {
+            if model.contractedBookings.isEmpty {
+                ContentUnavailableView {
+                    Label("No contracts yet", systemImage: "signature")
+                } description: {
+                    Text("When you book and sign, your contract is kept here.")
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                Section {
+                    ForEach(model.contractedBookings) { booking in
+                        NavigationLink {
+                            SignedContractView(booking: booking)
+                        } label: {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(booking.packageName).font(.headline)
+                                Text("\(booking.creatorName) · \(booking.startAt.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                        }
+                    }
+                } footer: {
+                    Text("Open one to read it or save the signed PDF.")
+                }
+                    .listRowBackground(Color.slateCard)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
+        .navigationTitle("My contracts")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// What the client has paid and been refunded, newest first.
+struct ClientPaymentsView: View {
+    @Environment(AppModel.self) private var model
+
+    private var history: [Payment] { ClientActivity.history(model.payments) }
+
+    var body: some View {
+        List {
+            if history.isEmpty {
+                ContentUnavailableView {
+                    Label("No payments yet", systemImage: "creditcard")
+                } description: {
+                    Text("Deposits, balances and refunds are listed here.")
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                Section {
+                    LabeledContent("Paid so far") {
+                        Text(Money.format(ClientActivity.netPaidCents(model.payments), code: history.first?.currencyCode ?? Money.defaultCurrencyCode))
+                            .font(.headline)
+                    }
+                    .frame(minHeight: Metrics.minTapTarget)
+                } footer: {
+                    Text("What you've paid, less refunds.")
+                }
+                    .listRowBackground(Color.slateCard)
+
+                Section {
+                    ForEach(history) { payment in
+                        paymentRow(payment)
+                    }
+                }
+                    .listRowBackground(Color.slateCard)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .slatePageBackground()
+        .navigationTitle("Payments")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func paymentRow(_ payment: Payment) -> some View {
+        let booking = model.bookings.first { $0.id == payment.bookingID }
+        let isRefund = payment.kind == .refund
+        return HStack(spacing: Space.m) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text("\(payment.kind.title) · \(booking?.packageName ?? "Booking")").font(.headline)
+                Text("\(booking?.creatorName ?? "") \(booking == nil ? "" : "· ")\(payment.statusTitle) · \((payment.paidAt ?? payment.createdAt).formatted(date: .abbreviated, time: .omitted))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: Space.s)
+            Text("\(isRefund ? "+" : "")\(Money.format(payment.amountCents, code: payment.currencyCode))")
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(isRefund ? Color.slateSuccess : Color.primary)
+        }
+        .frame(minHeight: Metrics.minTapTarget)
+        .accessibilityElement(children: .combine)
     }
 }
 

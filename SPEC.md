@@ -39,9 +39,10 @@ Decisions made with the product owner:
 | D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
 | D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
 | D15 | **Revisions are a second form of delivery, with no paywall.** After the client has paid, the creator can send revised or extra files that the client can save at once, with no payment step. | Section 5.5 and flow 8.12. A revision cannot exist while a balance is owed, so it is never a way around payment (R21). |
-| D16 | **A third account type: Client.** The choice screen after sign-in has three cards: *Just me*, *My company* and *I'm booking a creator*. A client is free, has no profile, and can book, sign, pay, message and keep contracts and files. A client can start selling later (Profile, Start taking bookings) and keeps every booking. | Sections 4.1 and 8.13. |
+| D16 | **A third account type: Client.** The choice screen after sign-in has three cards: *Just me*, *My company* and *I'm booking a creator*. A client is free, has no profile, and can search for creators, book, sign, pay, message and keep contracts, payments and files. A client account is for booking only: there is no way to start selling from inside it, so someone who wants to sell uses a different email. | Sections 4.1 and 8.13. |
 | D17 | **Two ways into a client account, both free: Sign in with Apple, or an emailed code.** The code is the guest account: no password, and entering the same email later signs the person back in, so a repeat client keeps their bookings. A name is asked once. | Section 8.13. Supabase email codes need the Email provider turned on and a real mail sender (README). |
 | D18 | **A booking link makes a client.** Someone who opens a booking link and has no account is taken to sign in as a client, with no type to choose, and lands on the creator's page afterwards. | Section 8.13. A web page for people without the app is still Q4. |
+| D19 | **Clients can search for creators** by name, link name or what they shoot (weddings, portraits). Only creators with a published package are found, so every result can be booked. There is still no marketplace: no categories to browse, no ranking, no ratings sort. | Section 8.13. Reverses part of D2 for search only (section 10). |
 
 Assumptions, open to change (section 13):
 
@@ -112,7 +113,7 @@ Out of the MVP: an internal support/admin role beyond the console below. The MVP
 
 ### 4.1 Account types
 
-A person picks an account type in onboarding, right after signing in. The choice screen is three cards on a plain grouped background: **Just me** (an individual freelancer), **My company** (a business or team, 10 or more people) and **I'm booking a creator** (a client). The screen also has a third card, **I'm booking a creator**, for a client (D16). A person who arrives from a booking link doesn't see the screen at all (D18).
+A person picks an account type in onboarding, right after signing in. The choice screen is three cards on a plain grouped background: **Just me** (an individual freelancer), **My company** (a business or team, 10 or more people) and **I'm booking a creator** (a client). The screen also has a third card, **I'm booking a creator**, for a client (D16). A client account is only for booking, so it has no way to start selling. A person who arrives from a booking link doesn't see the screen at all (D18).
 
 | | **Individual ("Just me")** | **Company ("My company")** |
 |---|---|---|
@@ -576,8 +577,8 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 *Choosing to be a client*
 
 1. After Sign in with Apple (or an emailed code), the choice screen shows three cards. **I'm booking a creator** takes the person straight into the app as a client: no profile, no payment details, nothing to set up. "Free, with or without a profile" is on the card.
-2. A client sees the same five tabs with client meanings (section 9). They can book, sign, pay, message, and keep their contracts and files.
-3. **Profile ▸ Start taking bookings** is how a client becomes a creator. It opens the Just me or My company setup. The client's bookings stay theirs.
+2. A client sees the same five tabs with client meanings (section 9). They can search for creators, book, sign, pay, message, and keep their contracts, payments and files.
+3. A client account has no "start selling" option. A person who later wants to sell signs in with a different email; being invited into a company (8.8) also works, and then the company shows in their account switcher.
 
 *Signing in with an emailed code (the guest account)*
 
@@ -586,11 +587,18 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 6. A code works for ten minutes and for one sign-in. Too many wrong tries ask for a new one.
 7. On a device with no server, the code is shown on the screen (it is always 123456) so the flow can be tried.
 
+*Finding a creator*
+
+8. The **Creators** tab has a search field. Typing a name, a link name or what they shoot ("weddings", "real estate") lists matching creators, best match first: an exact link name, then names that start with the words, then the rest. At least two characters, and no more than 20 results.
+9. With nothing typed, the tab offers the specialties as one-tap searches, and the creators the client has booked, with **Book again**.
+10. Pasting a booking link into the field and pressing search opens that creator's page directly.
+11. Only creators who have a published package are found, so every result can be booked. Searching needs an account.
+
 *A booking link*
 
-8. A creator shares their link (`slate://book/<handle>`, and the web link once there is a domain). Opening it in the app when signed in shows the creator's page over whatever the person was doing, as today.
-9. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
-10. A person who already has a creator account opens the page the same way, and books as themselves.
+12. A creator shares their link (`slate://book/<handle>`, and the web link once there is a domain). Opening it in the app when signed in shows the creator's page over whatever the person was doing, as today.
+13. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
+14. A person who already has a creator account opens the page the same way, and books as themselves.
 
 ## 9. Screens and navigation
 
@@ -624,11 +632,11 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 
 | Tab | A client sees |
 |---|---|
-| **Home** | The next booking, what needs doing (pay a balance, check the files, leave a review), and **Have a booking link?** to paste a link or a handle |
+| **Home** | A search field that opens Creators, the next booking, what needs doing (pay a balance, check the files, leave a review), and **Book again** with the creators they have booked |
 | **Bookings** | The same list, with the pay, files, contract and cancel actions |
-| **Creators** (in place of Services) | The creators they have booked, each opening that creator's page to book again |
+| **Creators** (in place of Services) | A search field for a name, a link name or what they shoot (a booking link pasted there opens that page), the specialties as one-tap searches, and the creators they have booked |
 | **Messages** | The booking conversations, as today |
-| **Profile** | Their name and email, notifications, sign out, delete account, and **Start taking bookings** |
+| **Profile** | Their name and email, **My contracts** (every signed contract and its PDF), **Payments and receipts** (what they have paid and been refunded), appearance, notifications, sign out and delete account. Nothing about selling. |
 
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
@@ -642,7 +650,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 
 | Area | Deferred |
 |---|---|
-| Discovery | Marketplace, search, categories, ratings and reviews |
+| Discovery | A marketplace: browsing by category, ranking, sorting by rating, featured creators. (Searching by name, link name or specialty is in, D19.) |
 | Booking modes | Request-to-book, custom quotes and proposals, recurring bookings, waitlists |
 | Money | Installments and milestones, invoices beyond deposit and balance, tax, multi-currency, promo codes, creator subscriptions |
 | Contracts | Third-party e-sign providers, model and property releases, usage-rights licensing add-ons, AI drafting |
@@ -765,4 +773,6 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q33 | **Should a person be able to browse a creator's page before signing in?** | Not in the app yet: a link asks for sign-in first (8.13). A public web page is Q4 |
 | Q34 | **Which email service sends the codes?** | Supabase's own for testing; a real sender (for example Resend) before launch, because the default is rate limited |
 | Q35 | **Should a guest be allowed to pay, or only reserve?** | Pay. The code proves the email, and the contract carries the name |
+| Q36 | **Should a client be able to turn their account into a creator account?** | No. A client account is for booking only (D16). Someone who wants to sell signs in with a different email |
+| Q37 | **Should search also look at a creator's location?** | Not yet. Name, link name and specialty only |
 

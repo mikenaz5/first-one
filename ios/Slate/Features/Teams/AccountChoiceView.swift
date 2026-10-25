@@ -8,11 +8,6 @@ struct AccountChoiceFlow: View {
 
     @Environment(AppModel.self) private var model
 
-    /// A client who has chosen to start selling can't choose to be a client again.
-    var allowClient = true
-    /// Shown as a Cancel button when the flow was opened from inside the app.
-    var onCancel: (() -> Void)?
-
     @State private var step = Step.choose
     @State private var isStartingClient = false
 
@@ -23,8 +18,7 @@ struct AccountChoiceFlow: View {
                 AccountChoiceView(
                     onIndividual: { step = .individual },
                     onCompany: { step = .company },
-                    onClient: allowClient ? { startClient() } : nil,
-                    onCancel: onCancel
+                    onClient: { startClient() }
                 )
                 .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)).combined(with: .opacity))
             case .individual:
@@ -41,7 +35,7 @@ struct AccountChoiceFlow: View {
         .motionSafe(.slateSmooth, value: step)
         .onAppear {
             // Someone who arrived from a booking link is here to book: no type to choose.
-            if allowClient, model.pendingBookingHandle != nil { startClient() }
+            if model.pendingBookingHandle != nil { startClient() }
         }
     }
 
@@ -97,17 +91,11 @@ struct AccountChoiceView: View {
 
     let onIndividual: () -> Void
     let onCompany: () -> Void
-    /// Nil leaves the third card out (a client who is starting to sell).
-    var onClient: (() -> Void)?
-    var onCancel: (() -> Void)?
+    let onClient: () -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
-                if let onCancel {
-                    Button("Cancel", action: onCancel)
-                        .frame(minHeight: Metrics.minTapTarget)
-                }
                 VStack(alignment: .leading, spacing: Space.s) {
                     Text("How will you use Slate?")
                         .font(SlateFont.display)
@@ -140,24 +128,20 @@ struct AccountChoiceView: View {
                         ],
                         action: onCompany
                     )
-                    if let onClient {
-                        ChoiceCard(
-                            symbol: "calendar.badge.checkmark",
-                            title: "I'm booking a creator",
-                            subtitle: "Client · always free",
-                            points: [
-                                "Book, sign and pay in a few taps",
-                                "Your contracts, messages and files in one place",
-                                "Start selling later, any time",
-                            ],
-                            action: onClient
-                        )
-                    }
+                    ChoiceCard(
+                        symbol: "calendar.badge.checkmark",
+                        title: "I'm booking a creator",
+                        subtitle: "Client · always free",
+                        points: [
+                            "Find a creator, book, sign and pay in a few taps",
+                            "Your contracts, payments, messages and files in one place",
+                            "Every contract in your name, nothing to set up",
+                        ],
+                        action: onClient
+                    )
                 }
 
-                Text(onClient == nil
-                     ? "Not sure? Choose Just me. You can upgrade from your profile whenever your team grows."
-                     : "Not sure? Choose Just me if you sell your work, or I'm booking a creator if you hire people. You can change later.")
+                Text("Not sure? Choose Just me if you sell your work, or I'm booking a creator if you hire people. A company is for teams that sell together.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
