@@ -59,8 +59,13 @@ struct SpecialtyChip: View {
 
     var body: some View {
         Button(action: action) {
-            Label(specialty.title, systemImage: specialty.symbol)
+            HStack(spacing: Space.xs) {
+                Image(systemName: specialty.symbol)
+                    .accessibilityHidden(true)
+                Text(specialty.title)
+            }
                 .font(.subheadline.weight(.medium))
+                .lineLimit(1)
                 .padding(.horizontal, Space.m)
                 .frame(minHeight: Metrics.minTapTarget)
                 .foregroundStyle(isSelected ? Color.slateOnAccent : Color.primary)
@@ -80,14 +85,17 @@ struct TagChip: View {
     var symbol: String?
 
     var body: some View {
-        Group {
+        // An explicit icon and name rather than a Label, so the name can't collapse to nothing inside a FlowLayout.
+        HStack(spacing: Space.xs) {
             if let symbol {
-                Label(title, systemImage: symbol)
-            } else {
-                Text(title)
+                Image(systemName: symbol)
+                    .accessibilityHidden(true)
             }
+            Text(title)
         }
+        .accessibilityElement(children: .combine)
         .font(.footnote.weight(.medium))
+        .lineLimit(1)
         .padding(.horizontal, Space.m)
         .padding(.vertical, Space.s)
         .background(Color.slateFill, in: Capsule())
@@ -104,13 +112,14 @@ struct FlowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
+        let offered = ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var usedWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(offered)
             if x > 0, x + size.width > maxWidth {
                 x = 0
                 y += rowHeight + lineSpacing
@@ -128,9 +137,10 @@ struct FlowLayout: Layout {
         var x = bounds.minX
         var y = bounds.minY
         var rowHeight: CGFloat = 0
+        let offered = ProposedViewSize(width: bounds.width.isFinite ? bounds.width : nil, height: nil)
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(offered)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 x = bounds.minX
                 y += rowHeight + lineSpacing
