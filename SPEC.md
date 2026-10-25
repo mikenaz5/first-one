@@ -1,9 +1,10 @@
 # Product Spec: Booking with Built-in Contracts for Creators
 
-**Status:** Draft v0.3 · 2026-10-25 · Working title: *Slate* (placeholder)
+**Status:** Draft v0.4 · 2026-10-25 · Working title: *Slate* (placeholder)
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
 **Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
+**Changes in v0.4:** client accounts, a free third account type with Sign in with Apple or an emailed code, and booking links that lead straight to one (sections 2, 4, 4.1, 5.2, 8.13, 9, 13).
 
 ---
 
@@ -38,6 +39,9 @@ Decisions made with the product owner:
 | D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
 | D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
 | D15 | **Revisions are a second form of delivery, with no paywall.** After the client has paid, the creator can send revised or extra files that the client can save at once, with no payment step. | Section 5.5 and flow 8.12. A revision cannot exist while a balance is owed, so it is never a way around payment (R21). |
+| D16 | **A third account type: Client.** The choice screen after sign-in has three cards: *Just me*, *My company* and *I'm booking a creator*. A client is free, has no profile, and can book, sign, pay, message and keep contracts and files. A client can start selling later (Profile, Start taking bookings) and keeps every booking. | Sections 4.1 and 8.13. |
+| D17 | **Two ways into a client account, both free: Sign in with Apple, or an emailed code.** The code is the guest account: no password, and entering the same email later signs the person back in, so a repeat client keeps their bookings. A name is asked once. | Section 8.13. Supabase email codes need the Email provider turned on and a real mail sender (README). |
+| D18 | **A booking link makes a client.** Someone who opens a booking link and has no account is taken to sign in as a client, with no type to choose, and lands on the creator's page afterwards. | Section 8.13. A web page for people without the app is still Q4. |
 
 Assumptions, open to change (section 13):
 
@@ -88,7 +92,7 @@ One account (Sign in with Apple) can hold both roles. A photographer can hire a 
 | | **Creator** | **Client** |
 |---|---|---|
 | Who | Videographer, photographer, freelance creator who sells packages | A person or business booking a creator (couples, event hosts, brands, agencies) |
-| Identity | Sign in with Apple, then creator onboarding (legal name, Stripe Connect) | Sign in with Apple in the app. On web: name and email, verified by a one-time code (guest). A guest account can be upgraded later. |
+| Identity | Sign in with Apple, then creator onboarding (legal name, Stripe Connect) | Sign in with Apple, or an emailed one-time code (a guest account with no password, which also works for a repeat client). Free. A client can become a creator later. |
 | Surfaces | iOS app only in the MVP | iOS app or web booking page |
 | Core jobs | Set up packages, contracts and availability. Share the link. Get paid. Manage bookings and changes. | Pick a package and time. Understand the terms. Sign and pay. Keep the contract. Reschedule or cancel. |
 
@@ -108,7 +112,7 @@ Out of the MVP: an internal support/admin role beyond the console below. The MVP
 
 ### 4.1 Account types
 
-A person who sells services picks one of two account types in onboarding, right after Sign in with Apple. The choice screen is two cards on a plain grouped background: **Just me** (an individual freelancer) and **My company** (a business or team, 10 or more people). Clients never see this screen. They book without choosing a type.
+A person picks an account type in onboarding, right after signing in. The choice screen is three cards on a plain grouped background: **Just me** (an individual freelancer), **My company** (a business or team, 10 or more people) and **I'm booking a creator** (a client). The screen also has a third card, **I'm booking a creator**, for a client (D16). A person who arrives from a booking link doesn't see the screen at all (D18).
 
 | | **Individual ("Just me")** | **Company ("My company")** |
 |---|---|---|
@@ -226,7 +230,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 | Feature | Detail | Phase |
 |---|---|---|
 | Book from a link | Package, optional add-ons, time, key terms, sign and pay. | MVP |
-| Sign in | Sign in with Apple, or on web a name and email verified by a one-time code. | MVP |
+| Sign in | Sign in with Apple, or an emailed one-time code in the app and on the web. Both make a free client account (8.13). | MVP |
 | Pay deposit | Apple Pay (iOS and Safari). Card fallback on web through Stripe. | MVP |
 | My bookings | Status, contract, payments, next steps. | MVP |
 | Pay balance | One-tap Apple Pay from a reminder, due N days before the shoot (default 7). | MVP |
@@ -567,6 +571,27 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 15. Earlier files are not touched. The delivery keeps its own date, and the client can still save from it until then. A revision adds to what the client has; to retire a superseded file, the creator removes it.
 16. If the delivery has expired and the client had paid, a revision is how the creator sends the files again.
 
+### 8.13 Client accounts and booking links
+
+*Choosing to be a client*
+
+1. After Sign in with Apple (or an emailed code), the choice screen shows three cards. **I'm booking a creator** takes the person straight into the app as a client: no profile, no payment details, nothing to set up. "Free, with or without a profile" is on the card.
+2. A client sees the same five tabs with client meanings (section 9). They can book, sign, pay, message, and keep their contracts and files.
+3. **Profile ▸ Start taking bookings** is how a client becomes a creator. It opens the Just me or My company setup. The client's bookings stay theirs.
+
+*Signing in with an emailed code (the guest account)*
+
+4. On the welcome screen, **Continue with email** asks for an email address and sends a six-digit code. The person types it in.
+5. A new email asks for a name once (it goes in the contracts they sign). An email that has an account just signs in, so a repeat client gets their bookings back on any phone. There is no password to forget.
+6. A code works for ten minutes and for one sign-in. Too many wrong tries ask for a new one.
+7. On a device with no server, the code is shown on the screen (it is always 123456) so the flow can be tried.
+
+*A booking link*
+
+8. A creator shares their link (`slate://book/<handle>`, and the web link once there is a domain). Opening it in the app when signed in shows the creator's page over whatever the person was doing, as today.
+9. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
+10. A person who already has a creator account opens the page the same way, and books as themselves.
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -594,6 +619,16 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 | **Profile** | The company page and its editor (Owner, Admin). The designated signer, the split ledger and going back to an individual account are under Settings ▸ Company settings; Stripe Connect for the company is under Services ▸ Payments (Owner). |
 
 **Slate Files.** *Bookings ▸ a booking* gains a **Files** section. For the creator it has Add files, the progress and Retry of each upload, Deliver, and the delivery's state ("Delivered, available until Nov 22", "12 of 48 saved", "balance unpaid"). For the client it has a grid of previews, the expiry date, **Pay balance to unlock downloads**, then Save and Save all. Once the balance is paid the creator also sees **Send a revision**, and the client sees each revision listed under the delivery with its own expiry date and Save buttons, and no payment step. *Profile ▸ ⋯ ▸ Settings* gains a **Storage** row with the meter for the account on screen. It uses the system's photo picker, file importer, video player and background transfers, and the same design rules as the rest.
+
+**Client accounts.** The five tabs and their labels stay, with these meanings for a client (an account with no creator profile and no company).
+
+| Tab | A client sees |
+|---|---|
+| **Home** | The next booking, what needs doing (pay a balance, check the files, leave a review), and **Have a booking link?** to paste a link or a handle |
+| **Bookings** | The same list, with the pay, files, contract and cancel actions |
+| **Creators** (in place of Services) | The creators they have booked, each opening that creator's page to book again |
+| **Messages** | The booking conversations, as today |
+| **Profile** | Their name and email, notifications, sign out, delete account, and **Start taking bookings** |
 
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
@@ -722,3 +757,12 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q30 | **Who at a company can open the files?** | Anyone who can see the booking except a Viewer |
 | Q31 | **Should a creator be able to unlock the originals early,** before the balance is paid, for a client they trust? | No in the first version (R21) |
 | Q32 | **Is there a limit on how many revisions a creator can send?** | No fixed limit. The allowance and the 30-day expiry bound it |
+
+**Added in v0.4 (client accounts).** Answered and recorded as D16 to D18. These remain open:
+
+| # | Question | Default |
+|---|---|---|
+| Q33 | **Should a person be able to browse a creator's page before signing in?** | Not in the app yet: a link asks for sign-in first (8.13). A public web page is Q4 |
+| Q34 | **Which email service sends the codes?** | Supabase's own for testing; a real sender (for example Resend) before launch, because the default is rate limited |
+| Q35 | **Should a guest be allowed to pay, or only reserve?** | Pay. The code proves the email, and the contract carries the name |
+
