@@ -2,7 +2,7 @@ import Foundation
 
 extension LocalBackend {
     /// Creators a client could book, best first (see `FeaturedRules`), each with a cover, a starting price and reviews.
-    func featuredCreators(specialty: Specialty?, limit: Int) async throws -> [FeaturedCreator] {
+    func featuredCreators(specialty: Specialty?, near: GeoPoint?, limit: Int) async throws -> [FeaturedCreator] {
         await seedSampleCreatorsIfNeeded()
         let folders = (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         var candidates: [(creator: FeaturedCreator, ranking: FeaturedRanking)] = []
@@ -15,13 +15,18 @@ extension LocalBackend {
             guard let cheapest = published.min(by: { ($0.priceCents, $0.position) < ($1.priceCents, $1.position) }) else { continue }
             let pieces = try await loadPortfolio(for: id)
             let reviews = try await loadReviewSummary(creatorID: id)
+            // How far from the client's place to the creator's city, when both are known.
+            let distance: Double? = {
+                guard let near, near.isValid, let city = profile.location else { return nil }
+                return GeoRules.distanceKm(from: near, to: GeoPoint(latitude: city.latitude, longitude: city.longitude))
+            }()
             let creator = FeaturedCreator(
                 profile: profile, coverURL: pieces.first?.thumbnailURL, startingPriceCents: cheapest.priceCents,
-                currencyCode: cheapest.currencyCode, reviews: reviews
+                currencyCode: cheapest.currencyCode, reviews: reviews, distanceKm: distance
             )
             let ranking = FeaturedRanking(
                 id: id, portfolioCount: pieces.count, reviewCount: reviews.count, ratingSum: reviews.ratingSum,
-                createdAt: profile.createdAt
+                createdAt: profile.createdAt, distanceKm: distance, travelRadiusKm: profile.location?.travelRadiusKm
             )
             candidates.append((creator, ranking))
         }

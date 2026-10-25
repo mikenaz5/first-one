@@ -43,8 +43,9 @@ protocol SlateBackend {
     /// `limit` (never more than 30), best match first. Nothing for fewer than two characters.
     func searchCreators(_ query: String, limit: Int) async throws -> [CreatorProfile]
     /// Creators a client could book, best first, for the explore grid on their Home (see `FeaturedRules`).
-    /// With a specialty, only those who shoot it.
-    func featuredCreators(specialty: Specialty?, limit: Int) async throws -> [FeaturedCreator]
+    /// With a specialty, only those who shoot it. With a place (city-level), creators who work there come first and
+    /// each tile knows how far away it is.
+    func featuredCreators(specialty: Specialty?, near: GeoPoint?, limit: Int) async throws -> [FeaturedCreator]
     func loadPublicPage(handle: String) async throws -> PublicCreatorPage?
     /// Settings plus blocked time ranges (never other people's booking details).
     func loadSchedule(for creatorID: UUID, from: Date, to: Date) async throws -> CreatorSchedule

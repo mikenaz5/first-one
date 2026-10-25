@@ -461,6 +461,9 @@ enum AppConfig {
     /// Set when a person says they are here to book (a client), so a person with no profile isn't asked to make one.
     static func clientAccountKey(for userID: UUID) -> String { "slate.clientAccount.\(userID.uuidString.lowercased())" }
 
+    /// The city a client chose, or the one their phone found, to see creators near them. Kept on this device only.
+    static func clientPlaceKey(for userID: UUID) -> String { "slate.clientPlace.\(userID.uuidString.lowercased())" }
+
     /// Which account (their own, or a company's) a person last had open on this device.
     static func activeAccountKey(for userID: UUID) -> String { "slate.activeAccount.\(userID.uuidString.lowercased())" }
 

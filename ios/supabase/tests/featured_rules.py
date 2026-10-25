@@ -63,17 +63,15 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
-def featured(specialty=None, limit="default", role="authenticated", columns="handle"):
-    """What a signed-in person is shown, in order, or 'ERR:...'."""
+def featured(specialty=None, limit="default", role="authenticated", columns="handle", lat=None, lon=None):
+    """What a signed-in person is shown, in order, or 'ERR:...'. `lat` and `lon` are the client's place."""
     c = connect()
     k = c.cursor()
     try:
         k.execute("select set_config('request.jwt.claim.sub', %s, false)", (str(uuid.uuid4()),))
         k.execute(f"set role {role}")
-        if limit == "default":
-            k.execute(f"select {columns} from featured_creators(%s)", (specialty,))
-        else:
-            k.execute(f"select {columns} from featured_creators(%s, %s)", (specialty, limit))
+        shown_limit = 12 if limit == "default" else limit
+        k.execute(f"select {columns} from featured_creators(%s, %s, %s, %s)", (specialty, shown_limit, lat, lon))
         rows = k.fetchall()
         return [r[0] for r in rows] if "," not in columns else rows
     except psycopg2.Error as e:
@@ -82,12 +80,15 @@ def featured(specialty=None, limit="default", role="authenticated", columns="han
         c.close()
 
 
-def make_creator(handle, specialties=(), uid=None, created="2026-03-01", packages=(), pieces=0, ratings=()):
+def make_creator(handle, specialties=(), uid=None, created="2026-03-01", packages=(), pieces=0, ratings=(), place=None):
     uid = uid or str(uuid.uuid4())
     a.execute("insert into auth.users (id, email) values (%s, %s)", (uid, f"{uid[:8]}@example.com"))
     a.execute(
-        "insert into creator_profiles (id, handle, display_name, specialties, created_at) values (%s,%s,%s,%s,%s)",
-        (uid, handle, handle.replace("-", " ").title(), list(specialties), f"{created}T12:00:00Z"),
+        "insert into creator_profiles (id, handle, display_name, specialties, created_at, location_name, latitude, longitude, travel_radius_km)"
+        " values (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (uid, handle, handle.replace("-", " ").title(), list(specialties), f"{created}T12:00:00Z",
+         place["name"] if place else None, place["lat"] if place else None, place["lon"] if place else None,
+         place["radiusKm"] if place else None),
     )
     for i, p in enumerate(packages):
         a.execute(
@@ -114,7 +115,7 @@ def make_creator(handle, specialties=(), uid=None, created="2026-03-01", package
 print("\n[the order, shared with the app]")
 for c in rules["creators"]:
     make_creator(c["handle"], c["specialties"], uid=c["id"], created=c["created"], packages=c["packages"],
-                 pieces=c["portfolio"], ratings=c["ratings"])
+                 pieces=c["portfolio"], ratings=c["ratings"], place=c["place"])
 # Never candidates, however good they look: nothing a client could book.
 make_creator("draft-only", ["weddings"], packages=[{"cents": 50000, "published": False}], pieces=9, ratings=[5] * 30)
 make_creator("no-packages", ["weddings"], packages=[], pieces=9, ratings=[5] * 30)
@@ -133,6 +134,39 @@ for specialty, expected in rules["bySpecialty"].items():
 check("a specialty with nobody shows nothing", featured("aerial") == [])
 check("text that isn't a specialty shows nothing", featured("x'; drop table packages; --") == [])
 check("the table is still there afterwards", (a.execute("select count(*) from packages") or a.fetchone()[0]) > 0)
+
+print("\n[by where the client is]")
+for client in rules["clients"]:
+    found = featured(lat=client["lat"], lon=client["lon"])
+    check(f"{client['name']}: creators who work there first, then the usual order", found == client["order"], found)
+    rows = {r[0]: r[1] for r in featured(columns="handle, distance_km", lat=client["lat"], lon=client["lon"])}
+    for handle, km in client["km"].items():
+        check(f"{client['name']}: {handle} is about {km} km away", rows[handle] is not None and abs(rows[handle] - km) < 0.2, rows[handle])
+    check(f"{client['name']}: a creator with no city has no distance", rows["most-work"] is None and rows["tie-but-newer"] is None)
+austin = rules["clients"][0]
+check("a place and a specialty work together",
+      featured("food", lat=austin["lat"], lon=austin["lon"]) == [h for h in austin["order"] if h in rules["bySpecialty"]["food"]],
+      featured("food", lat=austin["lat"], lon=austin["lon"]))
+check("nobody has a distance without a place", all(r[1] is None for r in featured(columns="handle, distance_km")))
+check("without a place the usual order is unchanged", featured() == rules["order"])
+check("only half a place counts as none", featured(lat=30.27) == rules["order"] and featured(lon=-97.74) == rules["order"],
+      (featured(lat=30.27), featured(lon=-97.74)))
+check("a place that isn't on Earth counts as none",
+      featured(lat=95, lon=10) == rules["order"] and featured(lat=10, lon=200) == rules["order"] and featured(lat=-91, lon=0) == rules["order"])
+# A profile with a city but no travel radius counts as 40 km. The near one is 22 km away, the far one 55 km; the far one
+# has the better reviews, which only matters when neither works where the client is.
+rid = rules["defaultTravelRadiusKm"]
+near_id = make_creator("radius-near", ["aerial"], created="2026-03-10", packages=[{"cents": 10000, "published": True}], pieces=1,
+                       place={"name": "Near", "lat": 35.2, "lon": -90.0, "radiusKm": None})
+far_id = make_creator("radius-far", ["aerial"], created="2026-03-11", packages=[{"cents": 10000, "published": True}], pieces=1,
+                      ratings=[5] * 5, place={"name": "Far", "lat": 35.5, "lon": -90.0, "radiusKm": None})
+check("the default radius is 40 km", rid == 40, rid)
+check("without a place, better reviews come first", featured("aerial") == ["radius-far", "radius-near"], featured("aerial"))
+check("a creator inside the default radius comes before one outside it, whatever their reviews",
+      featured("aerial", lat=35.0, lon=-90.0) == ["radius-near", "radius-far"], featured("aerial", lat=35.0, lon=-90.0))
+check("move the client and it flips", featured("aerial", lat=35.5, lon=-90.0) == ["radius-far", "radius-near"],
+      featured("aerial", lat=35.5, lon=-90.0))
+a.execute("delete from auth.users where id in (%s, %s)", (near_id, far_id))
 
 print("\n[what each tile is given]")
 tiles = {r[0]: r for r in featured(columns="handle, cover_path, starting_price_cents, currency_code, review_count, rating_sum, display_name, kind")}

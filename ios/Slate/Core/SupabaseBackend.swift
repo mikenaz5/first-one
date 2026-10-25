@@ -130,10 +130,14 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
     private struct FeaturedParams: Encodable {
         var pSpecialty: String?
         var pLimit: Int
+        var pLat: Double?
+        var pLon: Double?
 
         enum CodingKeys: String, CodingKey {
             case pSpecialty = "p_specialty"
             case pLimit = "p_limit"
+            case pLat = "p_lat"
+            case pLon = "p_lon"
         }
     }
 
@@ -145,6 +149,8 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         var currencyCode: String
         var reviewCount: Int
         var ratingSum: Int
+        /// Kilometres from the place the client sent to the creator's city. Null with no place, or no city.
+        var distanceKm: Double?
 
         enum CodingKeys: String, CodingKey {
             case coverPath = "cover_path"
@@ -152,6 +158,7 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             case currencyCode = "currency_code"
             case reviewCount = "review_count"
             case ratingSum = "rating_sum"
+            case distanceKm = "distance_km"
         }
 
         init(from decoder: Decoder) throws {
@@ -162,12 +169,19 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             currencyCode = try container.decode(String.self, forKey: .currencyCode)
             reviewCount = try container.decode(Int.self, forKey: .reviewCount)
             ratingSum = try container.decode(Int.self, forKey: .ratingSum)
+            distanceKm = try container.decodeIfPresent(Double.self, forKey: .distanceKm)
         }
     }
 
-    func featuredCreators(specialty: Specialty?, limit: Int) async throws -> [FeaturedCreator] {
+    func featuredCreators(specialty: Specialty?, near: GeoPoint?, limit: Int) async throws -> [FeaturedCreator] {
+        // The place is rounded to about a kilometre before it leaves the phone, and the database doesn't keep it.
+        let place = near.flatMap { $0.isValid ? $0.rounded() : nil }
+        let params = FeaturedParams(
+            pSpecialty: specialty?.rawValue, pLimit: FeaturedRules.clamped(limit: limit),
+            pLat: place?.latitude, pLon: place?.longitude
+        )
         let rows: [FeaturedRow] = try await client
-            .rpc("featured_creators", params: FeaturedParams(pSpecialty: specialty?.rawValue, pLimit: FeaturedRules.clamped(limit: limit)))
+            .rpc("featured_creators", params: params)
             .execute()
             .value
         return try rows.map(makeFeatured)
@@ -179,7 +193,8 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             coverURL: try row.coverPath.map { try publicURL(bucket: "portfolio", path: $0) },
             startingPriceCents: row.startingPriceCents,
             currencyCode: row.currencyCode,
-            reviews: ReviewSummary(count: row.reviewCount, ratingSum: row.ratingSum)
+            reviews: ReviewSummary(count: row.reviewCount, ratingSum: row.ratingSum),
+            distanceKm: row.distanceKm
         )
     }
 

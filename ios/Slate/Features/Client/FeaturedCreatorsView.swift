@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// The explore grid under the search box on a client's Home: creators a client could book, best first (see
-/// `FeaturedRules`), with a row of specialties to narrow it. Tapping a tile opens that creator's page.
+/// `FeaturedRules`), with a row of specialties to narrow it. With a place (a city they chose, or the one their phone
+/// found), creators who work there come first and each tile says how far away it is. Tapping a tile opens that
+/// creator's page.
 struct FeaturedCreatorsSection: View {
     private enum Phase: Equatable {
         case loading, loaded, failed(String)
@@ -10,6 +12,7 @@ struct FeaturedCreatorsSection: View {
     private struct LoadKey: Equatable {
         var specialty: Specialty?
         var reload: Int
+        var place: GeoPoint?
     }
 
     @Environment(AppModel.self) private var model
@@ -18,17 +21,112 @@ struct FeaturedCreatorsSection: View {
     /// Changes when Home is pulled to refresh, so the grid reloads with everything else.
     var reload = 0
 
+    @AppStorage("slate.featured.locationPromptDismissed") private var promptDismissed = false
     @State private var specialty: Specialty?
     @State private var creators: [FeaturedCreator] = []
     @State private var phase = Phase.loading
+    @State private var finder = DeviceLocationFinder()
+    @State private var findingPlace = false
+    @State private var showCityPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            SectionHeader("Featured creators")
+            SectionHeader(title: "Featured creators") { placeMenu }
+            if model.clientPlace == nil && !promptDismissed {
+                locationPrompt
+            }
             filters
             content
         }
-        .task(id: LoadKey(specialty: specialty, reload: reload)) { await load() }
+        .task(id: LoadKey(specialty: specialty, reload: reload, place: model.clientPlace?.point)) { await load() }
+        .sheet(isPresented: $showCityPicker) {
+            LocationPickerSheet { place in
+                model.setClientPlace(ClientPlace(name: place.name, point: GeoPoint(latitude: place.latitude, longitude: place.longitude)))
+            }
+        }
+    }
+
+    // MARK: Where
+
+    /// The place creators are measured from, and the way to change it.
+    private var placeMenu: some View {
+        Menu {
+            Button {
+                useMyLocation()
+            } label: {
+                Label("Use my current location", systemImage: "location")
+            }
+            Button {
+                showCityPicker = true
+            } label: {
+                Label("Choose a city", systemImage: "magnifyingglass")
+            }
+            if model.clientPlace != nil {
+                Button(role: .destructive) {
+                    model.setClientPlace(nil)
+                } label: {
+                    Label("Don't use a place", systemImage: "xmark")
+                }
+            }
+        } label: {
+            HStack(spacing: Space.xs) {
+                Image(systemName: "mappin.and.ellipse")
+                    .accessibilityHidden(true)
+                Text(model.clientPlace?.name ?? "Near me")
+                    .lineLimit(1)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.slateAccentText)
+            .frame(minHeight: Metrics.minTapTarget)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel(model.clientPlace.map { "Creators near \($0.name)" } ?? "Choose where to look for creators")
+        .accessibilityHint("Opens a menu to use your location or choose a city")
+    }
+
+    /// Shown until a place is chosen, and until it is waved away.
+    private var locationPrompt: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            Text("See creators near you")
+                .font(.headline)
+            Text("Creators who work in your area come first. Slate keeps only your city, on this phone.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            AdaptiveStack(alignment: .center, spacing: Space.s) {
+                Button {
+                    useMyLocation()
+                } label: {
+                    if findingPlace {
+                        ProgressView()
+                    } else {
+                        Text("Use my location")
+                    }
+                }
+                .buttonStyle(.slatePrimary)
+                .disabled(findingPlace)
+                Button("Choose a city") { showCityPicker = true }
+                    .buttonStyle(.slateOutline)
+            }
+            Button("Not now") { promptDismissed = true }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(minHeight: Metrics.minTapTarget)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(.outlined)
+    }
+
+    private func useMyLocation() {
+        guard !findingPlace else { return }
+        findingPlace = true
+        Task {
+            defer { findingPlace = false }
+            do {
+                model.setClientPlace(try await finder.currentPlace())
+            } catch {
+                model.show(error, title: "Couldn't find where you are")
+            }
+        }
     }
 
     // MARK: Filters
@@ -192,6 +290,12 @@ private struct FeaturedTile: View {
         }
     }
 
+    /// "4 mi away" with a place chosen, otherwise the creator's city.
+    private var whereLine: String? {
+        if let distance = creator.distanceText { return "\(distance) away" }
+        return creator.profile.location?.name
+    }
+
     // MARK: Words over the picture
 
     private var caption: some View {
@@ -211,6 +315,12 @@ private struct FeaturedTile: View {
             }
             .font(.caption.weight(.medium))
             .lineLimit(1)
+            if let line = whereLine {
+                Text(line)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)

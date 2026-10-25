@@ -19,11 +19,30 @@ extension AppModel {
         return found.filter { canBook(creatorID: $0.id) }
     }
 
-    /// Creators to explore on Home, best first, optionally only those who shoot one thing. Never the person's own
-    /// account or a company they work for.
+    /// Creators to explore on Home, best first, optionally only those who shoot one thing. With a place, creators who
+    /// work there come first. Never the person's own account or a company they work for.
     func featuredCreators(specialty: Specialty?) async throws -> [FeaturedCreator] {
-        let found = try await backend.featuredCreators(specialty: specialty, limit: FeaturedRules.defaultLimit)
+        let found = try await backend.featuredCreators(specialty: specialty, near: clientPlace?.point, limit: FeaturedRules.defaultLimit)
         return found.filter { canBook(creatorID: $0.id) }
+    }
+
+    /// Chooses where to look for creators, or (nil) stops using a place. Saved on this device for this person.
+    func setClientPlace(_ place: ClientPlace?) {
+        clientPlace = place
+        guard let id = session?.userID else { return }
+        let key = AppConfig.clientPlaceKey(for: id)
+        if let place, let data = try? JSONEncoder().encode(place) {
+            UserDefaults.standard.set(data, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    /// The place this person chose last time on this device, if it is still a real one.
+    func savedClientPlace(for userID: UUID) -> ClientPlace? {
+        guard let data = UserDefaults.standard.data(forKey: AppConfig.clientPlaceKey(for: userID)),
+              let place = try? JSONDecoder().decode(ClientPlace.self, from: data), place.point.isValid else { return nil }
+        return place
     }
 
     /// Signed contracts, newest shoot first.

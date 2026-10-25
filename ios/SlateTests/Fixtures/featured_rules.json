@@ -2,78 +2,484 @@
   "defaultLimit": 12,
   "maxLimit": 24,
   "rowColumns": [
-    "id", "handle", "display_name", "bio", "specialties", "location_name", "latitude", "longitude", "travel_radius_km",
-    "avatar_path", "created_at", "updated_at", "kind", "cover_path", "starting_price_cents", "currency_code",
-    "review_count", "rating_sum"
+    "id",
+    "handle",
+    "display_name",
+    "bio",
+    "specialties",
+    "location_name",
+    "latitude",
+    "longitude",
+    "travel_radius_km",
+    "avatar_path",
+    "created_at",
+    "updated_at",
+    "kind",
+    "cover_path",
+    "starting_price_cents",
+    "currency_code",
+    "review_count",
+    "rating_sum",
+    "distance_km"
   ],
   "limits": [
-    { "asked": -4, "clamped": 1 },
-    { "asked": 0, "clamped": 1 },
-    { "asked": 1, "clamped": 1 },
-    { "asked": 12, "clamped": 12 },
-    { "asked": 24, "clamped": 24 },
-    { "asked": 500, "clamped": 24 }
+    {
+      "asked": -4,
+      "clamped": 1
+    },
+    {
+      "asked": 0,
+      "clamped": 1
+    },
+    {
+      "asked": 1,
+      "clamped": 1
+    },
+    {
+      "asked": 12,
+      "clamped": 12
+    },
+    {
+      "asked": 24,
+      "clamped": 24
+    },
+    {
+      "asked": 500,
+      "clamped": 24
+    }
   ],
   "creators": [
     {
-      "id": "00000000-0000-0000-0000-00000000000a", "handle": "ivy-ten-fives", "portfolio": 3,
-      "ratings": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], "created": "2026-03-01",
-      "specialties": ["weddings", "portraits"], "packages": [{ "cents": 250000, "published": true }, { "cents": 90000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000a",
+      "handle": "ivy-ten-fives",
+      "portfolio": 3,
+      "ratings": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "created": "2026-03-01",
+      "specialties": [
+        "weddings",
+        "portraits"
+      ],
+      "packages": [
+        {
+          "cents": 250000,
+          "published": true
+        },
+        {
+          "cents": 90000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Austin, TX",
+        "lat": 30.27,
+        "lon": -97.74,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-00000000000b", "handle": "one-five-star", "portfolio": 2,
-      "ratings": [5], "created": "2026-03-02",
-      "specialties": ["weddings"], "packages": [{ "cents": 120000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000b",
+      "handle": "one-five-star",
+      "portfolio": 2,
+      "ratings": [
+        5
+      ],
+      "created": "2026-03-02",
+      "specialties": [
+        "weddings"
+      ],
+      "packages": [
+        {
+          "cents": 120000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Round Rock, TX",
+        "lat": 30.51,
+        "lon": -97.68,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-00000000000c", "handle": "new-with-work", "portfolio": 4,
-      "ratings": [], "created": "2026-03-03",
-      "specialties": ["food"], "packages": [{ "cents": 80000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000c",
+      "handle": "new-with-work",
+      "portfolio": 4,
+      "ratings": [],
+      "created": "2026-03-03",
+      "specialties": [
+        "food"
+      ],
+      "packages": [
+        {
+          "cents": 80000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Dallas, TX",
+        "lat": 32.78,
+        "lon": -96.8,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-00000000000d", "handle": "ten-fours", "portfolio": 1,
-      "ratings": [4, 4, 4, 4, 4, 4, 4, 4, 4, 4], "created": "2026-03-04",
-      "specialties": ["food", "weddings"], "packages": [{ "cents": 60000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000d",
+      "handle": "ten-fours",
+      "portfolio": 1,
+      "ratings": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "created": "2026-03-04",
+      "specialties": [
+        "food",
+        "weddings"
+      ],
+      "packages": [
+        {
+          "cents": 60000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "San Antonio, TX",
+        "lat": 29.42,
+        "lon": -98.49,
+        "radiusKm": 160
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-00000000000e", "handle": "stars-no-work", "portfolio": 0,
-      "ratings": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], "created": "2026-03-05",
-      "specialties": ["weddings"], "packages": [{ "cents": 100000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000e",
+      "handle": "stars-no-work",
+      "portfolio": 0,
+      "ratings": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "created": "2026-03-05",
+      "specialties": [
+        "weddings"
+      ],
+      "packages": [
+        {
+          "cents": 100000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Austin, TX",
+        "lat": 30.27,
+        "lon": -97.74,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-00000000000f", "handle": "tie-first", "portfolio": 1,
-      "ratings": [], "created": "2026-03-06",
-      "specialties": ["portraits"], "packages": [{ "cents": 70000, "published": true }]
+      "id": "00000000-0000-0000-0000-00000000000f",
+      "handle": "tie-first",
+      "portfolio": 1,
+      "ratings": [],
+      "created": "2026-03-06",
+      "specialties": [
+        "portraits"
+      ],
+      "packages": [
+        {
+          "cents": 70000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Austin, TX",
+        "lat": 30.27,
+        "lon": -97.74,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-000000000010", "handle": "tie-second", "portfolio": 1,
-      "ratings": [], "created": "2026-03-06",
-      "specialties": ["food"], "packages": [{ "cents": 70000, "published": true }]
+      "id": "00000000-0000-0000-0000-000000000010",
+      "handle": "tie-second",
+      "portfolio": 1,
+      "ratings": [],
+      "created": "2026-03-06",
+      "specialties": [
+        "food"
+      ],
+      "packages": [
+        {
+          "cents": 70000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Houston, TX",
+        "lat": 29.76,
+        "lon": -95.37,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-000000000011", "handle": "tie-but-newer", "portfolio": 1,
-      "ratings": [], "created": "2026-03-09",
-      "specialties": ["weddings"], "packages": [{ "cents": 70000, "published": true }]
+      "id": "00000000-0000-0000-0000-000000000011",
+      "handle": "tie-but-newer",
+      "portfolio": 1,
+      "ratings": [],
+      "created": "2026-03-09",
+      "specialties": [
+        "weddings"
+      ],
+      "packages": [
+        {
+          "cents": 70000,
+          "published": true
+        }
+      ],
+      "place": null
     },
     {
-      "id": "00000000-0000-0000-0000-000000000012", "handle": "weak-reviews", "portfolio": 5,
-      "ratings": [2, 2, 3], "created": "2026-03-07",
-      "specialties": ["food"], "packages": [{ "cents": 50000, "published": true }]
+      "id": "00000000-0000-0000-0000-000000000012",
+      "handle": "weak-reviews",
+      "portfolio": 5,
+      "ratings": [
+        2,
+        2,
+        3
+      ],
+      "created": "2026-03-07",
+      "specialties": [
+        "food"
+      ],
+      "packages": [
+        {
+          "cents": 50000,
+          "published": true
+        }
+      ],
+      "place": {
+        "name": "Austin, TX",
+        "lat": 30.27,
+        "lon": -97.74,
+        "radiusKm": 40
+      }
     },
     {
-      "id": "00000000-0000-0000-0000-000000000013", "handle": "most-work", "portfolio": 6,
-      "ratings": [], "created": "2026-02-01",
-      "specialties": ["portraits"], "packages": [{ "cents": 200000, "published": false }, { "cents": 140000, "published": true }]
+      "id": "00000000-0000-0000-0000-000000000013",
+      "handle": "most-work",
+      "portfolio": 6,
+      "ratings": [],
+      "created": "2026-02-01",
+      "specialties": [
+        "portraits"
+      ],
+      "packages": [
+        {
+          "cents": 200000,
+          "published": false
+        },
+        {
+          "cents": 140000,
+          "published": true
+        }
+      ],
+      "place": null
     }
   ],
   "order": [
-    "ivy-ten-fives", "one-five-star", "ten-fours", "most-work", "new-with-work",
-    "tie-but-newer", "tie-first", "tie-second", "weak-reviews", "stars-no-work"
+    "ivy-ten-fives",
+    "one-five-star",
+    "ten-fours",
+    "most-work",
+    "new-with-work",
+    "tie-but-newer",
+    "tie-first",
+    "tie-second",
+    "weak-reviews",
+    "stars-no-work"
   ],
   "bySpecialty": {
-    "weddings": ["ivy-ten-fives", "one-five-star", "ten-fours", "tie-but-newer", "stars-no-work"],
-    "food": ["ten-fours", "new-with-work", "tie-second", "weak-reviews"],
-    "portraits": ["ivy-ten-fives", "most-work", "tie-first"],
+    "weddings": [
+      "ivy-ten-fives",
+      "one-five-star",
+      "ten-fours",
+      "tie-but-newer",
+      "stars-no-work"
+    ],
+    "food": [
+      "ten-fours",
+      "new-with-work",
+      "tie-second",
+      "weak-reviews"
+    ],
+    "portraits": [
+      "ivy-ten-fives",
+      "most-work",
+      "tie-first"
+    ],
     "aerial": []
-  }
+  },
+  "defaultTravelRadiusKm": 40,
+  "clients": [
+    {
+      "name": "austin",
+      "lat": 30.27,
+      "lon": -97.74,
+      "order": [
+        "ivy-ten-fives",
+        "one-five-star",
+        "ten-fours",
+        "tie-first",
+        "weak-reviews",
+        "stars-no-work",
+        "most-work",
+        "new-with-work",
+        "tie-second",
+        "tie-but-newer"
+      ],
+      "km": {
+        "ivy-ten-fives": 0.0,
+        "one-five-star": 27.3,
+        "new-with-work": 293.0,
+        "ten-fours": 119.0,
+        "stars-no-work": 0.0,
+        "tie-first": 0.0,
+        "tie-second": 235.1,
+        "weak-reviews": 0.0
+      }
+    },
+    {
+      "name": "dallas",
+      "lat": 32.78,
+      "lon": -96.8,
+      "order": [
+        "new-with-work",
+        "ivy-ten-fives",
+        "one-five-star",
+        "ten-fours",
+        "most-work",
+        "tie-first",
+        "tie-second",
+        "tie-but-newer",
+        "weak-reviews",
+        "stars-no-work"
+      ],
+      "km": {
+        "ivy-ten-fives": 293.0,
+        "one-five-star": 265.8,
+        "new-with-work": 0.0,
+        "ten-fours": 406.8,
+        "stars-no-work": 293.0,
+        "tie-first": 293.0,
+        "tie-second": 362.3,
+        "weak-reviews": 293.0
+      }
+    },
+    {
+      "name": "seattle",
+      "lat": 47.61,
+      "lon": -122.33,
+      "order": [
+        "ivy-ten-fives",
+        "one-five-star",
+        "ten-fours",
+        "most-work",
+        "new-with-work",
+        "tie-first",
+        "tie-second",
+        "tie-but-newer",
+        "weak-reviews",
+        "stars-no-work"
+      ],
+      "km": {
+        "ivy-ten-fives": 2847.8,
+        "one-five-star": 2831.3,
+        "new-with-work": 2702.9,
+        "ten-fours": 2874.6,
+        "stars-no-work": 2847.8,
+        "tie-first": 2847.8,
+        "tie-second": 3040.6,
+        "weak-reviews": 2847.8
+      }
+    }
+  ],
+  "distances": [
+    {
+      "from": {
+        "lat": 30.27,
+        "lon": -97.74
+      },
+      "to": {
+        "lat": 32.78,
+        "lon": -96.8
+      },
+      "km": 293.0
+    },
+    {
+      "from": {
+        "lat": 30.27,
+        "lon": -97.74
+      },
+      "to": {
+        "lat": 47.61,
+        "lon": -122.33
+      },
+      "km": 2847.8
+    },
+    {
+      "from": {
+        "lat": 32.78,
+        "lon": -96.8
+      },
+      "to": {
+        "lat": 47.61,
+        "lon": -122.33
+      },
+      "km": 2702.9
+    },
+    {
+      "from": {
+        "lat": 30.27,
+        "lon": -97.74
+      },
+      "to": {
+        "lat": 30.27,
+        "lon": -97.74
+      },
+      "km": 0.0
+    }
+  ]
 }

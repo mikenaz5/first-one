@@ -107,6 +107,8 @@ final class AppModel {
     var presentedPage: PublicCreatorPage?
     /// A booking link opened before the person was signed in. Welcome says so, and the page opens after sign-in.
     var pendingBookingHandle: String?
+    /// Where a client is looking for creators (a city). Saved on this device, per person, and nowhere else.
+    var clientPlace: ClientPlace?
     let calendar = CalendarService()
 
     init(
@@ -261,7 +263,10 @@ final class AppModel {
             show(error, title: "Couldn't delete your account")
             return
         }
-        if let deleted { UserDefaults.standard.removeObject(forKey: AppConfig.clientAccountKey(for: deleted)) }
+        if let deleted {
+            UserDefaults.standard.removeObject(forKey: AppConfig.clientAccountKey(for: deleted))
+            UserDefaults.standard.removeObject(forKey: AppConfig.clientPlaceKey(for: deleted))
+        }
         await clearAccount()
     }
 
@@ -294,6 +299,7 @@ final class AppModel {
         paymentAccount = nil
         presentedPage = nil
         pendingBookingHandle = nil
+        clientPlace = nil
         await resetNotifications()
         CalendarPreferences.clear()
         calendarPrefs = CalendarPreferences()
@@ -311,6 +317,7 @@ final class AppModel {
                 ?? AccountList(hasPersonalProfile: personalProfile != nil, companies: [])
             teamConfig = (try? await backend.loadTeamConfig()) ?? .standard
             activeAccount = restoredActiveAccount(for: session.userID)
+            clientPlace = savedClientPlace(for: session.userID)
             try await loadOwnerData()
             loadErrorMessage = nil
             updatePhase()
