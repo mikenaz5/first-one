@@ -86,11 +86,18 @@ fi
 # Pick the simulator: the one asked for, or the newest regular iPhone that is installed.
 uuid_pattern='[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}'
 pick_udid() {
+  local list found
   if [[ -n "$device" ]]; then
     xcrun simctl list devices available | grep -F "$device (" | grep -oE "$uuid_pattern" | tail -1 || true
-  else
-    xcrun simctl list devices available | grep -E '^ +iPhone ' | grep -v ' SE ' | grep -oE "$uuid_pattern" | tail -1 || true
+    return
   fi
+  # Prefer the newest regular "iPhone N Pro", then a plain "iPhone N", then any iPhone that isn't a special shape.
+  list=$(xcrun simctl list devices available | grep -E '^ +iPhone ' || true)
+  found=$(printf '%s\n' "$list" | grep -E '^ +iPhone [0-9]+ Pro \(' | grep -oE "$uuid_pattern" | tail -1 || true)
+  [[ -n "$found" ]] || found=$(printf '%s\n' "$list" | grep -E '^ +iPhone [0-9]+ \(' | grep -oE "$uuid_pattern" | tail -1 || true)
+  [[ -n "$found" ]] || found=$(printf '%s\n' "$list" | grep -Ev ' (SE|Duo|Fold|Air)' | grep -oE "$uuid_pattern" | tail -1 || true)
+  [[ -n "$found" ]] || found=$(printf '%s\n' "$list" | grep -oE "$uuid_pattern" | tail -1 || true)
+  printf '%s\n' "$found"
 }
 
 udid=$(pick_udid)
@@ -121,28 +128,27 @@ fi
 say "Starting the simulator"
 xcrun simctl boot "$udid" 2>/dev/null || true   # already running is fine
 if [[ $headless -eq 0 ]]; then
-  # The Simulator app lives inside Xcode, and macOS doesn't always know where. Try the likely places.
+  # The window that shows the phone is the Simulator app, or "Device Hub" in the newest Xcode. It lives inside Xcode,
+  # and macOS doesn't always know where, so try the likely places.
   opened=0
-  sim_app="$(xcode-select -p)/Applications/Simulator.app"
-  if [[ ! -d "$sim_app" ]]; then
-    sim_app=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.iphonesimulator'" 2>/dev/null | head -1 || true)
+  window_app=""
+  for candidate in "$(xcode-select -p)/Applications/Simulator.app" "$(xcode-select -p)/Applications/Device Hub.app"; do
+    if [[ -d "$candidate" ]]; then window_app="$candidate"; break; fi
+  done
+  if [[ -z "$window_app" ]]; then
+    window_app=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.iphonesimulator'" 2>/dev/null | head -1 || true)
   fi
-  if [[ -z "$sim_app" || ! -d "$sim_app" ]]; then
-    sim_app=$(find /Applications "$HOME/Applications" -maxdepth 6 -name Simulator.app -type d 2>/dev/null | head -1 || true)
+  if [[ -z "$window_app" ]]; then
+    window_app=$(mdfind -name "Device Hub.app" 2>/dev/null | head -1 || true)
   fi
-  if [[ -n "$sim_app" && -d "$sim_app" ]]; then
-    open "$sim_app" --args -CurrentDeviceUDID "$udid" && opened=1 || true
+  if [[ -n "$window_app" && -d "$window_app" ]]; then
+    open "$window_app" --args -CurrentDeviceUDID "$udid" && opened=1 || true
   fi
   if [[ $opened -eq 0 ]]; then
-    open -b com.apple.iphonesimulator --args -CurrentDeviceUDID "$udid" 2>/dev/null && opened=1 || true
+    open -a "Device Hub" 2>/dev/null && opened=1 || open -a Simulator 2>/dev/null && opened=1 || true
   fi
   if [[ $opened -eq 0 ]]; then
-    say "Couldn't open the Simulator window by itself. Press Command and Space, type Simulator, and press Return. If that finds nothing, in Xcode choose Xcode > Open Developer Tool > Simulator."
-    {
-      echo "Xcode folder: $(xcode-select -p)"
-      echo "Inside it, Applications holds:"
-      ls "$(xcode-select -p)/Applications" 2>&1 | head -10
-    } >&2
+    say "Couldn't open the phone window by itself. Press Command and Space, type Simulator (or Device Hub), and press Return. Or in Xcode choose Xcode > Open Developer Tool."
   fi
 fi
 xcrun simctl bootstatus "$udid" -b >/dev/null
