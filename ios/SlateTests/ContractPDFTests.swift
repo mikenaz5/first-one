@@ -107,7 +107,7 @@ final class ContractPDFTests: XCTestCase {
         let info = pdf.documentAttributes ?? [:]
         XCTAssertEqual(info[PDFDocumentAttribute.titleAttribute] as? String, contract.title)
         XCTAssertEqual(info[PDFDocumentAttribute.authorAttribute] as? String, "Maya Chen Photography")
-        XCTAssertEqual(info[PDFDocumentAttribute.creatorAttribute] as? String, "Slate")
+        XCTAssertEqual(info[PDFDocumentAttribute.creatorAttribute] as? String, AppConfig.productName)
     }
 }
 
