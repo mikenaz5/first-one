@@ -57,6 +57,7 @@ jobs:
       - run: python ios/supabase/tests/team_rules.py
       - run: python ios/supabase/tests/company_rules.py
       - run: python ios/supabase/tests/billing_rules.py
+      - run: python ios/supabase/tests/search_rules.py
       # The Swift decoders are tested against this file; it must keep the shape of what the functions return.
       - run: python ios/supabase/tests/dump_team_rows.py --check
 
