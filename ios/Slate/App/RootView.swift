@@ -87,7 +87,7 @@ private struct LaunchView: View {
             Image(systemName: "camera.aperture")
                 .heroSymbol(56, weight: .light)
                 .foregroundStyle(Color.accentColor)
-                .accessibilityLabel("Slate")
+                .accessibilityLabel(AppConfig.productName)
         }
     }
 }

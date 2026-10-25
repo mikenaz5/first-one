@@ -229,7 +229,7 @@ struct CompanySettingsView: View {
             } header: {
                 Text("Payments")
             } footer: {
-                Text("Clients pay the company's own Stripe account. With splitting on, you set each person's share and Slate keeps a ledger of what each is owed; the company pays them out itself.")
+                Text("Clients pay the company's own Stripe account. With splitting on, you set each person's share and Slate Pro keeps a ledger of what each is owed; the company pays them out itself.")
             }
                 .listRowBackground(Color.slateCard)
         }
@@ -373,7 +373,7 @@ struct SignerPickerView: View {
             } header: {
                 Text("Who signs")
             } footer: {
-                Text("They need a signature saved in Slate. Each person adds their own, under Services ▸ Contracts.")
+                Text("They need a signature saved in Slate Pro. Each person adds their own, under Services ▸ Contracts.")
             }
                 .listRowBackground(Color.slateCard)
 

@@ -33,7 +33,7 @@ struct SettingsView: View {
             } header: {
                 Text("Look")
             } footer: {
-                Text("Slate is dark by default. Choose Light, or follow your iPhone's setting.")
+                Text("Slate Pro is dark by default. Choose Light, or follow your iPhone's setting.")
             }
                 .listRowBackground(Color.slateCard)
 
@@ -76,7 +76,7 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showUpgrade) { UpgradeSheet() }
         .sheet(isPresented: $showNewCompany) { NewCompanySheet() }
-        .confirmationDialog("Sign out of Slate?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+        .confirmationDialog("Sign out of Slate Pro?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { Task { await model.signOut() } }
         }
         .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {

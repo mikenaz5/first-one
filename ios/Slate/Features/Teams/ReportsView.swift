@@ -80,7 +80,7 @@ struct ReportsView: View {
                 Text("By person")
             } footer: {
                 if splits {
-                    Text("Owed is each person's share of the finished work they did, as it was set when the booking was given to them. Slate keeps the ledger; the company pays people itself.")
+                    Text("Owed is each person's share of the finished work they did, as it was set when the booking was given to them. Slate Pro keeps the ledger; the company pays people itself.")
                 }
             }
                 .listRowBackground(Color.slateCard)

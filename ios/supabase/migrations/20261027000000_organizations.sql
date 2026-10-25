@@ -476,7 +476,7 @@ as $$
   select coalesce((select display_name from public.creator_profiles where id = p_user and kind = 'person'), '');
 $$;
 
--- Internal. The actor is whoever is signed in; a webhook or a job has none and is logged as Slate.
+-- Internal. The actor is whoever is signed in; a webhook or a job has none and is logged as Slate Pro.
 create or replace function public.activity_add(
   p_org         uuid,
   p_action      text,
@@ -494,7 +494,7 @@ as $$
   values (
     p_org,
     auth.uid(),
-    case when auth.uid() is null then 'Slate' else coalesce(nullif(public.person_name(auth.uid()), ''), 'Someone') end,
+    case when auth.uid() is null then 'Slate Pro' else coalesce(nullif(public.person_name(auth.uid()), ''), 'Someone') end,
     p_action, coalesce(p_entity_type, ''), p_entity_id, left(p_summary, 300), coalesce(p_metadata, '{}'::jsonb)
   );
 $$;

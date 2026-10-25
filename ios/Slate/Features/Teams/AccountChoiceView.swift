@@ -97,7 +97,7 @@ struct AccountChoiceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
                 VStack(alignment: .leading, spacing: Space.s) {
-                    Text("How will you use Slate?")
+                    Text("How will you use Slate Pro?")
                         .font(SlateFont.display)
                         .accessibilityAddTraits(.isHeader)
                     Text("You can start on your own and move to a company account later. Your profile, services, bookings and contracts come with you.")

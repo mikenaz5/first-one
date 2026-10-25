@@ -403,7 +403,7 @@ struct PaymentSetupSheet: View {
                             .frame(minHeight: Metrics.minTapTarget)
                             .disabled(isWorking)
                     } footer: {
-                        Text("Stripe collects your identity and bank details on its own pages. Slate never sees them. Stripe charges its normal processing fee on each payment; Slate adds no fee.")
+                        Text("Stripe collects your identity and bank details on its own pages. Slate Pro never sees them. Stripe charges its normal processing fee on each payment; Slate Pro adds no fee.")
                     }
                         .listRowBackground(Color.slateCard)
                 }

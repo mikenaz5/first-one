@@ -1,6 +1,6 @@
 # Product Spec: Booking with Built-in Contracts for Creators
 
-**Status:** Draft v0.4 · 2026-10-25 · Working title: *Slate* (placeholder)
+**Status:** Draft v0.4 · 2026-10-25 · Product name: *Slate Pro*
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
 **Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
@@ -32,9 +32,9 @@ Decisions made with the product owner:
 | D6 | **Company seats are billed with Stripe Billing, per seat.** The company plan is bought and managed on the web in a system sheet. No In-App Purchase. Individual accounts stay free. | App Review risk R9. Billing state lives on the organization (section 7). |
 | D7 | **The 10-seat minimum is a billing floor,** not a member count. A company can have fewer than 10 members and is billed for at least 10 seats. The maximum is 250. Both numbers are config values (section 4.4). | Changing them is a config change, not a code change. |
 | D8 | **On upgrade, services move to the company, signed work stays with the person.** Services, packages and contract templates become company-owned. The person's availability stays on their own calendar, which becomes their member calendar. Executed contracts and their bookings stay with the person as the contracting party, because they are immutable and the client agreed to that person. | Section 8.7. |
-| D9 | **Company payments go to the company's own Stripe Connect account.** Optional member payouts are a **split ledger** (a per-member share recorded on each booking for reports and payroll). Slate makes no automatic transfers to members. | Section 4.3. Stripe transfers to members are Later. |
+| D9 | **Company payments go to the company's own Stripe Connect account.** Optional member payouts are a **split ledger** (a per-member share recorded on each booking for reports and payroll). Slate Pro makes no automatic transfers to members. | Section 4.3. Stripe transfers to members are Later. |
 | D10 | **Company defaults:** bookings are auto-assigned unless an Admin switches the company to manual assignment. Invites are single-use links shared through the system share sheet (no server-sent email yet). Contracts are countersigned automatically by a **designated signer**. | Sections 6, 8.8, 8.9. |
-| D11 | **Slate hosts the delivery files.** A creator delivers photos and videos inside the app, and the client views and saves them there. Delivery by an external link stays as a fallback, for very large files or a creator who prefers their own host. | Section 5.5 and flow 8.12. Slate becomes a host of people's files, so terms of use, reporting and takedown are launch requirements (R16). |
+| D11 | **Slate Pro hosts the delivery files.** A creator delivers photos and videos inside the app, and the client views and saves them there. Delivery by an external link stays as a fallback, for very large files or a creator who prefers their own host. | Section 5.5 and flow 8.12. Slate Pro becomes a host of people's files, so terms of use, reporting and takedown are launch requirements (R16). |
 | D12 | **Storage comes with the plan, and delivered files expire 30 days after delivery.** An Individual account has a storage allowance. A company's allowance grows with its billed seats. Files that are not saved in time are deleted. | Config values in 4.4. Expiry is final, and the app says so before and after delivery (R17). |
 | D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
 | D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
@@ -515,7 +515,7 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 ### 8.8 Invite a team member
 
 1. Settings, Team, **Invite** (needs `team.invite`). Pick a role (never Owner) and optionally type an email.
-2. Slate creates a single-use invite and opens the system share sheet with the link. If an email was typed, a pre-addressed Mail compose sheet is offered. The link is shown once. A lost link is replaced, not recovered: **Resend** revokes the old invite and makes a new one.
+2. Slate Pro creates a single-use invite and opens the system share sheet with the link. If an email was typed, a pre-addressed Mail compose sheet is offered. The link is shown once. A lost link is replaced, not recovered: **Resend** revokes the old invite and makes a new one.
 3. Pending invites are listed with swipe actions: **Revoke** and **Resend**. They expire after `invites.expiry_days`.
 4. The invitee opens the link. The app opens, they sign in with Apple (their own login), see "Join Acme Films as Creator", add a name and handle if they have no profile, and tap **Join**.
 5. An invite can't be created when the plan isn't active or the seat maximum would be exceeded, and the screen says which.
@@ -551,7 +551,7 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 1. Once the shoot has started, the booking shows **Add files**. The creator picks photos and videos from Photos or the Files app. In a company, a member does this on a booking they may manage (4.3).
 2. For each file the app first checks the caps and the allowance. A file that does not fit is refused before it uploads, with "4.2 of 25 GB used" and the choices: remove something, or deliver by link.
 3. The app makes a reduced, watermarked preview of each file, uploads it, then uploads the original. Uploads continue in the background, so the creator can close the app. A file that fails shows **Retry**. Files that are never delivered are removed after 7 days.
-4. When every file is ready, **Deliver** becomes available. Its confirmation says that {client} can see previews now, can save the originals once the balance is paid, and has until {date, 30 days on}; and that Slate is not an archive, so the creator should keep their own copies. Delivering starts the 30 days, makes the balance payable, and notifies the client.
+4. When every file is ready, **Deliver** becomes available. Its confirmation says that {client} can see previews now, can save the originals once the balance is paid, and has until {date, 30 days on}; and that Slate Pro is not an archive, so the creator should keep their own copies. Delivering starts the 30 days, makes the balance payable, and notifies the client.
 
 *The client*
 
@@ -724,10 +724,10 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R11 | **An upgrade leaves records split between a person and a company,** which can confuse accounting. | The upgrade summary says what moves and what stays. Records show whether they are Personal or the company's. The company's reports cover only the company. |
 | R12 | **A removed designated signer halts bookings.** | Removing or demoting the signer is warned about before it happens, and the company shows a banner until a new signer is chosen. |
 | R13 | **A company booking in manual mode can sit unassigned** while the client has paid. | Manual-mode capacity is limited (8.9) and unassigned bookings are on the Managers' needs-assignment list (Home and Bookings). *Not built:* a reminder before the shoot if it is still unassigned. |
-| R14 | **Seat counts disagree between Slate and Stripe.** | Seats billed are computed in one place from active members and the floor. Stripe's webhook is the record of what was charged, and the Owner's screen shows both. |
+| R14 | **Seat counts disagree between Slate Pro and Stripe.** | Seats billed are computed in one place from active members and the floor. Stripe's webhook is the record of what was charged, and the Owner's screen shows both. |
 | R15 | **Storage and bandwidth cost grow with use, and video dominates both.** | An allowance per plan, the 30-day expiry and per-file and per-delivery caps, all config values (4.4). Measure real cost in the pilot before fixing the allowances (Q25). Moving downloads to a store without download fees is an option if bandwidth dominates. |
-| R16 | **Hosting people's files makes Slate responsible for what is on them** (App Review guideline 1.2, copyright takedowns, duties to report illegal content). | Files are private to the two people on a booking. Terms of use, a Report action on every file, a support process to remove content and suspend accounts, and a legal check of reporting duties before launch. Reporting and blocking are a prerequisite. |
-| R17 | **Expiry deletes the only copy a client may have.** | The warning when delivering, the expiry date on every screen, reminders at 7 and 1 days, telling the creator which files were not saved, and saying plainly that Slate is not an archive. Creators keep their own originals. |
+| R16 | **Hosting people's files makes Slate Pro responsible for what is on them** (App Review guideline 1.2, copyright takedowns, duties to report illegal content). | Files are private to the two people on a booking. Terms of use, a Report action on every file, a support process to remove content and suspend accounts, and a legal check of reporting duties before launch. Reporting and blocking are a prerequisite. |
+| R17 | **Expiry deletes the only copy a client may have.** | The warning when delivering, the expiry date on every screen, reminders at 7 and 1 days, telling the creator which files were not saved, and saying plainly that Slate Pro is not an archive. Creators keep their own originals. |
 | R18 | **A preview cannot be made impossible to copy, and the server cannot check a preview's pixels** because it is made on the creator's phone. | Previews are small and watermarked, so a screenshot is not worth taking. The server caps a preview's size and refuses one that is too large. Originals live on a different path that the database releases only after payment. Server-made previews are Later. |
 | R19 | **Large uploads are unreliable on a phone** (signal, battery, the app closed, a full disk). | Resumable background uploads, per-file retry, a cellular prompt for large video, reservations that lapse after 24 hours. CI cannot exercise real uploads, so test on real devices in the pilot. |
 | R20 | **An unpaid balance keeps files in storage** until the 30 days end. | The same 30-day clock. The creator sees "balance unpaid" on the delivery and can follow up in Messages. After expiry they can deliver again. |
@@ -740,7 +740,7 @@ Defaults in brackets are what this spec assumes if you don't change them.
 
 | # | Question | Default |
 |---|---|---|
-| Q1 | **Product name?** | *Slate* (placeholder) |
+| Q1 | **Product name?** | *Slate Pro* (placeholder) |
 | Q2 | **Launch market, currency and legal framework?** | US, USD, ESIGN/UETA |
 | Q3 | **How does the platform make money?** Percentage fee per booking, creator subscription, or both. This affects App Review (R4). | Percentage fee per booking (rate TBD) |
 | Q4 | **Clients without the app:** lightweight web page, or an App Clip (more native, supports Apple Pay and Sign in with Apple, iPhone only)? And is iPhone-only acceptable for clients? | Web page for the MVP; evaluate an App Clip |
@@ -763,7 +763,7 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q22 | **How long is the grace period** after a failed seat payment? | 7 days (`billing.grace_days`) |
 | Q23 | **Should the company handle share a namespace with personal handles?** | Yes, one unique `handle` space |
 
-**Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D15: Slate hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both, and free revisions after payment. These remain open:
+**Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D15: Slate Pro hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both, and free revisions after payment. These remain open:
 
 | # | Question | Default |
 |---|---|---|

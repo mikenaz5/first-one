@@ -65,7 +65,7 @@ struct CalendarSyncSection: View {
         } footer: {
             VStack(alignment: .leading, spacing: Space.xs) {
                 if let note { Text(note).foregroundStyle(Color.slateWarning) }
-                Text("Only start and end times of your busy events are shared, never their titles, places or guests. Busy time is as fresh as the last time Slate synced, which happens when you open the app.")
+                Text("Only start and end times of your busy events are shared, never their titles, places or guests. Busy time is as fresh as the last time Slate Pro synced, which happens when you open the app.")
             }
         }
             .listRowBackground(Color.slateCard)

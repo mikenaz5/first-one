@@ -15,7 +15,7 @@ enum ContractPDF {
             kCGPDFContextTitle as String: contract.title,
             kCGPDFContextAuthor as String: creatorName,
             kCGPDFContextSubject as String: "Agreement between \(creatorName) and \(clientName)",
-            kCGPDFContextCreator as String: "Slate",
+            kCGPDFContextCreator as String: "Slate Pro",
         ]
         let renderer = UIGraphicsPDFRenderer(bounds: bounds, format: format)
 

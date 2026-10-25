@@ -150,7 +150,7 @@ struct NextBookingView: View {
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             Spacer(minLength: 0)
-            Text(entry.state == .signedOut ? "Sign in to Slate" : "No upcoming bookings")
+            Text(entry.state == .signedOut ? "Sign in to Slate Pro" : "No upcoming bookings")
                 .font(.subheadline.weight(.semibold))
             Text(entry.state == .signedOut ? "Open the app to see your next shoot." : "New bookings appear here.")
                 .font(.caption)
@@ -174,7 +174,7 @@ struct NextBookingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .widgetURL(Self.link(to: next))
             } else {
-                Text(entry.state == .signedOut ? "Sign in to Slate" : "No upcoming bookings")
+                Text(entry.state == .signedOut ? "Sign in to Slate Pro" : "No upcoming bookings")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

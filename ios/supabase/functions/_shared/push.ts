@@ -257,7 +257,7 @@ export function compose(row: Pick<QueuedPush, "kind" | "booking_id" | "data">, n
       if (d.revised === true) {
         return notice("Link to your files updated", `${creator} replaced the link to the final files for ${pkg}.`);
       }
-      return notice("Your files are ready", `${creator} shared the final files for ${pkg}. Open Slate to confirm you have them.`);
+      return notice("Your files are ready", `${creator} shared the final files for ${pkg}. Open Slate Pro to confirm you have them.`);
     }
     case "receipt_confirmed": {
       const client = tidy(d.clientName, 60, "Your client");

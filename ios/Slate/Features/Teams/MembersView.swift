@@ -424,7 +424,7 @@ struct InviteLinkView: View {
 
     private var message: String {
         let inviter = model.personalProfile?.displayName ?? "Someone"
-        return "\(inviter) invited you to join \(companyName) on Slate as \(created.invite.role.title). Open this link on your iPhone: "
+        return "\(inviter) invited you to join \(companyName) on Slate Pro as \(created.invite.role.title). Open this link on your iPhone: "
     }
 
     var body: some View {
@@ -449,7 +449,7 @@ struct InviteLinkView: View {
 
                         ShareLink(
                             item: link,
-                            subject: Text("Join \(companyName) on Slate"),
+                            subject: Text("Join \(companyName) on Slate Pro"),
                             message: Text(message)
                         ) {
                             Label("Share link", systemImage: "square.and.arrow.up")
@@ -532,7 +532,7 @@ struct InviteLinkView: View {
         components.scheme = "mailto"
         components.path = created.invite.email ?? ""
         components.queryItems = [
-            URLQueryItem(name: "subject", value: "Join \(companyName) on Slate"),
+            URLQueryItem(name: "subject", value: "Join \(companyName) on Slate Pro"),
             URLQueryItem(name: "body", value: message + link.absoluteString),
         ]
         return components.url
@@ -644,7 +644,7 @@ struct MemberDetailSheet: View {
                     } header: {
                         Text("Payout share")
                     } footer: {
-                        Text("Their share of each booking assigned to them. The company is paid first; Slate records the split and doesn't move the money.")
+                        Text("Their share of each booking assigned to them. The company is paid first; Slate Pro records the split and doesn't move the money.")
                     }
                         .listRowBackground(Color.slateCard)
                 }
@@ -665,7 +665,7 @@ struct MemberDetailSheet: View {
                     } header: {
                         Text("Contracts")
                     } footer: {
-                        Text("The signer countersigns every contract the company makes. They need a signature saved in Slate first.")
+                        Text("The signer countersigns every contract the company makes. They need a signature saved in Slate Pro first.")
                     }
                         .listRowBackground(Color.slateCard)
                 }

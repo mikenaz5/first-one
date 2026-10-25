@@ -39,13 +39,17 @@ struct WelcomeView: View {
             Spacer(minLength: Space.xxl)
 
             VStack(alignment: .leading, spacing: Space.m) {
-                // The mark: a violet rounded tile, the way the reference's logo sits on its splash screen.
-                Image(systemName: "camera.aperture")
-                    .heroSymbol(34, weight: .regular)
-                    .foregroundStyle(Color.slateOnAccent)
-                    .frame(width: Metrics.avatarM, height: Metrics.avatarM)
-                    .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: Radius.l, style: .continuous))
-                    .accessibilityHidden(true)
+                // The mark: a violet rounded tile, the way the reference's logo sits on its splash screen, and the name.
+                AdaptiveStack(alignment: .center, spacing: Space.m) {
+                    Image(systemName: "camera.aperture")
+                        .heroSymbol(34, weight: .regular)
+                        .foregroundStyle(Color.slateOnAccent)
+                        .frame(width: Metrics.avatarM, height: Metrics.avatarM)
+                        .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: Radius.l, style: .continuous))
+                        .accessibilityHidden(true)
+                    Text(AppConfig.productName)
+                        .font(.title.weight(.bold))
+                }
 
                 // The last line is the accent, like "connection" in the reference's headline.
                 (Text("Get booked.\nGet signed.\n") + Text("Get paid.").foregroundStyle(Color.slateAccentText))

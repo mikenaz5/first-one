@@ -442,6 +442,10 @@ enum SlateError: LocalizedError, Equatable {
 // MARK: - Config
 
 enum AppConfig {
+    /// What the app is called to the people who use it. The target, module, folders, `slate://` link scheme, bundle ids
+    /// and placeholder domain keep the working name "Slate"; nothing a person reads should.
+    static let productName = "Slate Pro"
+
     /// Placeholder host for public booking links (`.example` is reserved and never resolves).
     static let bookingLinkHost = "slate.example"
     static let portfolioLimit = 12

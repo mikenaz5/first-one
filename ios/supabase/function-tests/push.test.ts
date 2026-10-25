@@ -156,7 +156,7 @@ describe("wording each kind of notification", () => {
   it("tells a client their files are ready, and when the link has been replaced", () => {
     const first = compose(row("delivery_shared", { ...base, role: "client", creatorName: "Maya Chen", revised: false, balanceCents: 150000 }), NOW);
     assert.equal(first.title, "Your files are ready");
-    assert.equal(first.body, "Maya Chen shared the final files for Wedding day. Open Slate to confirm you have them.");
+    assert.equal(first.body, "Maya Chen shared the final files for Wedding day. Open Slate Pro to confirm you have them.");
     assert.equal(first.url, `slate://booking/${BOOKING}`);
     const again = compose(row("delivery_shared", { ...base, role: "client", creatorName: "Maya Chen", revised: true }), NOW);
     assert.equal(again.title, "Link to your files updated");
@@ -184,7 +184,7 @@ describe("wording each kind of notification", () => {
   });
 
   it("falls back to plain names when the facts lack them", () => {
-    assert.equal(compose(row("delivery_shared", { ...base }), NOW).body, "Your creator shared the final files for Wedding day. Open Slate to confirm you have them.");
+    assert.equal(compose(row("delivery_shared", { ...base }), NOW).body, "Your creator shared the final files for Wedding day. Open Slate Pro to confirm you have them.");
     assert.equal(compose(row("receipt_confirmed", { ...base, balanceCents: 100 }), NOW).title, "Your client confirmed receipt");
   });
 

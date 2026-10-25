@@ -89,7 +89,7 @@ struct FeaturedCreatorsSection: View {
         VStack(alignment: .leading, spacing: Space.m) {
             Text("See creators near you")
                 .font(.headline)
-            Text("Creators who work in your area come first. Slate keeps only your city, on this phone.")
+            Text("Creators who work in your area come first. Slate Pro keeps only your city, on this phone.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             AdaptiveStack(alignment: .center, spacing: Space.s) {

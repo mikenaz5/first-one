@@ -157,7 +157,7 @@ xcrun simctl bootstatus "$udid" -b >/dev/null
 signing=()
 [[ -f Config/Secrets.xcconfig ]] || signing=(CODE_SIGNING_ALLOWED=NO)
 
-say "Building Slate (the first build downloads Swift packages and can take several minutes)"
+say "Building Slate Pro (the first build downloads Swift packages and can take several minutes)"
 mkdir -p build
 if ! xcodebuild build \
       -project Slate.xcodeproj \
@@ -187,4 +187,4 @@ if [[ -n "$shot" ]]; then
   say "Saved a screenshot to $shot"
 fi
 
-say "Slate is running. On the welcome screen, tap \"Continue with a demo account\"."
+say "Slate Pro is running. On the welcome screen, tap \"Continue with a demo account\"."

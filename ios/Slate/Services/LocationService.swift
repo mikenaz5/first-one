@@ -13,9 +13,9 @@ final class DeviceLocationFinder: NSObject, CLLocationManagerDelegate {
         var errorDescription: String? {
             switch self {
             case .denied:
-                "Location is off for Slate. You can turn it on in Settings, or choose a city instead."
+                "Location is off for Slate Pro. You can turn it on in Settings, or choose a city instead."
             case .notFound:
-                "Slate couldn't tell where you are just now. Try again, or choose a city instead."
+                "Slate Pro couldn't tell where you are just now. Try again, or choose a city instead."
             }
         }
     }

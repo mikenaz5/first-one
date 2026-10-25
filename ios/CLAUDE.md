@@ -1,4 +1,4 @@
-# Slate iOS app
+# Slate Pro iOS app
 
 SwiftUI app for creators (photographers, videographers) to get booked with a contract in every booking. Spec: `../SPEC.md`. Setup and backend notes: `README.md`.
 
@@ -27,6 +27,7 @@ SwiftUI app for creators (photographers, videographers) to get booked with a con
 
 ## Conventions
 
+- **The product is called Slate Pro.** Everything a person reads (screens, permission messages, notifications, emails, share text, the PDF author, the name under the icon) says "Slate Pro", from `AppConfig.productName` where it is built in code. The working name "Slate" stays in code that nobody reads: the target and module (`import Slate`), folders, the `slate://` link scheme, bundle ids, storage keys and the placeholder domain `slate.example`. `scripts/check_product_name.py` fails CI when a string a person can read says a bare "Slate".
 - Add unit tests for any logic you add in `Core/` or `ProfileDraft`. UI is verified by building and running, not unit tests.
 - Keep `HandleRules` and the `creator_profiles.handle` SQL check in sync, and likewise the portfolio limit (12) in `AppConfig` and the SQL trigger.
 - Booking rules live in two places that must agree: `AvailabilityEngine` + `PriceSummary` (Swift, used by the screen and `LocalBackend`) and `create_booking()` (SQL). Change one, change the other, and extend both test suites (`SchedulingBackendTests`, `supabase/tests/booking_rules.py`).

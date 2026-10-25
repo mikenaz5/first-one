@@ -117,7 +117,7 @@ struct BillingView: View {
         } footer: {
             Text(hasPlan
                  ? "Stripe's pages let you change the card, read invoices, or cancel at the end of the period."
-                 : "Stripe collects the card on its own pages. Slate never sees it.")
+                 : "Stripe collects the card on its own pages. Slate Pro never sees it.")
         }
             .listRowBackground(Color.slateCard)
     }

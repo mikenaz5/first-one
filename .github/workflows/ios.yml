@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check the product name
+        run: python3 scripts/check_product_name.py
+
       - name: Show toolchain
         run: |
           xcodebuild -version

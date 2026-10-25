@@ -34,7 +34,7 @@ struct NotificationSettingsView: View {
                 Text("Tell me about")
             } footer: {
                 if !model.backend.sendsPushFromServer {
-                    Text("On this phone Slate can only schedule shoot reminders. The other kinds need a Slate server, which this build isn't connected to.")
+                    Text("On this phone Slate Pro can only schedule shoot reminders. The other kinds need a Slate Pro server, which this build isn't connected to.")
                 }
             }
                 .listRowBackground(Color.slateCard)
@@ -91,9 +91,9 @@ struct NotificationSettingsView: View {
 
     private var statusFooter: String {
         switch model.notificationAuthorization {
-        case .allowed: "You'll hear about the things below, even when Slate is closed."
-        case .notDetermined: "Slate asks once. You can change your mind any time in Settings."
-        case .denied: "Notifications for Slate are off in Settings. Allow them there to hear about bookings, payments and messages."
+        case .allowed: "You'll hear about the things below, even when Slate Pro is closed."
+        case .notDetermined: "Slate Pro asks once. You can change your mind any time in Settings."
+        case .denied: "Notifications for Slate Pro are off in Settings. Allow them there to hear about bookings, payments and messages."
         }
     }
 }

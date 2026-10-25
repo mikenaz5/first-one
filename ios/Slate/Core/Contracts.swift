@@ -261,7 +261,7 @@ enum ContractRules {
             case .clauseTitle: "Every section needs a heading."
             case .clauseBody: "Every section needs some text."
             case .clauseBodyTooLong: "Keep each section under \(ContractRules.clauseBodyLimit) characters."
-            case .unknownPlaceholder(let token): "{{\(token)}} isn't a field Slate knows. Pick one from the Insert menu."
+            case .unknownPlaceholder(let token): "{{\(token)}} isn't a field Slate Pro knows. Pick one from the Insert menu."
             case .missingRequired(let field): "Mention \(field.title.lowercased()) somewhere ({{\(field.rawValue)}}) so the contract is complete."
             }
         }
@@ -349,7 +349,7 @@ enum SignatureMethod: String, Codable, CaseIterable, Identifiable, Hashable {
 enum SigningConsent {
     static let version = 1
     static let text = "By tapping Sign, I agree to this contract and to sign it electronically. My typed or drawn signature has the same effect as a handwritten one."
-    static let creatorAuthorization = "I authorize Slate to apply this signature to the contracts for my packages when clients book, and I agree to those contracts."
+    static let creatorAuthorization = "I authorize Slate Pro to apply this signature to the contracts for my packages when clients book, and I agree to those contracts."
 }
 
 /// A signature as the person gave it, before the server stamps it.
@@ -363,7 +363,7 @@ struct SignatureInput: Equatable {
 
     static var currentDeviceDescription: String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
-        return "Slate iOS app, OS \(version.majorVersion).\(version.minorVersion)"
+        return "Slate Pro iOS app, OS \(version.majorVersion).\(version.minorVersion)"
     }
 }
 

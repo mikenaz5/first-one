@@ -540,6 +540,6 @@ export function connectRedirect(to: string | null, appScheme: string): HttpResul
   return {
     status: 302,
     headers: { Location: location, "Content-Type": "text/html; charset=utf-8" },
-    body: `<!doctype html><meta charset="utf-8"><title>Returning to Slate</title><p>Returning to Slate… <a href="${location}">Tap here if nothing happens.</a></p>`,
+    body: `<!doctype html><meta charset="utf-8"><title>Returning to Slate Pro</title><p>Returning to Slate Pro… <a href="${location}">Tap here if nothing happens.</a></p>`,
   };
 }
