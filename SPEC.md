@@ -1,8 +1,9 @@
 # Product Spec: Booking with Built-in Contracts for Creators
 
-**Status:** Draft v0.2 · 2026-10-22 · Working title: *Slate* (placeholder)
+**Status:** Draft v0.3 · 2026-10-25 · Working title: *Slate* (placeholder)
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
+**Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
 
 ---
 
@@ -32,6 +33,10 @@ Decisions made with the product owner:
 | D8 | **On upgrade, services move to the company, signed work stays with the person.** Services, packages and contract templates become company-owned. The person's availability stays on their own calendar, which becomes their member calendar. Executed contracts and their bookings stay with the person as the contracting party, because they are immutable and the client agreed to that person. | Section 8.7. |
 | D9 | **Company payments go to the company's own Stripe Connect account.** Optional member payouts are a **split ledger** (a per-member share recorded on each booking for reports and payroll). Slate makes no automatic transfers to members. | Section 4.3. Stripe transfers to members are Later. |
 | D10 | **Company defaults:** bookings are auto-assigned unless an Admin switches the company to manual assignment. Invites are single-use links shared through the system share sheet (no server-sent email yet). Contracts are countersigned automatically by a **designated signer**. | Sections 6, 8.8, 8.9. |
+| D11 | **Slate hosts the delivery files.** A creator delivers photos and videos inside the app, and the client views and saves them there. Delivery by an external link stays as a fallback, for very large files or a creator who prefers their own host. | Section 5.5 and flow 8.12. Slate becomes a host of people's files, so terms of use, reporting and takedown are launch requirements (R16). |
+| D12 | **Storage comes with the plan, and delivered files expire 30 days after delivery.** An Individual account has a storage allowance. A company's allowance grows with its billed seats. Files that are not saved in time are deleted. | Config values in 4.4. Expiry is final, and the app says so before and after delivery (R17). |
+| D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
+| D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
 
 Assumptions, open to change (section 13):
 
@@ -45,6 +50,10 @@ Assumptions, open to change (section 13):
 - **A8.** A company is US and USD like everyone else (A1). One currency per company.
 - **A9.** A company has exactly one Owner. Ownership can be transferred, and an Owner must transfer or delete the company before deleting their own account.
 - **A10.** Invite links expire after 7 days (config value). The link is the credential. The email typed on an invite is only a label and an address for the Mail sheet, because Hide My Email relay addresses make matching unreliable (R6).
+- **A11.** The 30 days run from the moment the creator taps Deliver. Paying does not restart them and saving a file does not shorten them. On the last day the previews and the originals are deleted together (Q24).
+- **A12.** A booking has one delivery. The creator can add files to it until it expires, and added files expire with it.
+- **A13.** Previews are made on the creator's phone (reduced and watermarked) and uploaded beside each original. The server decides who may see what and caps how big a preview may be, but does not look at the pixels. Making previews on the server is Later (R18).
+- **A14.** Saving is file by file, or "Save all" as a queue of downloads. There are no zip files in the first version.
 
 ## 3. Design rules (normative)
 
@@ -170,8 +179,21 @@ Kept in one place per layer (`app_settings` in SQL, `TeamConfig` in Swift) so th
 | `seats.maximum` | 250 | Most members a company can have, counting pending invites. |
 | `invites.expiry_days` | 7 | Lifetime of an invite link. |
 | `billing.grace_days` | 7 | How long a company stays usable after a failed seat payment before it becomes read only. |
+| `files.retention_days` | 30 | How long a delivery stays available, counted from the moment it is delivered. |
+| `files.draft_days` | 7 | How long files that were uploaded but never delivered are kept. |
+| `files.warn_days` | 7, 1 | Reminders to the client, in days before expiry, while anything is unsaved. |
+| `files.quota_gb.individual` | 25 | Storage allowance of an Individual account. Placeholder (Q25). |
+| `files.quota_gb.per_seat` | 25 | Allowance added per **billed** seat for a company, shared across the company. Placeholder (Q25). |
+| `files.max_photo_mb` | 100 | Largest photo. |
+| `files.max_video_gb` | 4 | Largest video. |
+| `files.max_files` | 1000 | Most files in one delivery. |
+| `files.preview_photo_max_mb` | 5 | Largest preview of a photo. |
+| `files.preview_video_max_mb` | 150 | Largest preview of a video. |
+| `files.url_minutes` | 15 | How long a download link works once the app has asked for it. |
 
 Seat accounting: **seats used** = active members. **Seats billed** = `max(seats.minimum, seats used)`. Pending invites are not billed until accepted, but count toward `seats.maximum`. Seat additions are prorated by Stripe immediately. Reductions take effect at the next renewal, and the screen says exactly when and what changes before the Owner confirms.
+
+Storage accounting: **storage used** = the bytes of every file, original and preview, that is reserved, uploading or ready and not yet expired or removed, for the account on screen. A company's allowance is `files.quota_gb.per_seat` times its **billed** seats and is shared by everyone in it. Space is reserved when an upload starts and handed back if the upload is not finished within 24 hours. An upload that would go over the allowance is refused before any bytes are sent, and the message says how much is used and what the allowance is. Space comes back when files expire or the creator removes them. A lapsed company plan (4.3) keeps its files until they expire and takes no new uploads.
 
 ## 5. Core features
 
@@ -196,7 +218,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 | Import busy times from personal calendars | Avoid double-booking against non-app events. | Later (fast follow) |
 | Request-to-book, custom quotes and proposals | For bespoke jobs. | Later |
 | Second shooters, team accounts | Moved into scope as Company accounts, section 5.4. | See 5.4 |
-| Client gallery delivery | Integrate with an existing gallery tool rather than build one. | Later |
+| Client file delivery | Photos and videos delivered, previewed and saved in the app (Slate Files, section 5.5). | MVP |
 
 ### 5.2 Client
 
@@ -209,6 +231,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 | Pay balance | One-tap Apple Pay from a reminder, due N days before the shoot (default 7). | MVP |
 | Change or cancel | Reschedule request. Cancel with refund shown per policy *before* confirming. | MVP |
 | Contract access | Signed PDF in the booking, shareable from the system share sheet. Emailed to both parties. | MVP |
+| Receive files | Preview the delivered photos and videos at once, pay the balance to unlock them, save them to Photos or Files before the window ends (5.5, 8.12). | MVP |
 | Messages | Booking-scoped. | MVP |
 | Calendar, reminders, widget | EventKit event with an alarm. Push at 24 h and 1 h. | MVP |
 | Saved creators and rebook | The client's **Services** tab shows creators they've booked, with their packages. | MVP |
@@ -245,6 +268,46 @@ Everything in 5.1 applies to a company, owned by the organization instead of a p
 | Automatic Stripe transfers to members | Members connect their own account and shares are transferred. | Later |
 | SSO, SCIM, audit export | Enterprise administration. | Later |
 | Per-member public pages with their own packages that members create themselves | Members managing their own services. | Later |
+
+### 5.5 Slate Files (hosted delivery)
+
+A creator delivers the finished photos and videos inside Slate. The client sees previews at once, pays the balance, and then saves the originals. It works the same for an Individual and for a company; a company uses its shared allowance.
+
+| Feature | Detail | Phase |
+|---|---|---|
+| Deliver in the app | Once the shoot has started, the creator adds photos and videos from Photos or the Files app to the booking and taps **Deliver**. | MVP |
+| Background uploads | Uploads continue when the app is closed, resume after a drop in signal, and show progress and **Retry** per file. A large video asks before using cellular data. | MVP |
+| Previews | Each file has a reduced, watermarked preview made on the creator's phone. The client sees previews as soon as files are delivered. A preview is view only: no Save, no Share. | MVP |
+| Unlock on payment | Originals can be saved only when nothing is owed on the booking. The balance becomes payable at delivery (8.12). | MVP |
+| Saving | Per file to Photos or Files, or **Save all** as a queue of downloads that continues in the background. "Saved 12 of 48" is shown to the client and to the creator. | MVP |
+| Expiry | Everything in a delivery is deleted 30 days after delivery. The client is reminded at 7 days and 1 day while anything is unsaved. The creator is told when it ends and how many files were saved. | MVP |
+| Storage meter | "4.2 of 25 GB used" under Settings, for the account on screen (4.4). | MVP |
+| Remove a file | The creator can remove a file at any time. It is recorded. | MVP |
+| Report a file | Either person can report a file. Reports go to the support console (R16). | MVP |
+| Link delivery | The existing delivery by external link stays, for very large files. It still needs Confirm receipt before the balance is payable. | MVP |
+| Favourites, comments, public gallery links, zip downloads, print sales | Client gallery extras. | Later |
+| Previews made on the server, video transcoding and streaming | Stronger previews and smoother video. | Later |
+| Extend the window | A creator or client asks for more than 30 days. | Later |
+
+**Rules (normative).**
+
+- **Who can add, deliver and remove files:** the people who can share a delivery today, that is `bookings.manage`, or `bookings.manage_assigned` for a booking assigned to them (4.3). A Viewer sees no files, because client work is private. The client sees only the files of their own bookings.
+- **When a preview can be opened:** by the booking's client from delivery until expiry, and by the creator side while the files exist.
+- **When an original can be opened:** by the booking's client only after delivery, before expiry, and when **nothing is owed** (the balance is paid, or there was none). By the creator side while the files exist. Whether anything is owed comes from payments recorded by Stripe's signed webhook, like everything else about money, so the app cannot unlock a file.
+- **Hosted delivery has no Confirm receipt step.** The previews are how the client checks the work, so the balance is payable at delivery, and the booking completes when the files are delivered and nothing is owed. The delivery screen shows how many photos and videos there are, so a client can tell it is the whole set. "Something's wrong" opens the conversation. Link delivery is unchanged.
+- **One way per booking.** A booking is delivered by files or by link. The choice is locked once the client has paid the balance or confirmed receipt.
+- **Expiry is final.** On the last day the originals and previews are deleted together. The booking, contract, payments and messages are untouched. What stays is the history of the delivery: names, kinds, sizes, and whether each file was saved.
+- **After expiry** the client sees that the files have expired and who to ask. The creator can deliver again, which starts a new 30 days. If the balance is already paid, the client can save as soon as the new delivery is made.
+- **Deleting an account** deletes the files it delivered. A client who deletes their account loses their access and nothing else.
+
+**How it is built** (design notes, not a schema):
+
+- **Private storage.** One private bucket. Object paths use lowercase UUIDs: owner, booking, file, then `original` or `preview`. Nothing is public.
+- **Upload.** The app asks the backend to **reserve** a file. The backend checks permission, the caps and the allowance, records the file as uploading and returns the paths. The app then uploads with a resumable upload on a background session, preview first and original second, and asks the backend to **finalize**. Finalize reads the real size from storage, accepts the file, and deletes and rejects anything larger than was reserved or any preview over its cap. A reservation that is never finalized lapses after 24 hours.
+- **Download.** The app asks for a short-lived signed link (`files.url_minutes`). The link is made under the caller's own access, so the database policy for the preview or the original decides, at that moment. A link cannot be made for an original that is still locked.
+- **Expiry.** An Edge Function on a schedule, run like `send-push`, deletes the objects through the Storage API and marks the delivery expired. It is safe to run twice. Deleting database rows alone would not free the bytes.
+- **Rules in two places.** The caps, the allowance, the unlock rule and the expiry date are one set of rules in Swift and SQL, with a shared fixture (`file_rules.json`) that both test suites read, like the other rules in this spec.
+- **On a device with no server,** files are copied into the app's own folder, payment is the demo payment, and expiry uses the app's clock, so the whole flow can be tried and tested.
 
 ## 6. Contracts
 
@@ -311,6 +374,8 @@ erDiagram
     ORGANIZATION ||--o{ ACTIVITY_ENTRY : logs
     PACKAGE }o--o{ MEMBERSHIP : "offered only by (optional)"
     BOOKING }o--o| USER : "assigned to"
+    BOOKING ||--o| DELIVERY : "delivered through (files)"
+    DELIVERY ||--o{ DELIVERY_FILE : contains
 ```
 
 **The owner field.** Services (packages and their templates), bookings, contracts and payments accounts all carry an **owner** that is either a person or an organization. It is stored as a reference to a **CreatorProfile**, and a profile has a `kind` of `person` or `company`. A person's profile id is their user id. A company's profile id is its organization id. So a foreign key keeps the owner real, and "who owns this" is one lookup (`kind`), not a loose pair of columns. Team access is never inferred from the owner id alone: every read and write goes through the membership and role checks in section 4.3.
@@ -340,6 +405,8 @@ erDiagram
 | **Payment account** | creator id (**the owner**), Stripe account id, charges enabled, payouts enabled, details submitted | One per owner. A company's is separate from the personal one of any member. |
 | **Conversation / Message** | booking id, participants; sender, kind (text, system), body, sent at, read by | System messages are generated for booking, signing, payment and change events. |
 | **Device / NotificationPreference** | user id, APNs token, environment; per-event toggles | |
+| **Delivery** (files) | booking id, owner (the provider party, whose allowance is used), state (draft, delivered, expired), delivered by and at, expires at, expired at, file count, bytes | One per booking (A12). Written by backend functions only, never directly. The link delivery already on a booking is separate and unchanged. |
+| **DeliveryFile** | delivery id, kind (photo or video), display name, content type, width and height, duration (video), original path and bytes, preview path and bytes, status (reserved, uploading, ready, removed, expired), created by, reserved at, saved by the client at (first save), removed at and by | Rows outlive the bytes: after expiry or removal they keep name, kind, size and whether the file was saved. The paths are cleared. |
 | **AuditEvent** | entity type and id, actor, action, metadata, IP, timestamp | Append-only. Covers bookings, contracts, payments and changes. |
 
 **Booking lifecycle**
@@ -410,6 +477,7 @@ stateDiagram-v2
 1. The creator marks the booking **Completed**.
 2. If the balance is unpaid, the reminder flow continues. If it's paid, the booking moves to Past.
 3. Both can still open the signed PDF at any time.
+4. The creator delivers the final files, in the app (8.12) or by an external link. The client then pays the balance (8.3).
 
 ### 8.7 Choose a type, create or upgrade a company
 
@@ -464,6 +532,28 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 - **Leave a company.** Any member except the Owner can leave from Settings, Team. Their bookings return to the queue.
 - **Delete a company** (Owner, with a confirmation that names what is retained). Executed contracts and the activity log are retained (R7).
 
+### 8.12 Deliver files, preview, pay, save, expire
+
+*The creator*
+
+1. Once the shoot has started, the booking shows **Add files**. The creator picks photos and videos from Photos or the Files app. In a company, a member does this on a booking they may manage (4.3).
+2. For each file the app first checks the caps and the allowance. A file that does not fit is refused before it uploads, with "4.2 of 25 GB used" and the choices: remove something, or deliver by link.
+3. The app makes a reduced, watermarked preview of each file, uploads it, then uploads the original. Uploads continue in the background, so the creator can close the app. A file that fails shows **Retry**. Files that are never delivered are removed after 7 days.
+4. When every file is ready, **Deliver** becomes available. Its confirmation says that {client} can see previews now, can save the originals once the balance is paid, and has until {date, 30 days on}; and that Slate is not an archive, so the creator should keep their own copies. Delivering starts the 30 days, makes the balance payable, and notifies the client.
+
+*The client*
+
+5. The booking shows **Your files are ready**, "Available until {date}", and a grid of previews. A preview opens full screen, swipes between files, and plays video in place. It has no Save or Share.
+6. If a balance is owed, the main action is **Pay balance to unlock downloads** (Apple Pay, 8.3). When Stripe reports the payment, the originals unlock. The app learns this from the booking, not from its own say-so. If nothing is owed, the originals are available at once.
+7. **Save** puts a photo or video in Photos, or a file in Files. **Save all** queues every file as a background download with progress and **Cancel**. The screen shows "Saved 12 of 48". The creator sees the same count.
+8. While anything is unsaved the client is reminded 7 days and 1 day before the end (config `files.warn_days`).
+
+*The end*
+
+9. On the last day a scheduled job deletes every original and preview in the delivery, hands the space back and marks it **Expired**. The creator is told how many files the client had saved. The history stays.
+10. After expiry the client sees "These files expired on {date}. Ask {creator} to send them again." The creator can deliver again, which starts a new 30 days.
+11. The creator can remove a single file at any time. Removal frees its space and is recorded in the activity log (company) or audit log.
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -490,6 +580,8 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 | **Services** | Company services with an "Offered by" line (everyone, or the chosen members). Templates are managed here by Owner and Admin. |
 | **Profile** | The company page and its editor (Owner, Admin). The designated signer, the split ledger and going back to an individual account are under Settings ▸ Company settings; Stripe Connect for the company is under Services ▸ Payments (Owner). |
 
+**Slate Files.** *Bookings ▸ a booking* gains a **Files** section. For the creator it has Add files, the progress and Retry of each upload, Deliver, and the delivery's state ("Delivered, available until Nov 22", "12 of 48 saved", "balance unpaid"). For the client it has a grid of previews, the expiry date, **Pay balance to unlock downloads**, then Save and Save all. *Profile ▸ ⋯ ▸ Settings* gains a **Storage** row with the meter for the account on screen. It uses the system's photo picker, file importer, video player and background transfers, and the same design rules as the rest.
+
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
 ## 10. MVP scope
@@ -507,7 +599,8 @@ Each of these follows the design rules in section 3: system components, sheets w
 | Money | Installments and milestones, invoices beyond deposit and balance, tax, multi-currency, promo codes, creator subscriptions |
 | Contracts | Third-party e-sign providers, model and property releases, usage-rights licensing add-ons, AI drafting |
 | Teams | Automatic Stripe transfers to members, SSO and SCIM, audit export, members creating their own services. (Company accounts themselves are in scope, section 5.4.) |
-| Integrations | Google Calendar or personal-calendar busy-time import, client gallery delivery |
+| Integrations | Google Calendar or personal-calendar busy-time import |
+| Files | Favourites and comments, public gallery links, zip downloads, print sales, previews made on the server, video transcoding and streaming, extending the 30 days (section 5.5) |
 | Platform | Android, iPad-specific features beyond adaptive layout, Live Activities, in-app video calls |
 | Support | Dispute and chargeback tooling beyond the minimal support console |
 
@@ -533,6 +626,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | M4 Engagement | Messages, push and email, EventKit, widget |
 | M5 Beta | Web booking page hardening, accessibility audit, legal review, TestFlight pilot with real creators, App Review preparation |
 | M3b Company accounts | Organizations, memberships, roles enforced on the backend, shared services, assignment and team calendar, company contracts and payments, seat billing |
+| M3c Slate Files | Hosted delivery: reserve, upload, preview, unlock on payment, save, expiry, storage meter, report a file |
 
 ## 11. Non-functional requirements
 
@@ -542,6 +636,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | Performance | Booking sheet is interactive in under 1 second after the tap. Upcoming bookings and signed contracts remain readable offline. |
 | Security | Contracts are immutable and hash-verified. PDFs are served by short-lived signed URLs. Card data never touches our servers (Stripe and Apple Pay tokens). Audit log is append-only. |
 | Team access | A role is checked in the database on every read and write (section 4.3), never trusted from the client. A removed member loses access on the next request. Invite tokens are single use, stored hashed and expire. The activity log is append only. |
+| Files | One private bucket. Access only through short-lived signed links, each checked by the database at the moment it is made. An original is refused until nothing is owed. Uploads and downloads resume after an interruption and continue in the background. Expiry is idempotent. Storage used is computed in one place. Deleting an account deletes the files it delivered. |
 | Privacy | Data minimisation. Accurate App Privacy details. EventKit access requested only when the user turns on calendar sync, with a plain explanation. In-app account deletion. |
 | Reliability | Slot holds and payment-plus-contract confirmation must be atomic from the user's point of view (section 6, ordering rule). Idempotent payment calls. Reminders must still fire if a push is missed (local notifications as a backup). |
 | Compliance | ESIGN/UETA for the launch market. Other markets (eIDAS, etc.) require separate review. |
@@ -564,6 +659,12 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R12 | **A removed designated signer halts bookings.** | Removing or demoting the signer is warned about before it happens, and the company shows a banner until a new signer is chosen. |
 | R13 | **A company booking in manual mode can sit unassigned** while the client has paid. | Manual-mode capacity is limited (8.9) and unassigned bookings are on the Managers' needs-assignment list (Home and Bookings). *Not built:* a reminder before the shoot if it is still unassigned. |
 | R14 | **Seat counts disagree between Slate and Stripe.** | Seats billed are computed in one place from active members and the floor. Stripe's webhook is the record of what was charged, and the Owner's screen shows both. |
+| R15 | **Storage and bandwidth cost grow with use, and video dominates both.** | An allowance per plan, the 30-day expiry and per-file and per-delivery caps, all config values (4.4). Measure real cost in the pilot before fixing the allowances (Q25). Moving downloads to a store without download fees is an option if bandwidth dominates. |
+| R16 | **Hosting people's files makes Slate responsible for what is on them** (App Review guideline 1.2, copyright takedowns, duties to report illegal content). | Files are private to the two people on a booking. Terms of use, a Report action on every file, a support process to remove content and suspend accounts, and a legal check of reporting duties before launch. Reporting and blocking are a prerequisite. |
+| R17 | **Expiry deletes the only copy a client may have.** | The warning when delivering, the expiry date on every screen, reminders at 7 and 1 days, telling the creator which files were not saved, and saying plainly that Slate is not an archive. Creators keep their own originals. |
+| R18 | **A preview cannot be made impossible to copy, and the server cannot check a preview's pixels** because it is made on the creator's phone. | Previews are small and watermarked, so a screenshot is not worth taking. The server caps a preview's size and refuses one that is too large. Originals live on a different path that the database releases only after payment. Server-made previews are Later. |
+| R19 | **Large uploads are unreliable on a phone** (signal, battery, the app closed, a full disk). | Resumable background uploads, per-file retry, a cellular prompt for large video, reservations that lapse after 24 hours. CI cannot exercise real uploads, so test on real devices in the pilot. |
+| R20 | **An unpaid balance keeps files in storage** until the 30 days end. | The same 30-day clock. The creator sees "balance unpaid" on the delivery and can follow up in Messages. After expiry they can deliver again. |
 
 ## 13. Open questions
 
@@ -593,3 +694,15 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q21 | **May a Viewer see money** (earnings and the split ledger)? | Viewers see `reports.view` totals, not the per-member split |
 | Q22 | **How long is the grace period** after a failed seat payment? | 7 days (`billing.grace_days`) |
 | Q23 | **Should the company handle share a namespace with personal handles?** | Yes, one unique `handle` space |
+
+**Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D14: Slate hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both. These remain open:
+
+| # | Question | Default |
+|---|---|---|
+| Q24 | **Does "expire if not downloaded in time" mean every file is deleted 30 days after delivery, saved or not?** | Yes. Saving does not change the date (A11) |
+| Q25 | **What are the right allowances and caps?** | 25 GB for an Individual and 25 GB per billed seat for a company. Placeholders to tune against real cost (R15) |
+| Q26 | **Should the 30 days be extendable?** | No in the first version |
+| Q27 | **What does the watermark say?** | "PREVIEW" and the creator's business name, repeated diagonally |
+| Q28 | **A video preview: the whole video at reduced size, or a short clip?** | The whole video, reduced and watermarked, within its size cap |
+| Q29 | **For hosted files, should the balance be payable at delivery with no Confirm receipt step?** | Yes. The previews are how the client checks the work (5.5) |
+| Q30 | **Who at a company can open the files?** | Anyone who can see the booking except a Viewer |
