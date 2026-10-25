@@ -142,6 +142,11 @@ for c in rules["creators"]:
     check(f"{c['handle']}: the first piece is the cover", row[1] == (f"{c['handle']}/0-thumb.jpg" if c["portfolio"] else None), row[1])
     check(f"{c['handle']}: the lowest published price", row[2] == cheapest, row[2])
     check(f"{c['handle']}: the review totals", (row[4], row[5]) == (len(c["ratings"]), sum(c["ratings"])), (row[4], row[5]))
+c = connect()
+k = c.cursor()
+k.execute("select * from featured_creators(null)")
+check("the columns are the ones the app reads", [d.name for d in k.description] == rules["rowColumns"], [d.name for d in k.description])
+c.close()
 check("the currency comes with the price", all(r[3] == "USD" for r in tiles.values()))
 check("the profile comes with it", tiles["ivy-ten-fives"][6] == "Ivy Ten Fives" and tiles["ivy-ten-fives"][7] == "person",
       (tiles["ivy-ten-fives"][6], tiles["ivy-ten-fives"][7]))

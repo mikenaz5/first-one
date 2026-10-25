@@ -1,6 +1,11 @@
 {
   "defaultLimit": 12,
   "maxLimit": 24,
+  "rowColumns": [
+    "id", "handle", "display_name", "bio", "specialties", "location_name", "latitude", "longitude", "travel_radius_km",
+    "avatar_path", "created_at", "updated_at", "kind", "cover_path", "starting_price_cents", "currency_code",
+    "review_count", "rating_sum"
+  ],
   "limits": [
     { "asked": -4, "clamped": 1 },
     { "asked": 0, "clamped": 1 },

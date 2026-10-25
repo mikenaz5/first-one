@@ -15,7 +15,7 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
 
     // MARK: - Rows
 
-    private struct ProfileRow: Codable {
+    struct ProfileRow: Codable {
         var id: String
         var handle: String
         var displayName: String
@@ -125,6 +125,62 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             .execute()
             .value
         return try rows.map(makeProfile)
+    }
+
+    private struct FeaturedParams: Encodable {
+        var pSpecialty: String?
+        var pLimit: Int
+
+        enum CodingKeys: String, CodingKey {
+            case pSpecialty = "p_specialty"
+            case pLimit = "p_limit"
+        }
+    }
+
+    /// One row of `featured_creators()`: the columns of a profile, then what a tile needs beside it.
+    struct FeaturedRow: Decodable {
+        var profile: ProfileRow
+        var coverPath: String?
+        var startingPriceCents: Int
+        var currencyCode: String
+        var reviewCount: Int
+        var ratingSum: Int
+
+        enum CodingKeys: String, CodingKey {
+            case coverPath = "cover_path"
+            case startingPriceCents = "starting_price_cents"
+            case currencyCode = "currency_code"
+            case reviewCount = "review_count"
+            case ratingSum = "rating_sum"
+        }
+
+        init(from decoder: Decoder) throws {
+            profile = try ProfileRow(from: decoder)
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            coverPath = try container.decodeIfPresent(String.self, forKey: .coverPath)
+            startingPriceCents = try container.decode(Int.self, forKey: .startingPriceCents)
+            currencyCode = try container.decode(String.self, forKey: .currencyCode)
+            reviewCount = try container.decode(Int.self, forKey: .reviewCount)
+            ratingSum = try container.decode(Int.self, forKey: .ratingSum)
+        }
+    }
+
+    func featuredCreators(specialty: Specialty?, limit: Int) async throws -> [FeaturedCreator] {
+        let rows: [FeaturedRow] = try await client
+            .rpc("featured_creators", params: FeaturedParams(pSpecialty: specialty?.rawValue, pLimit: FeaturedRules.clamped(limit: limit)))
+            .execute()
+            .value
+        return try rows.map(makeFeatured)
+    }
+
+    func makeFeatured(_ row: FeaturedRow) throws -> FeaturedCreator {
+        FeaturedCreator(
+            profile: try makeProfile(row.profile),
+            coverURL: try row.coverPath.map { try publicURL(bucket: "portfolio", path: $0) },
+            startingPriceCents: row.startingPriceCents,
+            currencyCode: row.currencyCode,
+            reviews: ReviewSummary(count: row.reviewCount, ratingSum: row.ratingSum)
+        )
     }
 
     func requestEmailCode(_ email: String) async throws {

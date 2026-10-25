@@ -19,6 +19,13 @@ extension AppModel {
         return found.filter { canBook(creatorID: $0.id) }
     }
 
+    /// Creators to explore on Home, best first, optionally only those who shoot one thing. Never the person's own
+    /// account or a company they work for.
+    func featuredCreators(specialty: Specialty?) async throws -> [FeaturedCreator] {
+        let found = try await backend.featuredCreators(specialty: specialty, limit: FeaturedRules.defaultLimit)
+        return found.filter { canBook(creatorID: $0.id) }
+    }
+
     /// Signed contracts, newest shoot first.
     var contractedBookings: [Booking] {
         guard let id = session?.userID else { return [] }

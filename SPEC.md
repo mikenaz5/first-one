@@ -4,7 +4,7 @@
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
 **Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
-**Changes in v0.4:** client accounts, a free third account type with Sign in with Apple or an emailed code, and booking links that lead straight to one (sections 2, 4, 4.1, 5.2, 8.13, 9, 13).
+**Changes in v0.4:** client accounts, a free third account type with Sign in with Apple or an emailed code, and booking links that lead straight to one, search for creators, and a featured-creators grid on a client's Home (sections 2, 4, 4.1, 5.2, 8.13, 9, 10, 13).
 
 ---
 
@@ -43,6 +43,7 @@ Decisions made with the product owner:
 | D17 | **Two ways into a client account, both free: Sign in with Apple, or an emailed code.** The code is the guest account: no password, and entering the same email later signs the person back in, so a repeat client keeps their bookings. A name is asked once. | Section 8.13. Supabase email codes need the Email provider turned on and a real mail sender (README). |
 | D18 | **A booking link makes a client.** Someone who opens a booking link and has no account is taken to sign in as a client, with no type to choose, and lands on the creator's page afterwards. | Section 8.13. A web page for people without the app is still Q4. |
 | D19 | **Clients can search for creators** by name, link name or what they shoot (weddings, portraits). Only creators with a published package are found, so every result can be booked. There is still no marketplace: no categories to browse, no ranking, no ratings sort. | Section 8.13. Reverses part of D2 for search only (section 10). |
+| D20 | **A featured-creators grid on a client's Home**, under the search field and in the manner of an explore page: a picture for each creator a client could book, with their name, rating and starting price, and a row of specialties to narrow it. It is worked out, not paid for and not hand-picked, so it is the same for everyone and nobody can buy a place in it. Creators with work to show come first, then a smoothed average rating, then more reviews, more portfolio pieces, newest. Twelve at a time. | Section 8.13 and `featured_creators()` / `FeaturedRules`. Still no marketplace: no sort options, no paid placement, no categories page (section 10). Q38 asks whether creators may opt out. |
 
 Assumptions, open to change (section 13):
 
@@ -593,11 +594,14 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 9. With nothing typed, the tab offers the specialties as one-tap searches, and the creators the client has booked, with **Book again**.
 10. Pasting a booking link into the field and pressing search opens that creator's page directly.
 11. Only creators who have a published package are found, so every result can be booked. Searching needs an account.
+12. Under the search field, a client's **Home** shows **Featured creators**: a grid of the creators they could book, each a tile with the first picture from their portfolio (a soft colour when they have none yet), their name, their average rating when they have reviews, and "From $X", the lowest price among their published packages. Tapping a tile opens that creator's page, as a booking link does.
+13. A row of specialties above the grid ("All", then Weddings, Portraits and so on) narrows it to creators who shoot that. Up to twelve are shown. The order is worked out, the same for everyone: creators with a portfolio piece first; then a smoothed average, (sum of ratings + 12) divided by (number of reviews + 3), best first, so one five-star review doesn't outrank fifty good ones and a creator with no reviews yet isn't buried; then more reviews; then more portfolio pieces; then newest. Nobody pays for a place and nobody is picked by hand. A client never sees their own account, or a company they work for.
+14. On a device with no server there is nobody else to find, so the app starts with eight made-up sample creators (a profile, a published package with a contract, hours, a few drawn pictures and some reviews) so that search, the grid and booking can be tried end to end. With a server they never exist.
 
 *A booking link*
 
-12. A creator shares their link (`slate://book/<handle>`, and the web link once there is a domain). Opening it in the app when signed in shows the creator's page over whatever the person was doing, as today.
-13. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
+15. A creator shares their link (`slate://book/<handle>`, and the web link once there is a domain). Opening it in the app when signed in shows the creator's page over whatever the person was doing, as today.
+16. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
 14. A person who already has a creator account opens the page the same way, and books as themselves.
 
 ## 9. Screens and navigation
@@ -632,7 +636,7 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 
 | Tab | A client sees |
 |---|---|
-| **Home** | A search field that opens Creators, the next booking, what needs doing (pay a balance, check the files, leave a review), and **Book again** with the creators they have booked |
+| **Home** | A search field that opens Creators, the next booking, what needs doing (pay a balance, check the files, leave a review), **Book again** with the creators they have booked, and **Featured creators**: an explore grid with a row of specialties (8.13) |
 | **Bookings** | The same list, with the pay, files, contract and cancel actions |
 | **Creators** (in place of Services) | A search field for a name, a link name or what they shoot (a booking link pasted there opens that page), the specialties as one-tap searches, and the creators they have booked |
 | **Messages** | The booking conversations, as today |
@@ -650,7 +654,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 
 | Area | Deferred |
 |---|---|
-| Discovery | A marketplace: browsing by category, ranking, sorting by rating, featured creators. (Searching by name, link name or specialty is in, D19.) |
+| Discovery | A marketplace: a page of categories to browse, sort options, map view, paid or promoted placement. (Searching by name, link name or specialty is in, D19, and so is a featured-creators grid on a client's Home, D20.) |
 | Booking modes | Request-to-book, custom quotes and proposals, recurring bookings, waitlists |
 | Money | Installments and milestones, invoices beyond deposit and balance, tax, multi-currency, promo codes, creator subscriptions |
 | Contracts | Third-party e-sign providers, model and property releases, usage-rights licensing add-ons, AI drafting |
@@ -775,4 +779,6 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q35 | **Should a guest be allowed to pay, or only reserve?** | Pay. The code proves the email, and the contract carries the name |
 | Q36 | **Should a client be able to turn their account into a creator account?** | No. A client account is for booking only (D16). Someone who wants to sell signs in with a different email |
 | Q37 | **Should search also look at a creator's location?** | Not yet. Name, link name and specialty only |
+| Q38 | **Should a creator be able to opt out of the featured grid** (and of search), or ask to be shown first? | Not yet. Anyone with a published package is already findable by name, and the grid shows only what their public page shows. Opt-out is a small switch on the profile when someone asks for it. Paid or hand-picked placement is a different product decision and is not in the first version |
+| Q39 | **Should the grid know where the client is** and show nearby creators first? | Not yet. It needs location permission and a distance rule. The creator's city is on every tile today |
 

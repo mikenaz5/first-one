@@ -126,4 +126,11 @@ extension LocalBackend {
         let mine = readReviews().map(\.review).filter { $0.creatorID == creatorID }
         return ReviewSummary(count: mine.count, ratingSum: mine.reduce(0) { $0 + $1.rating })
     }
+
+    /// Reviews for the sample creators the app starts with on a device. They belong to no booking.
+    func storeSampleReviews(_ reviews: [Review]) throws {
+        var stored = readReviews()
+        stored.append(contentsOf: reviews.map { StoredReview(review: $0, reviewerID: nil) })
+        try write(stored, to: reviewsURL)
+    }
 }

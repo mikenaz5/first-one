@@ -4,6 +4,7 @@ extension LocalBackend {
     /// Creators a client could book (they have a published package), found by name, link name or specialty.
     func searchCreators(_ query: String, limit: Int) async throws -> [CreatorProfile] {
         guard CreatorSearchRules.clean(query) != nil else { return [] }
+        await seedSampleCreatorsIfNeeded()
         let folders = (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         var found: [CreatorProfile] = []
         for folder in folders {

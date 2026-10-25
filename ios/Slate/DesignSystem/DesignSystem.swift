@@ -77,6 +77,10 @@ enum Metrics {
     static let dayStripHeight: CGFloat = 22
     static let legendKey: CGFloat = 14
 
+    /// A tile in the explore grid on a client's Home (width over height), and the narrowest a column of them gets.
+    static let exploreTileAspect: CGFloat = 0.8
+    static let exploreColumnMinWidth: CGFloat = 130
+
     /// The signature pad, a typed signature's preview, and a signature shown on a signed contract.
     static let signaturePadHeight: CGFloat = 150
     static let signaturePreviewMinHeight: CGFloat = 96

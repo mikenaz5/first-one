@@ -18,16 +18,23 @@ actor LocalBackend: SlateBackend {
     /// Seat numbers. The database holds the real ones; tests pass small ones.
     let teamConfig: TeamConfig
 
+    /// Whether to start with a few made-up creators, so a client has someone to find and book before there is a
+    /// server. Only the app itself turns this on (`BackendFactory`); tests and previews start empty.
+    let offersSampleCreators: Bool
+    /// The one run that makes them, so two screens asking at once wait for the same one.
+    var sampleSeeding: Task<Void, Never>?
+
     /// Handles that pretend to belong to other people, so the "taken" state is easy to see.
     private let simulatedTakenHandles: Set<String> = ["maya", "demo", "studio", "photo", "video"]
 
     init(
         root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }, sendsPushFromServer: Bool = false,
-        teamConfig: TeamConfig = .standard
+        teamConfig: TeamConfig = .standard, offersSampleCreators: Bool = false
     ) {
         self.clock = clock
         self.sendsPushFromServer = sendsPushFromServer
         self.teamConfig = teamConfig
+        self.offersSampleCreators = offersSampleCreators
         let base: URL
         if let root {
             base = root

@@ -6,6 +6,8 @@ struct HomeView: View {
 
     @State private var showTeamCalendar = false
     @State private var assignTarget: Booking?
+    /// Changes on pull-to-refresh, so a client's featured creators reload with the rest of Home.
+    @State private var exploreReload = 0
 
     private var firstName: String {
         // The greeting is for the person, whichever account is showing.
@@ -75,6 +77,7 @@ struct HomeView: View {
 
                     if model.isClientOnly {
                         BookAgainShelf()
+                        FeaturedCreatorsSection(reload: exploreReload)
                     }
                 }
                 .padding(.horizontal, Space.page)
@@ -82,7 +85,10 @@ struct HomeView: View {
                 .frame(maxWidth: Metrics.pageWidth)
                 .frame(maxWidth: .infinity)
             }
-            .refreshable { await model.refresh() }
+            .refreshable {
+                await model.refresh()
+                exploreReload += 1
+            }
             .motionSafe(.slateSmooth, value: attention.map(\.id))
             .motionSafe(.slateSmooth, value: nextBooking?.id)
             .slatePageBackground()
