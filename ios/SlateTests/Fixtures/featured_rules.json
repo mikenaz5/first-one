@@ -1,0 +1,74 @@
+{
+  "defaultLimit": 12,
+  "maxLimit": 24,
+  "limits": [
+    { "asked": -4, "clamped": 1 },
+    { "asked": 0, "clamped": 1 },
+    { "asked": 1, "clamped": 1 },
+    { "asked": 12, "clamped": 12 },
+    { "asked": 24, "clamped": 24 },
+    { "asked": 500, "clamped": 24 }
+  ],
+  "creators": [
+    {
+      "id": "00000000-0000-0000-0000-00000000000a", "handle": "ivy-ten-fives", "portfolio": 3,
+      "ratings": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], "created": "2026-03-01",
+      "specialties": ["weddings", "portraits"], "packages": [{ "cents": 250000, "published": true }, { "cents": 90000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000b", "handle": "one-five-star", "portfolio": 2,
+      "ratings": [5], "created": "2026-03-02",
+      "specialties": ["weddings"], "packages": [{ "cents": 120000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000c", "handle": "new-with-work", "portfolio": 4,
+      "ratings": [], "created": "2026-03-03",
+      "specialties": ["food"], "packages": [{ "cents": 80000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000d", "handle": "ten-fours", "portfolio": 1,
+      "ratings": [4, 4, 4, 4, 4, 4, 4, 4, 4, 4], "created": "2026-03-04",
+      "specialties": ["food", "weddings"], "packages": [{ "cents": 60000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000e", "handle": "stars-no-work", "portfolio": 0,
+      "ratings": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], "created": "2026-03-05",
+      "specialties": ["weddings"], "packages": [{ "cents": 100000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000f", "handle": "tie-first", "portfolio": 1,
+      "ratings": [], "created": "2026-03-06",
+      "specialties": ["portraits"], "packages": [{ "cents": 70000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000010", "handle": "tie-second", "portfolio": 1,
+      "ratings": [], "created": "2026-03-06",
+      "specialties": ["food"], "packages": [{ "cents": 70000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000011", "handle": "tie-but-newer", "portfolio": 1,
+      "ratings": [], "created": "2026-03-09",
+      "specialties": ["weddings"], "packages": [{ "cents": 70000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000012", "handle": "weak-reviews", "portfolio": 5,
+      "ratings": [2, 2, 3], "created": "2026-03-07",
+      "specialties": ["food"], "packages": [{ "cents": 50000, "published": true }]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000013", "handle": "most-work", "portfolio": 6,
+      "ratings": [], "created": "2026-02-01",
+      "specialties": ["portraits"], "packages": [{ "cents": 200000, "published": false }, { "cents": 140000, "published": true }]
+    }
+  ],
+  "order": [
+    "ivy-ten-fives", "one-five-star", "ten-fours", "most-work", "new-with-work",
+    "tie-but-newer", "tie-first", "tie-second", "weak-reviews", "stars-no-work"
+  ],
+  "bySpecialty": {
+    "weddings": ["ivy-ten-fives", "one-five-star", "ten-fours", "tie-but-newer", "stars-no-work"],
+    "food": ["ten-fours", "new-with-work", "tie-second", "weak-reviews"],
+    "portraits": ["ivy-ten-fives", "most-work", "tie-first"],
+    "aerial": []
+  }
+}
