@@ -303,6 +303,14 @@ enum SlateError: LocalizedError, Equatable {
     case invalidEmail
     case invalidCode
     case nameRequired
+    case tooManyCards(limit: Int)
+    case cardNotFound
+    case cardExpired
+    case noCardAccess
+    case noBookingWithCreator
+    case cardConsentOutdated
+    case cardDeclined
+    case cardNeedsApproval
     case backend(String)
 
     var errorDescription: String? {
@@ -433,6 +441,22 @@ enum SlateError: LocalizedError, Equatable {
             "That code didn't work. It may have expired, so ask for a new one."
         case .nameRequired:
             "Add your name. It goes on the contracts you sign."
+        case .tooManyCards(let limit):
+            "You can keep up to \(limit) cards. Remove one to add another."
+        case .cardNotFound:
+            "That card isn't on file any more."
+        case .cardExpired:
+            "That card has expired."
+        case .noCardAccess:
+            "This client hasn't allowed a saved card to be charged for this booking."
+        case .noBookingWithCreator:
+            "You can only allow creators you've booked."
+        case .cardConsentOutdated:
+            "The wording of the agreement changed. Please open it again."
+        case .cardDeclined:
+            "The card was declined. The client can pay the balance in the app instead."
+        case .cardNeedsApproval:
+            "The client's bank needs them to approve this payment. They can pay the balance in the app instead."
         case .backend(let message):
             message
         }

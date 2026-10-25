@@ -108,6 +108,28 @@ protocol SlateBackend {
     /// Sends any refunds owed on a booking to the card that paid.
     func settleRefunds(bookingID: UUID) async throws
 
+    // Cards on file
+    /// The person's own cards. Stripe holds the numbers; these are what is shown.
+    func loadCards(for userID: UUID) async throws -> [SavedCard]
+    /// The creators the person has allowed to charge a card, with the card each may use.
+    func loadCardPermissions(for userID: UUID) async throws -> [CardPermission]
+    /// Starts adding a card: Stripe's own page to type it on (the app never sees it), or, on-device, a pretend card at once.
+    func beginAddingCard(for userID: UUID) async throws -> AddCardStep
+    /// Compares with Stripe after the person comes back from its page, and returns the cards as they now stand.
+    func syncCards(for userID: UUID) async throws -> [SavedCard]
+    /// Removes a card at Stripe and here, and every permission that used it.
+    func removeCard(_ id: UUID, for userID: UUID) async throws
+    /// Allows a creator the person has booked to charge the balance of their bookings to this card. `consentVersion` is the
+    /// wording the person was shown; the backend refuses any other.
+    func allowCreator(_ creatorID: UUID, cardID: UUID, consentVersion: Int, for userID: UUID) async throws
+    /// Stops it, at once.
+    func stopAllowingCreator(_ creatorID: UUID, for userID: UUID) async throws
+    /// What this booking says about a saved-card permission to the person looking at it.
+    func cardAccess(bookingID: UUID, for userID: UUID) async throws -> CardAccess
+    /// Charges the balance of a booking to the client's saved card, for whoever can manage the booking if the client has
+    /// allowed that creator. The amount comes from the booking, never from the caller.
+    func chargeSavedCard(bookingID: UUID, by userID: UUID) async throws -> SavedCardCharge
+
     // Messages (one conversation per booking)
     /// Every conversation the person is part of, newest first, with unread counts. Bookings whose hold ran out have none.
     func loadConversations(for userID: UUID) async throws -> [ConversationSummary]

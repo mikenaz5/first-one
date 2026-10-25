@@ -106,7 +106,8 @@ extension AppModel {
 
     /// Handles `slate://book/<handle>` (open a creator's page), `slate://booking/<id>` (from a calendar event or a
     /// notification), `slate://messages/<id>` (a message notification), `slate://join/<token>` (a company invite),
-    /// `slate://stripe/…` (back from Stripe) and `slate://billing/…` (back from the company plan's pages).
+    /// `slate://stripe/…` (back from Stripe), `slate://billing/…` (back from the company plan's pages) and
+    /// `slate://cards/…` (back from the page where a card is typed).
     func handle(url: URL) {
         guard let link = AppLink(url: url) else { return }
         switch link {
@@ -124,6 +125,9 @@ extension AppModel {
             openInviteLink(token: token)
         case .billingReturn:
             Task { await billingReturned() }
+        case .cardsReturn:
+            // Back from Stripe's page where a card is typed: see which cards there are now.
+            Task { await syncCards() }
         }
     }
 

@@ -280,6 +280,13 @@ extension SupabaseBackend {
         case "not_found": return .bookingNotFound
         case "unauthorized": return .notSignedIn
         case "profile_required": return .backend("Finish setting up your profile before connecting payments.")
+        // Cards on file (`_shared/cards.ts`).
+        case "card_declined": return .cardDeclined
+        case "authentication_required": return .cardNeedsApproval
+        case "no_card_access": return .noCardAccess
+        case "card_expired": return .cardExpired
+        case "card_not_found": return .cardNotFound
+        case "too_many_cards": return .tooManyCards(limit: CardRules.maxCards)
         default: return .paymentUnavailable
         }
     }

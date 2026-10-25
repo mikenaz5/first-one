@@ -90,7 +90,7 @@ extension AppModel {
     }
 
     /// The webhook confirms real payments a moment after Apple Pay finishes, so look a few times.
-    private func waitForPayment(bookingID: UUID, kind: PaymentKind, attempts: Int = 12) async -> Bool {
+    func waitForPayment(bookingID: UUID, kind: PaymentKind, attempts: Int = 12) async -> Bool {
         for attempt in 0..<attempts {
             await reloadMoney()
             if let booking = bookings.first(where: { $0.id == bookingID }) {

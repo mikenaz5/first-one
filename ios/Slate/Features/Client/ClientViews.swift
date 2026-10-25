@@ -334,6 +334,15 @@ struct ClientProfileView: View {
         return value.isEmpty ? "Your name" : value
     }
 
+    /// "2 cards", or nothing before any are saved.
+    private var cardsDetail: String? {
+        switch model.cards.count {
+        case 0: nil
+        case 1: "1 card"
+        default: "\(model.cards.count) cards"
+        }
+    }
+
     private var paidText: String {
         let cents = ClientActivity.netPaidCents(model.payments)
         return cents == 0 ? "" : Money.format(cents, code: model.payments.first?.currencyCode ?? Money.defaultCurrencyCode)
@@ -386,6 +395,19 @@ struct ClientProfileView: View {
                     .listRowBackground(Color.slateCard)
 
                 Section {
+                    NavigationLink {
+                        ClientCardsView()
+                    } label: {
+                        row("wallet.pass", "Cards on file", detail: cardsDetail)
+                    }
+                } header: {
+                    Text("Payment methods")
+                } footer: {
+                    Text("Keep a card with Stripe, and choose which creators you've booked may charge the balance to it.")
+                }
+                    .listRowBackground(Color.slateCard)
+
+                Section {
                     Picker(selection: $appearance) {
                         ForEach(AppearancePreference.allCases) { option in
                             Text(option.title).tag(option.rawValue)
@@ -428,6 +450,7 @@ struct ClientProfileView: View {
             .slatePageBackground()
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
+            .task { await model.loadCards() }
             .sheet(isPresented: $showNotifications) {
                 NotificationSettingsSheet()
                     .presentationDetents([.large])

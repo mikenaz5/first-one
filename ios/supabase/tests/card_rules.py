@@ -7,11 +7,13 @@ Needs a Postgres server (16 recommended) and psycopg2, like the other scripts he
 
     PGPORT=5432 python3 ios/supabase/tests/card_rules.py
 
-The expiry rule and the limits are shared with the app through SlateTests/Fixtures/card_rules.json.
+The expiry rule and the limits are shared with the app through SlateTests/Fixtures/card_rules.json. What the app decodes
+(card_rows.json) is checked against what the database really returns; run with --dump to rewrite it after changing a shape.
 """
 import json
 import os
 import pathlib
+import re
 import sys
 import uuid
 
@@ -27,6 +29,8 @@ if os.environ.get("PGPASSWORD"):
 HERE = pathlib.Path(__file__).resolve().parent
 MIG = HERE.parent / "migrations"
 FIXTURE = HERE.parents[1] / "SlateTests" / "Fixtures" / "card_rules.json"
+ROWS = HERE.parents[1] / "SlateTests" / "Fixtures" / "card_rows.json"
+SWIFT = HERE.parents[1] / "Slate" / "Core" / "SupabaseBackend+Cards.swift"
 DB = "slate_cards"
 rules = json.loads(FIXTURE.read_text())
 
@@ -322,6 +326,36 @@ check("you have to be signed in", err(sql_as(None, "select card_access_for_booki
 check("someone on the company's side who can only look sees it, without the last four",
       rpc(vee, "card_access_for_booking", b_acme)["allowed"] is True and rpc(vee, "card_access_for_booking", b_acme)["last4"] is None)
 check("a member with no share in the booking doesn't", err(rpc(kim, "card_access_for_booking", b_acme), "not_found") or rpc(kim, "card_access_for_booking", b_acme)["allowed"] is True)
+
+# =============================================================================
+print("\n[what the app decodes]")
+columns = re.search(r'static let cardColumns = "([^"]+)"', SWIFT.read_text()).group(1)
+card_row = sql_as(alice, f"select to_jsonb(c) from (select {columns} from client_cards where id = %s) c", (visa,))
+check("the columns the app asks for are the ones the database allows", not isinstance(card_row, str), card_row)
+grant_row = sql_as(alice, "select to_jsonb(g) from my_card_grants() g where g.creator_id = %s", (carol,))
+actual = {
+    "card": card_row[0][0][0],
+    "grant": grant_row[0][0][0],
+    "access_client": rpc(alice, "card_access_for_booking", b_carol),
+    "access_creator": rpc(carol, "card_access_for_booking", b_carol),
+    "access_none": rpc(carol, "card_access_for_booking", b_carol_bea),
+}
+
+
+def shape(value):
+    if isinstance(value, dict):
+        return {k: shape(v) for k, v in sorted(value.items())}
+    return "null" if value is None else type(value).__name__
+
+
+if "--dump" in sys.argv:
+    ROWS.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n")
+    print("  wrote", ROWS.name)
+else:
+    committed = json.loads(ROWS.read_text())
+    for name in actual:
+        check(f"{name}: the shape the app is tested against is what the database returns", shape(committed[name]) == shape(actual[name]),
+              (shape(committed[name]), shape(actual[name])))
 
 # =============================================================================
 print("\n[charging the balance]")

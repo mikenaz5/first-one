@@ -215,6 +215,8 @@ enum AppLink: Equatable {
     case join(token: String)
     /// Back from the company plan's Stripe pages: `slate://billing/return` or `/cancel`.
     case billingReturn
+    /// Back from the Stripe page where a card is typed: `slate://cards/return` or `/cancel`.
+    case cardsReturn
 
     init?(url: URL) {
         guard url.scheme == AppConfig.urlScheme, let host = url.host else { return nil }
@@ -235,6 +237,8 @@ enum AppLink: Equatable {
             self = .join(token: last)
         case "billing":
             self = .billingReturn
+        case "cards":
+            self = .cardsReturn
         default:
             return nil
         }

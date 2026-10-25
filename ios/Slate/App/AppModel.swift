@@ -78,6 +78,12 @@ final class AppModel {
     /// A creator's Stripe account, if they have one. Only meaningful for creators.
     var paymentAccount: PaymentAccount?
     var isPaying = false
+    /// The person's own cards (kept by Stripe; the app only shows what identifies them), and the creators they have allowed
+    /// to charge one for the balance of a booking.
+    var cards: [SavedCard] = []
+    var cardPermissions: [CardPermission] = []
+    /// What each booking on screen says about a saved-card permission, for the person looking at it.
+    var cardAccessByBooking: [UUID: CardAccess] = [:]
     var calendarPrefs = CalendarPreferences.load()
     var calendarAccess: CalendarService.Access = .notDetermined
     /// Which tab is showing. Lives here so deep links can switch tabs.
@@ -297,6 +303,9 @@ final class AppModel {
         reviewSummaryByCreator = [:]
         payments = []
         paymentAccount = nil
+        cards = []
+        cardPermissions = []
+        cardAccessByBooking = [:]
         presentedPage = nil
         pendingBookingHandle = nil
         clientPlace = nil

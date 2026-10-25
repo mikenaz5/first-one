@@ -1,0 +1,40 @@
+{
+  "access_client": {
+    "allowed": true,
+    "brand": "visa",
+    "expired": false,
+    "last4": "4242"
+  },
+  "access_creator": {
+    "allowed": true,
+    "brand": "visa",
+    "expired": false,
+    "last4": null
+  },
+  "access_none": {
+    "allowed": false,
+    "brand": null,
+    "expired": false,
+    "last4": null
+  },
+  "card": {
+    "brand": "visa",
+    "created_at": "2026-10-25T23:09:46.822928+00:00",
+    "exp_month": 8,
+    "exp_year": 2099,
+    "id": "79608610-2c96-4fe7-a5c3-93ed1b3336c8",
+    "last4": "4242"
+  },
+  "grant": {
+    "avatar_path": null,
+    "brand": "visa",
+    "card_id": "79608610-2c96-4fe7-a5c3-93ed1b3336c8",
+    "creator_id": "54f6d657-cf34-45e4-a963-c0f72877d5c4",
+    "creator_name": "Carol Chen",
+    "exp_month": 8,
+    "exp_year": 2099,
+    "granted_at": "2026-10-25T23:09:47.356269+00:00",
+    "handle": "carol-c",
+    "last4": "4242"
+  }
+}

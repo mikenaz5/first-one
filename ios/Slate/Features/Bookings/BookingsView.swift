@@ -269,6 +269,10 @@ struct BookingDetailView: View {
         }
         .navigationTitle(booking?.packageName ?? "Booking")
         .navigationBarTitleDisplayMode(.inline)
+        // What the booking says about a card on file; again when the money or the permissions around it change.
+        .task(id: [model.payments.count, model.cardPermissions.count, model.cards.count]) {
+            if let booking { await model.refreshCardAccess(for: booking) }
+        }
     }
 
     private func content(_ booking: Booking) -> some View {
@@ -291,6 +295,8 @@ struct BookingDetailView: View {
                     .padding(.vertical, Space.xs)
             }
                 .listRowBackground(Color.slateCard)
+
+            SavedCardSection(booking: booking)
 
             DeliverySection(booking: booking, tick: shootStarted)
 
