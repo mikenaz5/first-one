@@ -62,4 +62,4 @@ jobs:
 
       - name: Run the quick-start script with only the tools macOS ships
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./scripts/run-simulator.sh --headless
+          env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./scripts/run-simulator.sh --headless
