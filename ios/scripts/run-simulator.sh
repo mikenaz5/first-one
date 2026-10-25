@@ -121,7 +121,13 @@ fi
 say "Starting the simulator"
 xcrun simctl boot "$udid" 2>/dev/null || true   # already running is fine
 if [[ $headless -eq 0 ]]; then
-  open -a Simulator --args -CurrentDeviceUDID "$udid"
+  # The Simulator app lives inside Xcode. Open it from there, since the name alone isn't always found.
+  sim_app="$(xcode-select -p)/Applications/Simulator.app"
+  if [[ -d "$sim_app" ]]; then
+    open "$sim_app" --args -CurrentDeviceUDID "$udid" || true
+  else
+    open -a Simulator --args -CurrentDeviceUDID "$udid" || say "Couldn't open the Simulator window by itself. In Xcode choose Xcode > Open Developer Tool > Simulator."
+  fi
 fi
 xcrun simctl bootstatus "$udid" -b >/dev/null
 
