@@ -10,6 +10,7 @@ struct WelcomeView: View {
     /// The unhashed nonce for the in-flight request. Apple gets the SHA-256; the backend gets this.
     @State private var rawNonce = ""
     @State private var appeared = false
+    @State private var showEmail = false
 
     var body: some View {
         ZStack {
@@ -23,6 +24,7 @@ struct WelcomeView: View {
             }
             .frame(maxWidth: Metrics.readableWidth)
         }
+        .sheet(isPresented: $showEmail) { EmailSignInView() }
         .onAppear {
             if reduceMotion {
                 appeared = true
@@ -58,6 +60,21 @@ struct WelcomeView: View {
             }
             .stagger(appeared, index: 0)
 
+            if model.pendingBookingHandle != nil {
+                // Someone sent them a booking link: say so, and that signing in is all that's left.
+                Label {
+                    Text("You've been sent a booking link. Sign in, free, to see their page and book.")
+                        .font(.subheadline)
+                } icon: {
+                    Image(systemName: "link")
+                        .foregroundStyle(Color.slateAccentText)
+                        .accessibilityHidden(true)
+                }
+                .card()
+                .accessibilityElement(children: .combine)
+                .stagger(appeared, index: 1)
+            }
+
             VStack(alignment: .leading, spacing: Space.l) {
                 FeatureRow(symbol: "link", title: "One link to share", detail: "Clients pick a package and a time.")
                 FeatureRow(symbol: "signature", title: "Contracts built in", detail: "Signed before the booking is confirmed.")
@@ -81,10 +98,23 @@ struct WelcomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
                 .accessibilityHint("Creates your account or signs you in")
 
+                Button {
+                    showEmail = true
+                } label: {
+                    Label("Continue with email", systemImage: "envelope")
+                        .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+                }
+                .buttonStyle(.slateOutline)
+                .accessibilityHint("Emails you a six-digit code. No password.")
+
                 #if DEBUG
                 if model.isLocalBackend {
                     Button("Continue with a demo account") {
                         Task { await model.signInAsDemo() }
+                    }
+                    .buttonStyle(.slateOutline)
+                    Button("Continue with a demo client") {
+                        Task { await model.signInAsDemoClient() }
                     }
                     .buttonStyle(.slateOutline)
                 }

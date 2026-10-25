@@ -105,7 +105,10 @@ final class AppModel {
     @ObservationIgnored var startupTasks: [Task<Void, Never>] = []
     /// A creator's public page opened from a booking link, shown over the app.
     var presentedPage: PublicCreatorPage?
-    @ObservationIgnored var pendingBookingHandle: String?
+    /// A booking link opened before the person was signed in. Welcome says so, and the page opens after sign-in.
+    var pendingBookingHandle: String?
+    /// A client who chose "Start taking bookings": shows the Just me or My company setup over the app.
+    var startingCreatorSetup = false
     let calendar = CalendarService()
 
     init(
@@ -185,6 +188,62 @@ final class AppModel {
         await signIn(with: credential)
     }
 
+    // MARK: - Email code and client accounts
+
+    /// Emails a sign-in code. On a device with no server nothing is sent: the screen shows the demo code.
+    func requestEmailCode(_ email: String) async throws {
+        try await backend.requestEmailCode(email)
+    }
+
+    /// Signs in with the emailed code. Throws, so the screen can show what was wrong beside the field.
+    func signInWithEmailCode(email: String, code: String) async throws {
+        let newSession = try await backend.signInWithEmailCode(email: email, code: code)
+        UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
+        session = newSession
+        await loadAccount()
+    }
+
+    /// Debug-only: a client with no profile, signed in with the demo code, so the client side can be tried alone.
+    func signInAsDemoClient() async {
+        do {
+            try await signInWithEmailCode(email: "sam@example.com", code: EmailCodeRules.demoCode)
+            if session?.fullName?.isEmpty ?? true { try await becomeClient(name: "Sam Client") } else { try await becomeClient(name: nil) }
+        } catch {
+            show(error, title: "Couldn't sign in")
+        }
+    }
+
+    /// The person is here to book. Saves the name that goes on their contracts if they gave one, and opens the app.
+    func becomeClient(name: String?) async throws {
+        guard let current = session else { throw SlateError.notSignedIn }
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+            session = try await backend.updateDisplayName(name)
+        } else if (current.fullName ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+            throw SlateError.nameRequired
+        }
+        UserDefaults.standard.set(true, forKey: AppConfig.clientAccountKey(for: current.userID))
+        updatePhase()
+    }
+
+    /// Someone who has no creator profile and works for no company. They book; they don't sell.
+    var isClientOnly: Bool {
+        session != nil && personalProfile?.isComplete != true && accounts.companies.isEmpty
+    }
+
+    /// Whether this person has said they are a client, or has booked as one.
+    private var isClientAccount: Bool {
+        guard let id = session?.userID else { return false }
+        return UserDefaults.standard.bool(forKey: AppConfig.clientAccountKey(for: id))
+            || bookings.contains { $0.clientID == id }
+    }
+
+    /// A booking link opened by someone with no account makes a client (no type to choose), once their name is known.
+    private func adoptAsClientIfTheyArrivedByLink() {
+        guard let session, pendingBookingHandle != nil, personalProfile?.isComplete != true, accounts.companies.isEmpty,
+              !(session.fullName ?? "").trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        UserDefaults.standard.set(true, forKey: AppConfig.clientAccountKey(for: session.userID))
+    }
+
     func signOut() async {
         await forgetDevice()
         do {
@@ -197,12 +256,14 @@ final class AppModel {
     }
 
     func deleteAccount() async {
+        let deleted = session?.userID
         do {
             try await backend.deleteAccount()
         } catch {
             show(error, title: "Couldn't delete your account")
             return
         }
+        if let deleted { UserDefaults.standard.removeObject(forKey: AppConfig.clientAccountKey(for: deleted)) }
         await clearAccount()
     }
 
@@ -320,9 +381,10 @@ final class AppModel {
     }
 
     func updatePhase() {
+        adoptAsClientIfTheyArrivedByLink()
         if session == nil {
             phase = .signedOut
-        } else if personalProfile?.isComplete == true || !accounts.companies.isEmpty {
+        } else if personalProfile?.isComplete == true || !accounts.companies.isEmpty || isClientAccount {
             phase = .ready
             Task { await openPendingBookingLinkIfNeeded() }
             Task { await openPendingInviteIfNeeded() }

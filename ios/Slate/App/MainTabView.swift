@@ -10,9 +10,17 @@ struct MainTabView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        if model.isClientOnly {
+            ClientTabView()
+        } else {
+            creatorTabs
+        }
+    }
+
+    private var creatorTabs: some View {
         @Bindable var model = model
 
-        TabView(selection: $model.selectedTab) {
+        return TabView(selection: $model.selectedTab) {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)

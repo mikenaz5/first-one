@@ -114,13 +114,16 @@ actor LocalBackend: SlateBackend {
 
         let name = credential.fullName.map { $0.formatted() }.flatMap { $0.isEmpty ? nil : $0 }
         let previous = read(AuthSession.self, from: sessionURL)
+        let stored = storedClient(userID)
         let session = AuthSession(
             userID: userID,
             appleUserID: credential.userID,
-            email: credential.email ?? previous?.email,
-            fullName: name ?? previous?.fullName
+            email: credential.email ?? previous?.email ?? stored?.email,
+            // Apple only gives the name the first time, so keep the one we have.
+            fullName: name ?? previous?.fullName ?? stored?.name
         )
         try write(session, to: sessionURL)
+        if let known = session.fullName { try rememberClient(userID, name: known, email: session.email) }
         return session
     }
 

@@ -1,11 +1,20 @@
 import SwiftUI
 
-/// The first thing a new person sees after Sign in with Apple: are they one person, or a company?
-/// Choosing "Just me" goes on to the usual profile setup; "My company" goes on to starting a company.
+/// The first thing a new person sees after signing in: are they one person, a company, or here to book?
+/// "Just me" goes on to the usual profile setup, "My company" to starting a company, and "I'm booking a creator" straight
+/// into the app as a client (asking for a name first if there isn't one).
 struct AccountChoiceFlow: View {
-    private enum Step { case choose, individual, company }
+    private enum Step { case choose, individual, company, client }
+
+    @Environment(AppModel.self) private var model
+
+    /// A client who has chosen to start selling can't choose to be a client again.
+    var allowClient = true
+    /// Shown as a Cancel button when the flow was opened from inside the app.
+    var onCancel: (() -> Void)?
 
     @State private var step = Step.choose
+    @State private var isStartingClient = false
 
     var body: some View {
         ZStack {
@@ -13,7 +22,9 @@ struct AccountChoiceFlow: View {
             case .choose:
                 AccountChoiceView(
                     onIndividual: { step = .individual },
-                    onCompany: { step = .company }
+                    onCompany: { step = .company },
+                    onClient: allowClient ? { startClient() } : nil,
+                    onCancel: onCancel
                 )
                 .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)).combined(with: .opacity))
             case .individual:
@@ -22,9 +33,62 @@ struct AccountChoiceFlow: View {
             case .company:
                 CompanySetupView(mode: .new, onBack: { step = .choose })
                     .transition(.move(edge: .trailing).combined(with: .opacity))
+            case .client:
+                ClientNameStep(onBack: { step = .choose })
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .motionSafe(.slateSmooth, value: step)
+        .onAppear {
+            // Someone who arrived from a booking link is here to book: no type to choose.
+            if allowClient, model.pendingBookingHandle != nil { startClient() }
+        }
+    }
+
+    /// Straight in if we already know the name; otherwise ask for it once.
+    private func startClient() {
+        guard !isStartingClient else { return }
+        if (model.session?.fullName ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+            step = .client
+            return
+        }
+        isStartingClient = true
+        Task {
+            do {
+                try await model.becomeClient(name: nil)
+            } catch {
+                model.show(error, title: "Couldn't continue")
+            }
+            isStartingClient = false
+        }
+    }
+}
+
+/// Asks a new client for the name that goes on their contracts, then opens the app.
+private struct ClientNameStep: View {
+    @Environment(AppModel.self) private var model
+    let onBack: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: onBack) {
+                    Label("Back", systemImage: "chevron.left")
+                        .frame(minHeight: Metrics.minTapTarget)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, Space.page)
+
+            ClientNameForm(
+                heading: "What should we call you?",
+                detail: "This is the name on the contracts you sign when you book. You can change it later in Profile.",
+                buttonTitle: "Continue"
+            ) { name in
+                try await model.becomeClient(name: name)
+            }
+        }
+        .slateGlowBackground()
     }
 }
 
@@ -33,10 +97,17 @@ struct AccountChoiceView: View {
 
     let onIndividual: () -> Void
     let onCompany: () -> Void
+    /// Nil leaves the third card out (a client who is starting to sell).
+    var onClient: (() -> Void)?
+    var onCancel: (() -> Void)?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xl) {
+                if let onCancel {
+                    Button("Cancel", action: onCancel)
+                        .frame(minHeight: Metrics.minTapTarget)
+                }
                 VStack(alignment: .leading, spacing: Space.s) {
                     Text("How will you use Slate?")
                         .font(SlateFont.display)
@@ -69,9 +140,24 @@ struct AccountChoiceView: View {
                         ],
                         action: onCompany
                     )
+                    if let onClient {
+                        ChoiceCard(
+                            symbol: "calendar.badge.checkmark",
+                            title: "I'm booking a creator",
+                            subtitle: "Client · always free",
+                            points: [
+                                "Book, sign and pay in a few taps",
+                                "Your contracts, messages and files in one place",
+                                "Start selling later, any time",
+                            ],
+                            action: onClient
+                        )
+                    }
                 }
 
-                Text("Not sure? Choose Just me. You can upgrade from your profile whenever your team grows.")
+                Text(onClient == nil
+                     ? "Not sure? Choose Just me. You can upgrade from your profile whenever your team grows."
+                     : "Not sure? Choose Just me if you sell your work, or I'm booking a creator if you hire people. You can change later.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -142,6 +228,6 @@ private struct ChoiceCard: View {
 }
 
 #Preview("Account type") {
-    AccountChoiceView(onIndividual: {}, onCompany: {})
+    AccountChoiceView(onIndividual: {}, onCompany: {}, onClient: {})
         .environment(AppModel(backend: LocalBackend(root: FileManager.default.temporaryDirectory.appendingPathComponent("preview-choice"))))
 }

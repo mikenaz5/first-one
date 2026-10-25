@@ -81,7 +81,8 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
             userID: session.user.id,
             appleUserID: UserDefaults.standard.string(forKey: AppConfig.appleUserIDKey),
             email: session.user.email,
-            fullName: nil
+            // The name a person goes by is kept with their account, so it survives signing out and in.
+            fullName: session.user.userMetadata["full_name"]?.stringValue
         )
     }
 
@@ -93,12 +94,51 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
                 nonce: credential.rawNonce
             )
         )
-        let name = credential.fullName.map { $0.formatted() }.flatMap { $0.isEmpty ? nil : $0 }
+        let given = credential.fullName.map { $0.formatted() }.flatMap { $0.isEmpty ? nil : $0 }
+        let kept = session.user.userMetadata["full_name"]?.stringValue
+        // Apple only gives the name the first time, so keep it with the account.
+        if let given, kept == nil, let clean = EmailCodeRules.cleanName(given) {
+            _ = try? await client.auth.update(user: UserAttributes(data: ["full_name": .string(clean)]))
+        }
         return AuthSession(
             userID: session.user.id,
             appleUserID: credential.userID,
             email: credential.email ?? session.user.email,
-            fullName: name
+            fullName: kept ?? given
+        )
+    }
+
+    func requestEmailCode(_ email: String) async throws {
+        guard let address = EmailCodeRules.cleanEmail(email) else { throw SlateError.invalidEmail }
+        try await client.auth.signInWithOTP(email: address, shouldCreateUser: true)
+    }
+
+    func signInWithEmailCode(email: String, code: String) async throws -> AuthSession {
+        guard let address = EmailCodeRules.cleanEmail(email) else { throw SlateError.invalidEmail }
+        guard let digits = EmailCodeRules.cleanCode(code) else { throw SlateError.invalidCode }
+        do {
+            let response = try await client.auth.verifyOTP(email: address, token: digits, type: .email)
+            return AuthSession(
+                userID: response.user.id,
+                appleUserID: nil,
+                email: response.user.email ?? address,
+                fullName: response.user.userMetadata["full_name"]?.stringValue
+            )
+        } catch let error as AuthError {
+            // A wrong, used or expired code all come back as an auth error; a lost connection doesn't.
+            _ = error
+            throw SlateError.invalidCode
+        }
+    }
+
+    func updateDisplayName(_ name: String) async throws -> AuthSession {
+        guard let clean = EmailCodeRules.cleanName(name) else { throw SlateError.nameRequired }
+        let user = try await client.auth.update(user: UserAttributes(data: ["full_name": .string(clean)]))
+        return AuthSession(
+            userID: user.id,
+            appleUserID: UserDefaults.standard.string(forKey: AppConfig.appleUserIDKey),
+            email: user.email,
+            fullName: clean
         )
     }
 

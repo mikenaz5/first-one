@@ -14,6 +14,11 @@ struct AccountButton: View {
     private var name: String { model.profile?.displayName ?? "Account" }
 
     var body: some View {
+        // A client has one account and nothing to switch to.
+        if !model.isClientOnly { button }
+    }
+
+    private var button: some View {
         Button {
             showSwitcher = true
         } label: {

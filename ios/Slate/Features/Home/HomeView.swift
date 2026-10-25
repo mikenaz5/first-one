@@ -9,7 +9,7 @@ struct HomeView: View {
 
     private var firstName: String {
         // The greeting is for the person, whichever account is showing.
-        model.personalProfile?.displayName.split(separator: " ").first.map(String.init) ?? ""
+        model.clientFirstName
     }
 
     private var attention: [AttentionItem] { model.attentionItems }
@@ -56,6 +56,10 @@ struct HomeView: View {
                         NextBookingCard(booking: nextBooking)
                     }
 
+                    if model.isClientOnly {
+                        FindCreatorCard()
+                    }
+
                     if model.can(.companyEdit), let completeness = model.completeness, !completeness.isComplete {
                         CompletenessCard(completeness: completeness)
                     }
@@ -92,7 +96,7 @@ struct HomeView: View {
 
     /// Only someone who can change services, hours and contracts is asked to set them up.
     private var needsSetup: Bool {
-        guard model.can(.servicesManage) else { return false }
+        guard !model.isClientOnly, model.can(.servicesManage) else { return false }
         return model.packages.isEmpty || model.needsAvailability || !model.hasCreatorSignature
             || (model.hasPackagesWithDeposit && model.can(.paymentsConnect) && !model.canTakePayments)
     }

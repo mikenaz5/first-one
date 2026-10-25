@@ -300,6 +300,9 @@ enum SlateError: LocalizedError, Equatable {
     case memberUnavailable
     case profileRequired
     case billingUnavailable
+    case invalidEmail
+    case invalidCode
+    case nameRequired
     case backend(String)
 
     var errorDescription: String? {
@@ -424,6 +427,12 @@ enum SlateError: LocalizedError, Equatable {
             "Set up your own profile first."
         case .billingUnavailable:
             "Billing isn't available in this build. It needs a server with Stripe set up; see the README."
+        case .invalidEmail:
+            "Check the email address and try again."
+        case .invalidCode:
+            "That code didn't work. It may have expired, so ask for a new one."
+        case .nameRequired:
+            "Add your name. It goes on the contracts you sign."
         case .backend(let message):
             message
         }
@@ -448,6 +457,9 @@ enum AppConfig {
     static let notificationPromptDismissedKey = "slate.notificationPromptDismissed"
     /// Fake Apple user identifier used by the debug-only demo sign-in.
     static let demoAppleUserID = "slate.demo"
+
+    /// Set when a person says they are here to book (a client), so a person with no profile isn't asked to make one.
+    static func clientAccountKey(for userID: UUID) -> String { "slate.clientAccount.\(userID.uuidString.lowercased())" }
 
     /// Which account (their own, or a company's) a person last had open on this device.
     static func activeAccountKey(for userID: UUID) -> String { "slate.activeAccount.\(userID.uuidString.lowercased())" }

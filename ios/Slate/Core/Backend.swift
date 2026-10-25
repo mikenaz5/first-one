@@ -6,6 +6,12 @@ protocol SlateBackend {
     // Auth
     func restoreSession() async -> AuthSession?
     func signInWithApple(_ credential: AppleCredential) async throws -> AuthSession
+    /// Emails a six-digit sign-in code. Throws `invalidEmail`, `rateLimited`.
+    func requestEmailCode(_ email: String) async throws
+    /// Signs in with the code, creating a free account for an address that has none. Throws `invalidEmail`, `invalidCode`.
+    func signInWithEmailCode(email: String, code: String) async throws -> AuthSession
+    /// Saves the name a person goes by on the contracts they sign. Throws `nameRequired`.
+    func updateDisplayName(_ name: String) async throws -> AuthSession
     func signOut() async throws
     func deleteAccount() async throws
 
