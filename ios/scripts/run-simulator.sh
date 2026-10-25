@@ -12,6 +12,22 @@ set -euo pipefail
 say() { printf '\n==> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
+# Prints what this Mac has, so a problem can be diagnosed from a copy of the Terminal window.
+diagnose() {
+  {
+    echo
+    echo "----- Copy everything from here to the end and send it to Claude -----"
+    echo "macOS: $(sw_vers -productVersion 2>&1)"
+    echo "Xcode folder: $(xcode-select -p 2>&1)"
+    xcodebuild -version 2>&1 | head -3
+    echo "Free space: $(df -h / | tail -1 | awk '{print $4}')"
+    echo "Simulator software installed:"
+    xcrun simctl list runtimes 2>&1 | head -8
+    echo "Phones available:"
+    xcrun simctl list devices available 2>&1 | head -14
+  } >&2
+}
+
 cd "$(dirname "$0")/.."   # the ios/ folder
 
 device=""
@@ -62,6 +78,11 @@ if [[ $open_xcode -eq 1 ]]; then
   exit 0
 fi
 
+if ! xcrun simctl list devices available >/dev/null 2>&1; then
+  diagnose
+  die "Xcode's simulator tool isn't working yet. Open the Xcode app once, let it finish installing components, quit it, and run this again."
+fi
+
 # Pick the simulator: the one asked for, or the newest regular iPhone that is installed.
 uuid_pattern='[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}'
 pick_udid() {
@@ -90,8 +111,10 @@ if [[ -z "$udid" && -z "$device" ]]; then
 fi
 if [[ -z "$udid" ]]; then
   if [[ -n "$device" ]]; then
+    diagnose
     die "No installed simulator is called \"$device\". See what you have with: xcrun simctl list devices available"
   fi
+  diagnose
   die "There is still no iPhone simulator. Open Xcode, choose Xcode > Settings > Components, download the iOS simulator there, and run this again."
 fi
 
@@ -117,6 +140,7 @@ if ! xcodebuild build \
       ${signing[@]+"${signing[@]}"} \
       > build/xcodebuild.log 2>&1; then
   grep -E 'error:' build/xcodebuild.log | sort -u | head -30 >&2 || true
+  diagnose
   die "The build failed. The full log is in ios/build/xcodebuild.log."
 fi
 
