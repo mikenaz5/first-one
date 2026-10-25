@@ -3,7 +3,7 @@
 **Status:** Draft v0.3 · 2026-10-25 · Working title: *Slate* (placeholder)
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
-**Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
+**Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
 
 ---
 
@@ -37,6 +37,7 @@ Decisions made with the product owner:
 | D12 | **Storage comes with the plan, and delivered files expire 30 days after delivery.** An Individual account has a storage allowance. A company's allowance grows with its billed seats. Files that are not saved in time are deleted. | Config values in 4.4. Expiry is final, and the app says so before and after delivery (R17). |
 | D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
 | D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
+| D15 | **Revisions are a second form of delivery, with no paywall.** After the client has paid, the creator can send revised or extra files that the client can save at once, with no payment step. | Section 5.5 and flow 8.12. A revision cannot exist while a balance is owed, so it is never a way around payment (R21). |
 
 Assumptions, open to change (section 13):
 
@@ -51,7 +52,7 @@ Assumptions, open to change (section 13):
 - **A9.** A company has exactly one Owner. Ownership can be transferred, and an Owner must transfer or delete the company before deleting their own account.
 - **A10.** Invite links expire after 7 days (config value). The link is the credential. The email typed on an invite is only a label and an address for the Mail sheet, because Hide My Email relay addresses make matching unreliable (R6).
 - **A11.** The 30 days run from the moment the creator taps Deliver. Paying does not restart them and saving a file does not shorten them. On the last day the previews and the originals are deleted together (Q24).
-- **A12.** A booking has one delivery. The creator can add files to it until it expires, and added files expire with it.
+- **A12.** A booking has one delivery and any number of revisions (D15). The creator can add files to a delivery or a revision until it expires, and added files expire with it.
 - **A13.** Previews are made on the creator's phone (reduced and watermarked) and uploaded beside each original. The server decides who may see what and caps how big a preview may be, but does not look at the pixels. Making previews on the server is Later (R18).
 - **A14.** Saving is file by file, or "Save all" as a queue of downloads. There are no zip files in the first version.
 
@@ -231,7 +232,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 | Pay balance | One-tap Apple Pay from a reminder, due N days before the shoot (default 7). | MVP |
 | Change or cancel | Reschedule request. Cancel with refund shown per policy *before* confirming. | MVP |
 | Contract access | Signed PDF in the booking, shareable from the system share sheet. Emailed to both parties. | MVP |
-| Receive files | Preview the delivered photos and videos at once, pay the balance to unlock them, save them to Photos or Files before the window ends (5.5, 8.12). | MVP |
+| Receive files | Preview the delivered photos and videos at once, pay the balance to unlock them, save them to Photos or Files before the window ends. Later revisions arrive the same way and are free (5.5, 8.12). | MVP |
 | Messages | Booking-scoped. | MVP |
 | Calendar, reminders, widget | EventKit event with an alarm. Push at 24 h and 1 h. | MVP |
 | Saved creators and rebook | The client's **Services** tab shows creators they've booked, with their packages. | MVP |
@@ -279,6 +280,7 @@ A creator delivers the finished photos and videos inside Slate. The client sees 
 | Background uploads | Uploads continue when the app is closed, resume after a drop in signal, and show progress and **Retry** per file. A large video asks before using cellular data. | MVP |
 | Previews | Each file has a reduced, watermarked preview made on the creator's phone. The client sees previews as soon as files are delivered. A preview is view only: no Save, no Share. | MVP |
 | Unlock on payment | Originals can be saved only when nothing is owed on the booking. The balance becomes payable at delivery (8.12). | MVP |
+| Revisions | Once the client has paid, the creator can **Send a revision**: more files with a title ("Revision 2: colour corrections") and a note. The client can save them at once, with no payment step. Each revision has its own 30 days and its own saved count. | MVP |
 | Saving | Per file to Photos or Files, or **Save all** as a queue of downloads that continues in the background. "Saved 12 of 48" is shown to the client and to the creator. | MVP |
 | Expiry | Everything in a delivery is deleted 30 days after delivery. The client is reminded at 7 days and 1 day while anything is unsaved. The creator is told when it ends and how many files were saved. | MVP |
 | Storage meter | "4.2 of 25 GB used" under Settings, for the account on screen (4.4). | MVP |
@@ -286,6 +288,7 @@ A creator delivers the finished photos and videos inside Slate. The client sees 
 | Report a file | Either person can report a file. Reports go to the support console (R16). | MVP |
 | Link delivery | The existing delivery by external link stays, for very large files. It still needs Confirm receipt before the balance is payable. | MVP |
 | Favourites, comments, public gallery links, zip downloads, print sales | Client gallery extras. | Later |
+| Client revision requests, revisions included in a package | The client asks for a revision in a structured request, and a package says how many revisions it includes. Today a client asks in the conversation. | Later |
 | Previews made on the server, video transcoding and streaming | Stronger previews and smoother video. | Later |
 | Extend the window | A creator or client asks for more than 30 days. | Later |
 
@@ -295,7 +298,9 @@ A creator delivers the finished photos and videos inside Slate. The client sees 
 - **When a preview can be opened:** by the booking's client from delivery until expiry, and by the creator side while the files exist.
 - **When an original can be opened:** by the booking's client only after delivery, before expiry, and when **nothing is owed** (the balance is paid, or there was none). By the creator side while the files exist. Whether anything is owed comes from payments recorded by Stripe's signed webhook, like everything else about money, so the app cannot unlock a file.
 - **Hosted delivery has no Confirm receipt step.** The previews are how the client checks the work, so the balance is payable at delivery, and the booking completes when the files are delivered and nothing is owed. The delivery screen shows how many photos and videos there are, so a client can tell it is the whole set. "Something's wrong" opens the conversation. Link delivery is unchanged.
-- **One way per booking.** A booking is delivered by files or by link. The choice is locked once the client has paid the balance or confirmed receipt.
+- **One way for the first delivery.** The first delivery is by files or by link, and the choice is locked once the client has paid the balance or confirmed receipt. Revisions are always files, whichever way the first delivery was made.
+- **Revisions have no paywall.** Once the first delivery has been made and nothing is owed, the creator can send a revision (more files, a title, a note) as often as needed, on a completed booking too. Nothing in a revision is locked, so it has no payment step and its originals can be saved at once. It is not a way around payment, because the backend refuses to create a revision while a balance is owed, and a creator has no switch to waive payment on a first delivery (R21, Q31). A revision has its own 30 days, uses the same allowance, and leaves earlier deliveries as they are. It is also the way to re-send files after a paid delivery has expired.
+- **Notifications** use the existing Bookings switch: files delivered, revision sent, files about to expire (to the client), and a delivery or revision expired (to the creator). The conversation also gets a line for each delivery and each revision, written by the database like the others.
 - **Expiry is final.** On the last day the originals and previews are deleted together. The booking, contract, payments and messages are untouched. What stays is the history of the delivery: names, kinds, sizes, and whether each file was saved.
 - **After expiry** the client sees that the files have expired and who to ask. The creator can deliver again, which starts a new 30 days. If the balance is already paid, the client can save as soon as the new delivery is made.
 - **Deleting an account** deletes the files it delivered. A client who deletes their account loses their access and nothing else.
@@ -374,7 +379,7 @@ erDiagram
     ORGANIZATION ||--o{ ACTIVITY_ENTRY : logs
     PACKAGE }o--o{ MEMBERSHIP : "offered only by (optional)"
     BOOKING }o--o| USER : "assigned to"
-    BOOKING ||--o| DELIVERY : "delivered through (files)"
+    BOOKING ||--o{ DELIVERY : "delivered and revised through (files)"
     DELIVERY ||--o{ DELIVERY_FILE : contains
 ```
 
@@ -405,7 +410,7 @@ erDiagram
 | **Payment account** | creator id (**the owner**), Stripe account id, charges enabled, payouts enabled, details submitted | One per owner. A company's is separate from the personal one of any member. |
 | **Conversation / Message** | booking id, participants; sender, kind (text, system), body, sent at, read by | System messages are generated for booking, signing, payment and change events. |
 | **Device / NotificationPreference** | user id, APNs token, environment; per-event toggles | |
-| **Delivery** (files) | booking id, owner (the provider party, whose allowance is used), state (draft, delivered, expired), delivered by and at, expires at, expired at, file count, bytes | One per booking (A12). Written by backend functions only, never directly. The link delivery already on a booking is separate and unchanged. |
+| **Delivery** (files) | booking id, owner (the provider party, whose allowance is used), kind (delivery or revision), sequence (0 for the delivery, 1, 2 and so on for revisions), title and note (for a revision), state (draft, delivered, expired), delivered by and at, expires at, expired at, file count, bytes | One delivery and any number of revisions per booking (A12). A revision can be created only when nothing is owed. Written by backend functions only, never directly. The link delivery already on a booking is separate and unchanged. |
 | **DeliveryFile** | delivery id, kind (photo or video), display name, content type, width and height, duration (video), original path and bytes, preview path and bytes, status (reserved, uploading, ready, removed, expired), created by, reserved at, saved by the client at (first save), removed at and by | Rows outlive the bytes: after expiry or removal they keep name, kind, size and whether the file was saved. The paths are cleared. |
 | **AuditEvent** | entity type and id, actor, action, metadata, IP, timestamp | Append-only. Covers bookings, contracts, payments and changes. |
 
@@ -554,6 +559,14 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 10. After expiry the client sees "These files expired on {date}. Ask {creator} to send them again." The creator can deliver again, which starts a new 30 days.
 11. The creator can remove a single file at any time. Removal frees its space and is recorded in the activity log (company) or audit log.
 
+*A revision, after payment*
+
+12. When the first delivery has been made and nothing is owed, the booking shows **Send a revision**, including after the booking is completed. The creator adds files, gives the revision a title (it starts as "Revision 1", then "Revision 2") and an optional note, and taps **Send**. Nothing is locked, so the app makes only the small thumbnail the grid needs, without a watermark.
+13. The client is notified: "{creator} sent revised files". The revision is listed under the delivery with its own "Available until {date}", a note, Save and Save all, and its own "Saved 3 of 14". There is no payment step.
+14. The reminders at 7 days and 1 day apply to each revision on its own.
+15. Earlier files are not touched. The delivery keeps its own date, and the client can still save from it until then. A revision adds to what the client has; to retire a superseded file, the creator removes it.
+16. If the delivery has expired and the client had paid, a revision is how the creator sends the files again.
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -580,7 +593,7 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 | **Services** | Company services with an "Offered by" line (everyone, or the chosen members). Templates are managed here by Owner and Admin. |
 | **Profile** | The company page and its editor (Owner, Admin). The designated signer, the split ledger and going back to an individual account are under Settings ▸ Company settings; Stripe Connect for the company is under Services ▸ Payments (Owner). |
 
-**Slate Files.** *Bookings ▸ a booking* gains a **Files** section. For the creator it has Add files, the progress and Retry of each upload, Deliver, and the delivery's state ("Delivered, available until Nov 22", "12 of 48 saved", "balance unpaid"). For the client it has a grid of previews, the expiry date, **Pay balance to unlock downloads**, then Save and Save all. *Profile ▸ ⋯ ▸ Settings* gains a **Storage** row with the meter for the account on screen. It uses the system's photo picker, file importer, video player and background transfers, and the same design rules as the rest.
+**Slate Files.** *Bookings ▸ a booking* gains a **Files** section. For the creator it has Add files, the progress and Retry of each upload, Deliver, and the delivery's state ("Delivered, available until Nov 22", "12 of 48 saved", "balance unpaid"). For the client it has a grid of previews, the expiry date, **Pay balance to unlock downloads**, then Save and Save all. Once the balance is paid the creator also sees **Send a revision**, and the client sees each revision listed under the delivery with its own expiry date and Save buttons, and no payment step. *Profile ▸ ⋯ ▸ Settings* gains a **Storage** row with the meter for the account on screen. It uses the system's photo picker, file importer, video player and background transfers, and the same design rules as the rest.
 
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
@@ -600,7 +613,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | Contracts | Third-party e-sign providers, model and property releases, usage-rights licensing add-ons, AI drafting |
 | Teams | Automatic Stripe transfers to members, SSO and SCIM, audit export, members creating their own services. (Company accounts themselves are in scope, section 5.4.) |
 | Integrations | Google Calendar or personal-calendar busy-time import |
-| Files | Favourites and comments, public gallery links, zip downloads, print sales, previews made on the server, video transcoding and streaming, extending the 30 days (section 5.5) |
+| Files | Favourites and comments, public gallery links, zip downloads, print sales, previews made on the server, video transcoding and streaming, extending the 30 days, client revision requests and revisions included in a package (section 5.5) |
 | Platform | Android, iPad-specific features beyond adaptive layout, Live Activities, in-app video calls |
 | Support | Dispute and chargeback tooling beyond the minimal support console |
 
@@ -626,7 +639,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | M4 Engagement | Messages, push and email, EventKit, widget |
 | M5 Beta | Web booking page hardening, accessibility audit, legal review, TestFlight pilot with real creators, App Review preparation |
 | M3b Company accounts | Organizations, memberships, roles enforced on the backend, shared services, assignment and team calendar, company contracts and payments, seat billing |
-| M3c Slate Files | Hosted delivery: reserve, upload, preview, unlock on payment, save, expiry, storage meter, report a file |
+| M3c Slate Files | Hosted delivery: reserve, upload, preview, unlock on payment, revisions, save, expiry, storage meter, report a file |
 
 ## 11. Non-functional requirements
 
@@ -665,6 +678,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R18 | **A preview cannot be made impossible to copy, and the server cannot check a preview's pixels** because it is made on the creator's phone. | Previews are small and watermarked, so a screenshot is not worth taking. The server caps a preview's size and refuses one that is too large. Originals live on a different path that the database releases only after payment. Server-made previews are Later. |
 | R19 | **Large uploads are unreliable on a phone** (signal, battery, the app closed, a full disk). | Resumable background uploads, per-file retry, a cellular prompt for large video, reservations that lapse after 24 hours. CI cannot exercise real uploads, so test on real devices in the pilot. |
 | R20 | **An unpaid balance keeps files in storage** until the 30 days end. | The same 30-day clock. The creator sees "balance unpaid" on the delivery and can follow up in Messages. After expiry they can deliver again. |
+| R21 | **A revision could become a way to hand over originals before payment,** or to pile up storage with repeated revisions. | The backend refuses to create a revision while a balance is owed, and there is no creator-side switch to waive payment. Revisions use the same allowance and the same 30-day expiry as everything else, so storage stays bounded. |
 
 ## 13. Open questions
 
@@ -695,7 +709,7 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q22 | **How long is the grace period** after a failed seat payment? | 7 days (`billing.grace_days`) |
 | Q23 | **Should the company handle share a namespace with personal handles?** | Yes, one unique `handle` space |
 
-**Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D14: Slate hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both. These remain open:
+**Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D15: Slate hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both, and free revisions after payment. These remain open:
 
 | # | Question | Default |
 |---|---|---|
@@ -706,3 +720,5 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q28 | **A video preview: the whole video at reduced size, or a short clip?** | The whole video, reduced and watermarked, within its size cap |
 | Q29 | **For hosted files, should the balance be payable at delivery with no Confirm receipt step?** | Yes. The previews are how the client checks the work (5.5) |
 | Q30 | **Who at a company can open the files?** | Anyone who can see the booking except a Viewer |
+| Q31 | **Should a creator be able to unlock the originals early,** before the balance is paid, for a client they trust? | No in the first version (R21) |
+| Q32 | **Is there a limit on how many revisions a creator can send?** | No fixed limit. The allowance and the 30-day expiry bound it |
