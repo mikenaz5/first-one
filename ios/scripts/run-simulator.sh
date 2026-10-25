@@ -64,12 +64,35 @@ fi
 
 # Pick the simulator: the one asked for, or the newest regular iPhone that is installed.
 uuid_pattern='[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}'
-if [[ -n "$device" ]]; then
-  udid=$(xcrun simctl list devices available | grep -F "$device (" | grep -oE "$uuid_pattern" | tail -1 || true)
-  [[ -n "$udid" ]] || die "No installed simulator is called \"$device\". See what you have with: xcrun simctl list devices available"
-else
-  udid=$(xcrun simctl list devices available | grep -E '^ +iPhone ' | grep -v ' SE ' | grep -oE "$uuid_pattern" | tail -1 || true)
-  [[ -n "$udid" ]] || die "No iPhone simulator is installed. In Xcode open Settings, then Components, download the iOS Simulator, and run this again."
+pick_udid() {
+  if [[ -n "$device" ]]; then
+    xcrun simctl list devices available | grep -F "$device (" | grep -oE "$uuid_pattern" | tail -1 || true
+  else
+    xcrun simctl list devices available | grep -E '^ +iPhone ' | grep -v ' SE ' | grep -oE "$uuid_pattern" | tail -1 || true
+  fi
+}
+
+udid=$(pick_udid)
+if [[ -z "$udid" && -z "$device" ]]; then
+  # Newer versions of Xcode don't come with the iPhone simulator. Ask Apple for it.
+  say "No iPhone simulator found. Downloading it from Apple (several GB, so this can take a while)"
+  xcodebuild -downloadPlatform iOS || true
+  udid=$(pick_udid)
+fi
+if [[ -z "$udid" && -z "$device" ]]; then
+  # The simulator software is there but no phone has been set up in it yet, so make one.
+  runtime=$(xcrun simctl list runtimes available | grep -E '^iOS ' | tail -1 | sed -E 's/.* - (com\.apple\.CoreSimulator\.SimRuntime\.[^ ]+)$/\1/' || true)
+  phone_type=$(xcrun simctl list devicetypes | grep -E '^iPhone ' | grep -v ' SE ' | tail -1 | sed -E 's/.*\((com\.apple\.CoreSimulator\.SimDeviceType\.[^)]+)\)$/\1/' || true)
+  if [[ "$runtime" == com.apple.* && "$phone_type" == com.apple.* ]]; then
+    say "Setting up an iPhone in the simulator"
+    udid=$(xcrun simctl create "Slate iPhone" "$phone_type" "$runtime" 2>/dev/null || true)
+  fi
+fi
+if [[ -z "$udid" ]]; then
+  if [[ -n "$device" ]]; then
+    die "No installed simulator is called \"$device\". See what you have with: xcrun simctl list devices available"
+  fi
+  die "There is still no iPhone simulator. Open Xcode, choose Xcode > Settings > Components, download the iOS simulator there, and run this again."
 fi
 
 say "Starting the simulator"
