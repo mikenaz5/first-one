@@ -9,7 +9,7 @@ You need a Mac with Xcode 16 or newer (it is built and tested with the latest Xc
 Open Terminal (press ⌘ and Space, type Terminal, press Return), paste this one line and press Return:
 
 ```sh
-curl -L -o slate.zip https://github.com/mikenaz5/first-one/archive/refs/heads/claude/ecstatic-curie-4456ah.zip && unzip -oq slate.zip && cd first-one-claude-ecstatic-curie-4456ah/ios && bash scripts/run-simulator.sh
+cd ~ && curl -L -o slate.zip https://github.com/mikenaz5/first-one/archive/refs/heads/claude/ecstatic-curie-4456ah.zip && unzip -oq slate.zip && cd first-one-claude-ecstatic-curie-4456ah/ios && bash scripts/run-simulator.sh
 ```
 
 (If you use git, `git clone -b claude/ecstatic-curie-4456ah https://github.com/mikenaz5/first-one.git`, then `cd first-one/ios` and `./scripts/run-simulator.sh` does the same.)
@@ -22,6 +22,8 @@ If something goes wrong:
 
 - *"Xcode isn't ready"*: open Xcode once and accept the license, or run `sudo xcode-select -s /Applications/Xcode.app`.
 - *No iPhone simulator*: in Xcode open Settings ▸ Components and download the iOS Simulator.
+- *The phone switched itself off, or "Unable to lookup in current state: Shutdown"*: the script now starts it again by itself. If you still see it, close the Simulator (or Device Hub) window, and paste the line again.
+- *Folders inside folders*: the line starts with `cd ~` so it always works from your home folder. Older versions of it didn't, and running them again from inside the folder made a new copy in a deeper folder each time. They are safe to delete: in Finder open your home folder and trash `first-one-claude-ecstatic-curie-4456ah`, then run the line again.
 - *The build fails*: the errors are printed and the whole log is in `ios/build/xcodebuild.log`. Send me the first error.
 - *Packages won't download*: check the network, then in Xcode choose File ▸ Packages ▸ Reset Package Caches.
 - *Start from a clean slate*: in the Simulator choose Device ▸ Erase All Content and Settings, or delete the app.

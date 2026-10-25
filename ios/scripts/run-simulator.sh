@@ -127,7 +127,8 @@ fi
 
 say "Starting the simulator"
 xcrun simctl boot "$udid" 2>/dev/null || true   # already running is fine
-if [[ $headless -eq 0 ]]; then
+show_window() {
+  [[ $headless -eq 0 ]] || return 0
   # The window that shows the phone is the Simulator app, or "Device Hub" in the newest Xcode. It lives inside Xcode,
   # and macOS doesn't always know where, so try the likely places.
   opened=0
@@ -150,8 +151,27 @@ if [[ $headless -eq 0 ]]; then
   if [[ $opened -eq 0 ]]; then
     say "Couldn't open the phone window by itself. Press Command and Space, type Simulator (or Device Hub), and press Return. Or in Xcode choose Xcode > Open Developer Tool."
   fi
-fi
+}
+
+show_window
 xcrun simctl bootstatus "$udid" -b >/dev/null
+
+# The phone can switch itself off while a long build runs (for instance when its window is closed). Start it again
+# whenever it isn't on, and show its window.
+ensure_booted() {
+  local state tries=0
+  state=$(xcrun simctl list devices | grep "$udid" | grep -oE '\((Booted|Shutdown|Shutting Down|Booting|Creating)\)' | head -1 || true)
+  while [[ "$state" == "(Shutting Down)" && $tries -lt 30 ]]; do
+    sleep 1; tries=$((tries + 1))
+    state=$(xcrun simctl list devices | grep "$udid" | grep -oE '\((Booted|Shutdown|Shutting Down|Booting|Creating)\)' | head -1 || true)
+  done
+  if [[ "$state" != "(Booted)" ]]; then
+    say "The simulator had switched itself off, so starting it again"
+    xcrun simctl boot "$udid" 2>/dev/null || true
+    show_window
+  fi
+  xcrun simctl bootstatus "$udid" -b >/dev/null
+}
 
 # With no Config/Secrets.xcconfig there is no development team, so build without signing, which is all a simulator needs.
 signing=()
@@ -177,9 +197,19 @@ app="build/DerivedData/Build/Products/Debug-iphonesimulator/Slate.app"
 bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
 
 say "Installing and launching"
-xcrun simctl install "$udid" "$app"
-xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
-xcrun simctl launch "$udid" "$bundle_id" >/dev/null
+launched=0
+for attempt in 1 2 3; do
+  ensure_booted
+  if xcrun simctl install "$udid" "$app" \
+     && { xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true; } \
+     && xcrun simctl launch "$udid" "$bundle_id" >/dev/null; then
+    launched=1
+    break
+  fi
+  echo "That didn't work (try $attempt of 3). Trying again." >&2
+  sleep 3
+done
+[[ $launched -eq 1 ]] || { diagnose; die "Couldn't put the app on the simulator. Close the Simulator or Device Hub window, run this again, and if it still fails send me this whole screen."; }
 
 if [[ -n "$shot" ]]; then
   sleep 6
