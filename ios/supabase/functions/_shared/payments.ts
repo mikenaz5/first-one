@@ -13,6 +13,7 @@
 // Only erasable TypeScript syntax is used (no enums or parameter properties) so Node can run it directly.
 
 import { handleBillingEvent } from "./billing.ts";
+import { handleCardEvent } from "./cards.ts";
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -399,8 +400,8 @@ async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
         p_intent_id: object.id,
         p_amount_cents: object.amount_received ?? object.amount,
         p_charge_id: typeof object.latest_charge === "string" ? object.latest_charge : null,
-        // Apple Pay is the only way the app collects money.
-        p_method: "apple_pay",
+        // Apple Pay, unless the creator charged a card the client allowed them to (cards.ts marks those in the metadata).
+        p_method: object.metadata?.saved_card === "true" ? "card" : "apple_pay",
       });
       if (result.action === "refund_required") {
         // The money arrived too late (or for a cancelled booking). Send it back.
@@ -439,7 +440,9 @@ async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
       return;
     }
     default:
-      // Subscription events belong to seat billing; anything else we don't care about is acknowledged and ignored.
+      // Cards kept for later, then subscription events for seat billing; anything else we don't care about is
+      // acknowledged and ignored.
+      if (await handleCardEvent(deps, event)) return;
       await handleBillingEvent(deps, event);
       return;
   }

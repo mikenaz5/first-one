@@ -1,10 +1,11 @@
 # Product Spec: Booking with Built-in Contracts for Creators
 
-**Status:** Draft v0.4 · 2026-10-25 · Product name: *Slate Pro*
+**Status:** Draft v0.5 · 2026-10-25 · Product name: *Slate Pro*
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
 **Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
 **Changes in v0.4:** client accounts, a free third account type with Sign in with Apple or an emailed code, and booking links that lead straight to one, search for creators, and a featured-creators grid on a client's Home (sections 2, 4, 4.1, 5.2, 8.13, 9, 10, 13).
+**Changes in v0.5:** cards on file on a client's Profile, and a creator's permission to charge a saved card for the balance of a booking (sections 2, 5.2, 7, 8.3, 8.14, 9, 12, 13).
 
 ---
 
@@ -45,6 +46,10 @@ Decisions made with the product owner:
 | D19 | **Clients can search for creators** by name, link name or what they shoot (weddings, portraits). Only creators with a published package are found, so every result can be booked. There is still no marketplace: no categories to browse, no ranking, no ratings sort. | Section 8.13. Reverses part of D2 for search only (section 10). |
 | D20 | **A featured-creators grid on a client's Home**, under the search field and in the manner of an explore page: a picture for each creator a client could book, with their name, rating and starting price, a row of specialties to narrow it, and, once the client has said where they are, how far away each creator is. **It is based on location:** creators who work where the client is come first. It is worked out, not paid for and not hand-picked, so it is the same for everyone and nobody can buy a place in it. Twelve at a time. | Section 8.13 and `featured_creators()` / `FeaturedRules`. Still no marketplace: no sort options, no paid placement, no categories page (section 10). Q38 asks whether creators may opt out. |
 | D21 | **A client says where they are by choosing a city or by letting the phone find theirs.** Either way only a city-level place (rounded to about a kilometre) is kept: on the phone, per person, and nowhere else. It is sent to the database only as an argument when the grid is asked for, and not stored there. Using location is always optional: without a place the grid is ordered by quality alone. | Section 8.13, R22, `GeoPoint` / `ClientPlace`. Asks for the "while using the app" permission, with an approximate position, and only when the person taps Use my location. |
+| D22 | **A client can keep cards on file, on their Profile.** A card is added on Stripe's own secure page; Slate Pro never sees the number, the expiry or the security code. Slate Pro keeps only a reference to the card at Stripe and what is needed to show it ("Visa ending 4242, expires 08/28"). Up to five cards. Removing a card removes it at Stripe too and ends every permission that used it. | Section 8.14 and `…_cards_on_file.sql`. Keeps Slate Pro out of the heaviest card-security rules (R24). Q47 asks about saving an Apple Pay card. |
+| D23 | **A creator can charge a saved card only if the client has allowed that creator, and then only for the balance of a booking.** The client chooses, creator by creator, which card, and can stop it at any moment without anyone's agreement. The permission covers the remaining balance of the client's bookings with that creator, never more, and nothing else: no fees, no extras, no deposit. It does not change *when* the balance is payable (D13): not until the client has confirmed they have their files. A creator sees that a card is allowed and its brand, never the number. | Section 8.14, R23, R25. Q42 to Q44 are the "what about" questions (deposits, late fees, automatic payment). |
+| D24 | **A charge to a saved card goes through the same rules as any balance payment.** The database works out the amount, Stripe's signed webhook is the only thing that records money as received, and the client is told at once with the usual "payment received" notice. If the card is declined, or the bank wants the client to approve it, nothing is recorded as paid, the creator is told, and the client pays in the app as before. There is no automatic retry. | Section 8.14. A decline notice to the client is Q45. |
+| D25 | **Who may charge:** whoever can manage that booking: a person selling alone, for their own bookings; at a company, the Owner, Admin and Manager, and the Creator the booking is assigned to. A Viewer cannot. | The same access as marking a booking delivered or cancelling it (`provider_access(…, 'manage')`), so no new permission exists to keep in step across three places. |
 
 Assumptions, open to change (section 13):
 
@@ -237,6 +242,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 | Pay deposit | Apple Pay (iOS and Safari). Card fallback on web through Stripe. | MVP |
 | My bookings | Status, contract, payments, next steps. | MVP |
 | Pay balance | One-tap Apple Pay from a reminder, due N days before the shoot (default 7). | MVP |
+| Cards on file | Save cards on Stripe's page, see them as "Visa ending 4242", remove them, and allow a creator to charge the balance of their bookings to one (8.14). | MVP |
 | Change or cancel | Reschedule request. Cancel with refund shown per policy *before* confirming. | MVP |
 | Contract access | Signed PDF in the booking, shareable from the system share sheet. Emailed to both parties. | MVP |
 | Receive files | Preview the delivered photos and videos at once, pay the balance to unlock them, save them to Photos or Files before the window ends. Later revisions arrive the same way and are free (5.5, 8.12). | MVP |
@@ -375,6 +381,9 @@ erDiagram
     CONTRACT ||--o{ SIGNATURE : has
     CONTRACT ||--o{ AMENDMENT : "changed by"
     BOOKING ||--o{ PAYMENT : "paid via"
+    USER ||--o{ CLIENT_CARD : "keeps"
+    CLIENT_CARD ||--o{ CARD_PERMISSION : "used by"
+    CREATOR_PROFILE ||--o{ CARD_PERMISSION : "may charge under"
     BOOKING ||--o| CONVERSATION : "discussed in"
     CONVERSATION ||--o{ MESSAGE : contains
     BOOKING ||--o{ AUDIT_EVENT : logs
@@ -415,6 +424,9 @@ erDiagram
 | **Payment** | booking id, kind (deposit, balance, refund, adjustment), amount, currency, platform fee, Stripe payment intent id, status, method (Apple Pay, card), paid at | Money is stored in minor units. |
 | **Payout** (read-only mirror) | creator id (**the owner**), Stripe payout id, amount, status, arrival date | For the earnings screen. Stripe is the source of truth. A company's payouts are those of its own Connect account. |
 | **Payment account** | creator id (**the owner**), Stripe account id, charges enabled, payouts enabled, details submitted | One per owner. A company's is separate from the personal one of any member. |
+| **ClientCard** | user id, Stripe payment method id (never shown to the app), brand, last four digits, expiry month and year, added at | A reference, not a card: Stripe holds the number. Up to five per person. Readable only by its owner, and only these display columns. |
+| **CardPermission** | client id, **owner (creator id)**, card id, consent version, allowed at | At most one per client and creator. Ends when the client stops it, the card is removed, or either account is deleted. Creators do not read this table; they are told only whether the booking in front of them has one (brand only). |
+| **CardPermissionLog** | client id, creator id, action (allowed, stopped, card removed), card brand and last four at the time, consent version, at | Append only, kept for the client's own record and to show when an agreement was given if a charge is ever disputed. Removed with the account. |
 | **Conversation / Message** | booking id, participants; sender, kind (text, system), body, sent at, read by | System messages are generated for booking, signing, payment and change events. |
 | **Device / NotificationPreference** | user id, APNs token, environment; per-event toggles | |
 | **Delivery** (files) | booking id, owner (the provider party, whose allowance is used), kind (delivery or revision), sequence (0 for the delivery, 1, 2 and so on for revisions), title and note (for a revision), state (draft, delivered, expired), delivered by and at, expires at, expired at, file count, bytes | One delivery and any number of revisions per booking (A12). A revision can be created only when nothing is owed. Written by backend functions only, never directly. The link delivery already on a booking is separate and unchanged. |
@@ -471,6 +483,7 @@ stateDiagram-v2
 1. N days before the shoot (default 7), push and email: "Balance of $X due."
 2. Client taps the notification, then **Pay balance** with Apple Pay.
 3. Creator sees "Paid in full". If still unpaid after the due date, both are notified and the booking appears under the creator's needs-attention list.
+4. If the client has allowed the creator to charge a saved card (8.14), the creator can take the balance themselves, once it is payable.
 
 ### 8.4 Reschedule
 
@@ -610,6 +623,33 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 18. Opening it with no account shows the welcome screen with "Sign in to see {creator}'s page", skips the account type choice (D18) and, after Apple or the emailed code, lands on the creator's page as a client.
 14. A person who already has a creator account opens the page the same way, and books as themselves.
 
+### 8.14 Cards on file
+
+*Adding and removing cards*
+
+1. **Profile ▸ Payment methods** lists the client's cards, each as "Visa ending 4242" with "Expires 08/28", or says there are none yet. A card past its expiry month is marked **Expired** and cannot be used.
+2. **Add a card** opens Stripe's secure page in the in-app browser. The client types the card there; Slate Pro never receives it. When Stripe sends the person back, the card appears. Up to five cards; at five, Add a card says so.
+3. **Remove** (swipe, or the card's menu) asks first. If creators are allowed to use that card the dialog names how many: "This also stops 2 creators from using it." Removing deletes the card at Stripe and then here.
+4. On a device with no server, **Add a demo card** adds a pretend Visa so the rest can be tried. No card is read and no money moves.
+
+*Allowing a creator*
+
+5. Under the cards, **Creators who can charge a card** lists each permission (creator, card, date) with **Stop access**, which takes effect at once. **Allow a creator** lists the creators the client has booked (not cancelled) who have no permission yet. A booking's page offers the same: "Let {creator} charge the balance to my card", when the client has a card and has not already.
+6. The agreement is a screen of plain words with a button: "{Creator} will be able to charge the remaining balance of your bookings with them to your Visa ending 4242, once you've confirmed you have your files. They can't charge anything else and they never see your card number. You can stop this at any time in Profile." **Allow {Creator}**. The wording has a version number, kept with the permission.
+7. Allowing again with another card replaces the first. Only creators the client has actually booked can be allowed, and only with the client's own cards.
+
+*Charging (the creator)*
+
+8. On a booking whose balance is payable (the client has confirmed they have the files) and whose client has allowed the creator, whoever can manage that booking (D25) sees **Charge the saved card**: the amount, the card's brand and a confirmation ("Charge $1,200.00 to Alex's Visa? Alex is told straight away."). The amount is the balance, worked out by the database; it cannot be changed.
+9. Before the balance is payable the same place says "{Client} has allowed you to charge their saved card once they confirm their files." Without a permission nothing is shown.
+10. After the tap the app waits for Stripe to confirm, as for any payment, then shows "Paid in full". The client gets the usual payment notice and the conversation gets its "balance paid" line. A client who is part-way through paying with Apple Pay is not charged twice: the unfinished attempt is cancelled first.
+11. If the card is declined, or the bank wants the client to approve the payment, the creator is told which, nothing is recorded as paid, and the balance stays due for the client to pay in the app. Slate Pro does not try again by itself.
+
+*What the server checks, every time*
+
+12. The person asking can manage the booking (D25); the client has a permission for this creator; the permission's card still exists and is not expired; the booking's balance is payable and unpaid (the same checks as `payment_prepare`). The permission is read at the moment of the charge, so stopping access stops any charge that has not started.
+13. Deleting an account deletes its cards at Stripe and here; deleting a creator's profile ends the permissions given to them.
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -646,7 +686,7 @@ One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`.
 | **Bookings** | The same list, with the pay, files, contract and cancel actions |
 | **Creators** (in place of Services) | A search field for a name, a link name or what they shoot (a booking link pasted there opens that page), the specialties as one-tap searches, and the creators they have booked |
 | **Messages** | The booking conversations, as today |
-| **Profile** | Their name and email, **My contracts** (every signed contract and its PDF), **Payments and receipts** (what they have paid and been refunded), appearance, notifications, sign out and delete account. Nothing about selling. |
+| **Profile** | Their name and email, **My contracts** (every signed contract and its PDF), **Payments and receipts** (what they have paid and been refunded), **Payment methods** (cards on file and the creators allowed to charge them), appearance, notifications, sign out and delete account. Nothing about selling. |
 
 Each of these follows the design rules in section 3: system components, sheets with detents, swipe actions, context menus, and the same Dynamic Type and VoiceOver behaviour as everything else.
 
@@ -733,6 +773,10 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R20 | **An unpaid balance keeps files in storage** until the 30 days end. | The same 30-day clock. The creator sees "balance unpaid" on the delivery and can follow up in Messages. After expiry they can deliver again. |
 | R21 | **A revision could become a way to hand over originals before payment,** or to pile up storage with repeated revisions. | The backend refuses to create a revision while a balance is owed, and there is no creator-side switch to waive payment. Revisions use the same allowance and the same 30-day expiry as everything else, so storage stays bounded. |
 | R22 | **A client's location is personal.** Sending it to a server with every request would build a trail of where someone has been. | The app rounds it to about a kilometre, keeps it only on the phone, sends it only as an argument of the featured-creators call, and the database function stores nothing of it. (A server's own request logs are a separate matter: check what Supabase logs for RPC calls before launch, and turn it down if it records arguments.) It is optional, asked for only when the person taps Use my location, and "Don't use a place" removes it. A client's exact position never leaves the phone |
+| R23 | **A creator charges a card the client did not expect,** which costs trust and invites disputes with the bank. | The client allows each creator by name, on a screen that says what it covers. It covers the balance only, never before the client has confirmed their files, never extras. The client is told the moment it happens, can stop it with one tap, and the permission's wording version and time are kept. |
+| R24 | **Card numbers are the most sensitive thing the product could hold.** A leak, or a stolen card tested through the Add a card page, would be serious. | The app and the database never hold a card number: Stripe's page collects it and Stripe keeps it. Here are only Stripe's reference (which the app cannot read, by column permission), the brand, the last four and the expiry. Up to five cards, a signed-in person only, and Stripe's own fraud checks stand in front of the page. The server key stays on the server. |
+| R25 | **Card networks have rules for saving a card and charging it later when the client is not there,** and some banks will insist the client approves a charge. Wording that is too vague can lose a dispute. | The agreement wording is plain, versioned and kept with the permission. Charges that need approval fail safely and fall back to the client paying in the app. **The wording and terms need a lawyer's review before launch.** |
+| R26 | **The card at Stripe and the row here can disagree** after a dropped connection: a card removed at one and not the other. | Removal deletes at Stripe first, then here. A refresh compares the two lists and fixes the difference. A charge to a card that no longer exists fails before any money moves. |
 
 ## 13. Open questions
 
@@ -790,4 +834,16 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | Q39 | **Should the grid know where the client is** and show nearby creators first? | Yes (D20, D21): by a chosen city or the phone's location, city-level only, always optional |
 | Q40 | **Should creators be ranked by how near they are, or should only creators who travel to the client come first?** | Creators who work where the client is come first; after them the usual order, with nearer breaking ties (8.13). A pure nearest-first list would put a new creator next door above an excellent one a little further away who already travels to the client |
 | Q41 | **Should the grid refresh as the client travels,** and should a client be able to type a postcode? | Not yet. The place changes when the client changes it. A postcode or address search is a later addition to Choose a city |
+
+**Added in v0.5 (cards on file).** Answered and recorded as D22 to D25. These remain open:
+
+| # | Question | Default |
+|---|---|---|
+| Q42 | **Should a creator be able to charge the deposit from a saved card?** | No. The deposit is paid at booking, with the client there, and holds the time. A permission covers the balance only (D23) |
+| Q43 | **Should a creator be able to charge a late fee, a no-show fee or an extra** the client agreed to later? | Not in the first version. It would need an amount the client agreed to in the contract and its own agreement screen, and its own limit |
+| Q44 | **Should the client be able to choose "pay my balance automatically"** when they confirm their files, so the creator does not have to tap? | Not yet. The creator's tap keeps a person in the loop. A client-side switch is a small addition once this has been used |
+| Q45 | **Should the client get a notice when a saved card is declined?** | Not yet. The balance stays due, the failed try is in the payment history, and the creator can write in Messages. A dedicated notice is a push kind to add |
+| Q46 | **What if the client never confirms they have their files?** | Nothing changes: the balance is not payable until they do (D13), so a permission cannot be used to skip it |
+| Q47 | **Can a card added with Apple Pay be kept as a card on file?** | Not yet. Cards are added on Stripe's page. Apple Pay stays a pay-once method |
+| Q48 | **Should the app warn before a card expires?** | Not yet. An expired card is shown as Expired and cannot be used; the creator is told to ask for another way to pay |
 

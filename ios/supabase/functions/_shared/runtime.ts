@@ -25,6 +25,7 @@ import { DbError } from "./payments.ts";
 import type { Db, Deps, HttpResult } from "./payments.ts";
 import { createApnsSender } from "./apns.ts";
 import type { BillingDeps } from "./billing.ts";
+import type { CardDeps } from "./cards.ts";
 import type { PushDeps } from "./push.ts";
 
 let cached: Deps | null = null;
@@ -97,6 +98,33 @@ export function makeBillingDeps(): BillingDeps | null {
       seatPriceId,
       trialDays: Number.isFinite(trial) && trial > 0 ? Math.floor(trial) : 0,
     },
+    log: base.log,
+  };
+}
+
+/** Everything the card functions need. */
+export function makeCardDeps(): CardDeps {
+  const base = makeDeps();
+  const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { httpClient: Stripe.createFetchHttpClient() });
+  return {
+    db: base.db,
+    stripe: {
+      customers: {
+        create: (params, options) => stripe.customers.create(params as never, options),
+        del: (id) => stripe.customers.del(id),
+      },
+      checkout: { sessions: { create: (params, options) => stripe.checkout.sessions.create(params as never, options) } },
+      paymentMethods: {
+        list: (params) => stripe.paymentMethods.list(params as never) as never,
+        detach: (id) => stripe.paymentMethods.detach(id),
+      },
+      paymentIntents: {
+        create: (params, options) => stripe.paymentIntents.create(params as never, options),
+        retrieve: (id) => stripe.paymentIntents.retrieve(id),
+        cancel: (id) => stripe.paymentIntents.cancel(id),
+      },
+    },
+    config: { platformFeeBps: base.config.platformFeeBps, functionsBaseUrl: base.config.functionsBaseUrl },
     log: base.log,
   };
 }

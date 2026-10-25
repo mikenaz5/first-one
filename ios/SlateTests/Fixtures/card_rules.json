@@ -1,0 +1,14 @@
+{
+  "maxCards": 5,
+  "consentVersion": 1,
+  "expiry": [
+    { "month": 8, "year": 2027, "at": "2027-08-31T23:59:59Z", "expired": false },
+    { "month": 8, "year": 2027, "at": "2027-09-01T00:00:00Z", "expired": true },
+    { "month": 12, "year": 2026, "at": "2026-12-15T12:00:00Z", "expired": false },
+    { "month": 1, "year": 2027, "at": "2026-12-31T23:59:59Z", "expired": false },
+    { "month": 1, "year": 2027, "at": "2027-02-01T00:00:00Z", "expired": true },
+    { "month": 12, "year": 2025, "at": "2026-01-01T00:00:00Z", "expired": true },
+    { "month": 2, "year": 2028, "at": "2028-02-29T10:00:00Z", "expired": false },
+    { "month": 2, "year": 2028, "at": "2028-03-01T00:00:00Z", "expired": true }
+  ]
+}

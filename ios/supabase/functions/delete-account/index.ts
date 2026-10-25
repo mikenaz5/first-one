@@ -1,4 +1,4 @@
-// Deletes the signed-in user's account: their files, then the auth user (which cascades to
+// Deletes the signed-in user's account: their cards at Stripe, their files, then the auth user (which cascades to
 // creator_profiles and portfolio_items through foreign keys).
 //
 // Refuses (409) while the person is the Owner of a company; see account_blockers.
@@ -12,6 +12,8 @@
 // This function has not been run against a live project yet.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { forgetCards } from "../_shared/cards.ts";
+import { makeCardDeps } from "../_shared/runtime.ts";
 
 const BUCKETS = ["avatars", "portfolio"];
 
@@ -49,6 +51,20 @@ Deno.serve(async (request) => {
       status: 409,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  // Cards kept at Stripe go first: once the account is gone nothing here points at them any more. Without Stripe set up
+  // there can be no cards.
+  if (Deno.env.get("STRIPE_SECRET_KEY")) {
+    try {
+      await forgetCards(makeCardDeps(), user.id);
+    } catch (error) {
+      console.error("could not remove the cards at Stripe", error);
+      return new Response(JSON.stringify({ error: "cards_not_removed" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   for (const bucket of BUCKETS) {

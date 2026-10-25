@@ -2,7 +2,8 @@
 //   payment_intent.succeeded, payment_intent.payment_failed, refund.created, refund.updated, refund.failed,
 //   charge.refund.updated, account.updated  (Connect events: turn on "Listen to events on Connected accounts"
 //   only if you want account.updated for connected accounts to arrive here),
-//   customer.subscription.created, customer.subscription.updated, customer.subscription.deleted  (company seat plans)
+//   customer.subscription.created, customer.subscription.updated, customer.subscription.deleted  (company seat plans),
+//   payment_method.attached, payment_method.updated, payment_method.automatically_updated, payment_method.detached  (cards on file)
 // Deploy with --no-verify-jwt: Stripe calls it, and the request is authenticated by Stripe's signature instead.
 // This has not been run against a live project.
 import { handleStripeWebhook } from "../_shared/payments.ts";
