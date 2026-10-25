@@ -147,11 +147,12 @@ final class ClientSearchBackendTests: XCTestCase {
     }
 
     func testAnExactLinkNameBeatsNamesThatMerelyContainIt() async throws {
-        try await creator("mayachen", "Maya Chen", [.weddings])
-        try await creator("maya-films", "Northlight Films", [.commercial])
-        try await creator("maya", "Zed Quill", [.music])
-        let found = try await handles("maya")
-        XCTAssertEqual(found, ["maya", "mayachen", "maya-films"])
+        // Not "maya": the on-device backend pretends that link name is already taken, for the sign-up demo.
+        try await creator("ivychen", "Ivy Chen", [.weddings])
+        try await creator("ivy-films", "Northlight Films", [.commercial])
+        try await creator("ivy", "Zed Quill", [.music])
+        let found = try await handles("ivy")
+        XCTAssertEqual(found, ["ivy", "ivychen", "ivy-films"])
     }
 
     func testTheLimitIsRespected() async throws {
