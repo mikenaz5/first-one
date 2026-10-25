@@ -121,12 +121,28 @@ fi
 say "Starting the simulator"
 xcrun simctl boot "$udid" 2>/dev/null || true   # already running is fine
 if [[ $headless -eq 0 ]]; then
-  # The Simulator app lives inside Xcode. Open it from there, since the name alone isn't always found.
+  # The Simulator app lives inside Xcode, and macOS doesn't always know where. Try the likely places.
+  opened=0
   sim_app="$(xcode-select -p)/Applications/Simulator.app"
-  if [[ -d "$sim_app" ]]; then
-    open "$sim_app" --args -CurrentDeviceUDID "$udid" || true
-  else
-    open -a Simulator --args -CurrentDeviceUDID "$udid" || say "Couldn't open the Simulator window by itself. In Xcode choose Xcode > Open Developer Tool > Simulator."
+  if [[ ! -d "$sim_app" ]]; then
+    sim_app=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.iphonesimulator'" 2>/dev/null | head -1 || true)
+  fi
+  if [[ -z "$sim_app" || ! -d "$sim_app" ]]; then
+    sim_app=$(find /Applications "$HOME/Applications" -maxdepth 6 -name Simulator.app -type d 2>/dev/null | head -1 || true)
+  fi
+  if [[ -n "$sim_app" && -d "$sim_app" ]]; then
+    open "$sim_app" --args -CurrentDeviceUDID "$udid" && opened=1 || true
+  fi
+  if [[ $opened -eq 0 ]]; then
+    open -b com.apple.iphonesimulator --args -CurrentDeviceUDID "$udid" 2>/dev/null && opened=1 || true
+  fi
+  if [[ $opened -eq 0 ]]; then
+    say "Couldn't open the Simulator window by itself. Press Command and Space, type Simulator, and press Return. If that finds nothing, in Xcode choose Xcode > Open Developer Tool > Simulator."
+    {
+      echo "Xcode folder: $(xcode-select -p)"
+      echo "Inside it, Applications holds:"
+      ls "$(xcode-select -p)/Applications" 2>&1 | head -10
+    } >&2
   fi
 fi
 xcrun simctl bootstatus "$udid" -b >/dev/null
