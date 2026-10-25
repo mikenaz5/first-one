@@ -49,3 +49,17 @@ jobs:
             ios/build/launch.png
             ios/build/xcodebuild.log
           if-no-files-found: ignore
+
+  # A Mac that has Xcode but no Homebrew or XcodeGen, and the older bash that macOS ships: what a first-time user has.
+  no-homebrew:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the quick-start script with only the tools macOS ships
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./scripts/run-simulator.sh --headless

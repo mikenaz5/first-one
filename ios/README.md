@@ -6,13 +6,15 @@ SwiftUI app for photographers, videographers and freelance creators to get booke
 
 You need a Mac with Xcode 16 or newer (it is built and tested with the latest Xcode). Nothing else: no Apple Developer account, no server, no keys.
 
+Open Terminal (press ⌘ and Space, type Terminal, press Return), paste this one line and press Return:
+
 ```sh
-git clone -b claude/ecstatic-curie-4456ah https://github.com/mikenaz5/first-one.git
-cd first-one/ios
-./scripts/run-simulator.sh
+curl -L -o slate.zip https://github.com/mikenaz5/first-one/archive/refs/heads/claude/ecstatic-curie-4456ah.zip && unzip -oq slate.zip && cd first-one-claude-ecstatic-curie-4456ah/ios && bash scripts/run-simulator.sh
 ```
 
-The script installs XcodeGen with Homebrew if you don't have it, builds the app, starts an iPhone simulator, installs Slate and opens it. The first build downloads two Swift packages (Supabase and Stripe) and takes a few minutes. On the welcome screen tap **Continue with a demo account**. From then on everything runs on the device: profile, services, booking and signing a contract, pretend payments, delivery and reviews, messages, and company accounts (*Invite ▸ Add pretend teammate* stands in for a second person).
+(If you use git, `git clone -b claude/ecstatic-curie-4456ah https://github.com/mikenaz5/first-one.git`, then `cd first-one/ios` and `./scripts/run-simulator.sh` does the same.)
+
+The script downloads XcodeGen (a small tool that makes the Xcode project; it uses Homebrew's copy if you have one), builds the app, starts an iPhone simulator, installs Slate and opens it. The first build downloads two Swift packages (Supabase and Stripe) and takes about ten minutes; later runs are much faster. On the welcome screen tap **Continue with a demo account**. From then on everything runs on the device: profile, services, booking and signing a contract, pretend payments, delivery and reviews, messages, and company accounts (*Invite ▸ Add pretend teammate* stands in for a second person).
 
 To work in Xcode instead, run `./scripts/run-simulator.sh --xcode`. It generates `Slate.xcodeproj` and opens it; pick an iPhone simulator at the top and press Run. A simulator build needs no signing, so leave the Team empty. If Xcode still complains about signing, use the script, which always builds the simulator app unsigned.
 

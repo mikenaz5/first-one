@@ -34,14 +34,27 @@ done
 command -v xcodebuild >/dev/null 2>&1 || die "Xcode isn't installed. Install it from the App Store, open it once to accept the license, then run this again."
 xcodebuild -version >/dev/null 2>&1 || die "Xcode is installed but isn't ready. Open Xcode once and accept the license, or run: sudo xcode-select -s /Applications/Xcode.app"
 
+# XcodeGen turns project.yml into the Xcode project. Use the copy that is installed, or Homebrew's, or download it.
+xcodegen_cmd=(xcodegen)
 if ! command -v xcodegen >/dev/null 2>&1; then
-  command -v brew >/dev/null 2>&1 || die "XcodeGen is needed. Install Homebrew from https://brew.sh, then run: brew install xcodegen"
-  say "Installing XcodeGen with Homebrew"
-  brew install xcodegen
+  if command -v brew >/dev/null 2>&1; then
+    say "Installing XcodeGen with Homebrew"
+    brew install xcodegen
+  else
+    say "Downloading XcodeGen, the small tool that makes the Xcode project"
+    tools="$PWD/build/tools"
+    mkdir -p "$tools"
+    curl -fsSL -o "$tools/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/latest/download/xcodegen.zip" \
+      || die "Couldn't download XcodeGen. Check your internet connection and try again."
+    unzip -oq "$tools/xcodegen.zip" -d "$tools"
+    found=$(find "$tools" -type f -name xcodegen -perm -u+x | head -1)
+    [[ -n "$found" ]] || die "Downloaded XcodeGen but couldn't find the program inside it."
+    xcodegen_cmd=("$found")
+  fi
 fi
 
 say "Generating Slate.xcodeproj"
-xcodegen generate
+"${xcodegen_cmd[@]}" generate
 
 if [[ $open_xcode -eq 1 ]]; then
   open Slate.xcodeproj
