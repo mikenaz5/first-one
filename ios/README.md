@@ -2,15 +2,32 @@
 
 SwiftUI app for photographers, videographers and freelance creators to get booked with a contract built into every booking. Product details are in [`../SPEC.md`](../SPEC.md).
 
-**What exists today:**
+## Run it on the simulator
 
-- The project scaffold, design system and five-tab shell.
-- Creator onboarding and profiles: Sign in with Apple, profile photo, bio, specialties, location, a photo and reel portfolio.
-- **Service builder:** creators make packages (price, duration, deliverables, turnaround, deposit, optional add-ons such as extra hours, drone footage and rush delivery). Clients see them as cards.
-- **Availability and booking:** working hours, blackout dates, booking rules, Apple Calendar sync via EventKit, and a client booking sheet with add-ons, date and time, and a price summary. Double-booking is prevented.
-- A basic Bookings tab (upcoming and past, detail, cancel).
+You need a Mac with Xcode 16 or newer (it is built and tested with the latest Xcode). Nothing else: no Apple Developer account, no server, no keys.
 
-Messages, contracts and payments are not built yet. A booking today reserves the time; nothing is signed or charged.
+```sh
+git clone -b claude/ecstatic-curie-4456ah https://github.com/mikenaz5/first-one.git
+cd first-one/ios
+./scripts/run-simulator.sh
+```
+
+The script installs XcodeGen with Homebrew if you don't have it, builds the app, starts an iPhone simulator, installs Slate and opens it. The first build downloads two Swift packages (Supabase and Stripe) and takes a few minutes. On the welcome screen tap **Continue with a demo account**. From then on everything runs on the device: profile, services, booking and signing a contract, pretend payments, delivery and reviews, messages, and company accounts (*Invite ▸ Add pretend teammate* stands in for a second person).
+
+To work in Xcode instead, run `./scripts/run-simulator.sh --xcode`. It generates `Slate.xcodeproj` and opens it; pick an iPhone simulator at the top and press Run. A simulator build needs no signing, so leave the Team empty. If Xcode still complains about signing, use the script, which always builds the simulator app unsigned.
+
+If something goes wrong:
+
+- *"Xcode isn't ready"*: open Xcode once and accept the license, or run `sudo xcode-select -s /Applications/Xcode.app`.
+- *No iPhone simulator*: in Xcode open Settings ▸ Components and download the iOS Simulator.
+- *The build fails*: the errors are printed and the whole log is in `ios/build/xcodebuild.log`. Send me the first error.
+- *Packages won't download*: check the network, then in Xcode choose File ▸ Packages ▸ Reset Package Caches.
+- *Start from a clean slate*: in the Simulator choose Device ▸ Erase All Content and Settings, or delete the app.
+- *No demo button*: it appears in Debug builds only, and the script builds Debug.
+
+To go beyond the demo (a real backend, real Sign in with Apple, payments, push), see "Using a real Supabase project" and the "Turning on…" sections below.
+
+**What exists today:** Individual and company accounts with roles, billing and a team calendar; creator profiles and portfolios; packages, availability and booking with no double-booking; contracts signed inside the booking; Apple Pay deposits and balances through Stripe Connect, with refunds; messages and notifications; delivery by link, reviews, and a home screen widget; and a dark violet design. Most of it has been compiled and unit-tested by CI but has not yet been run against a live server or on a real phone (see "Status of verification" below).
 
 ## Backend recommendation: Supabase, with Stripe Connect for money
 

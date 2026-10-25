@@ -1,0 +1,51 @@
+name: Simulator
+
+# Runs the quick-start script (ios/scripts/run-simulator.sh) on a macOS runner: builds the app, starts a simulator,
+# installs and launches Slate, and takes a screenshot. It runs when the script changes, or by hand from the Actions tab.
+on:
+  push:
+    paths:
+      - "ios/scripts/**"
+      - "ios/Config/**"
+      - ".github/workflows/simulator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the app with the quick-start script
+        run: ./scripts/run-simulator.sh --headless --screenshot build/launch.png
+
+      - name: Print a small copy of the screenshot into the log
+        if: always()
+        run: |
+          if [ -f build/launch.png ]; then
+            sips -Z 640 -s format jpeg -s formatOptions 60 build/launch.png --out build/launch-small.jpg >/dev/null
+            echo "SHOT-BEGIN"
+            base64 -i build/launch-small.jpg | fold -w 160
+            echo "SHOT-END"
+          fi
+
+      - name: Keep the screenshot and the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator
+          path: |
+            ios/build/launch.png
+            ios/build/xcodebuild.log
+          if-no-files-found: ignore

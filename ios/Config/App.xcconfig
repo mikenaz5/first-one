@@ -21,4 +21,8 @@ APP_GROUP_ID = group.com.example.slate
 // because that entitlement needs a merchant ID registered in your Apple developer account.
 CODE_SIGN_ENTITLEMENTS = Config/Slate.entitlements
 
+// A simulator build needs no signing, so it runs with no development team (the default). Secrets.xcconfig turns signing
+// back on for the simulator, which real Sign in with Apple needs there. Device and App Store builds are not affected.
+CODE_SIGNING_ALLOWED[sdk=iphonesimulator*] = NO
+
 #include? "Secrets.xcconfig"
