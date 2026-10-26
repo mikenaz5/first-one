@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import ImageIO
 import UIKit
 
@@ -100,7 +101,7 @@ struct PreviewMaker: FilePreparing {
         case .thumbnail:
             previewURL = try await poster(of: asset, longEdge: PreviewSpec.thumbnailLongEdge)
         case .watermarked:
-            previewURL = try await watermarkedCopy(of: asset, track: track, transform: transform, shown: CGSize(width: width, height: height), duration: duration)
+            previewURL = try await watermarkedCopy(of: asset, shown: CGSize(width: width, height: height), duration: duration)
         }
         let previewBytes = byteCount(at: previewURL)
         let cap = FileRules.maxPreviewBytes(.video)
@@ -126,36 +127,21 @@ struct PreviewMaker: FilePreparing {
         return url
     }
 
-    /// A reduced copy of the video with the watermark across it.
-    private static func watermarkedCopy(
-        of asset: AVURLAsset, track: AVAssetTrack, transform: CGAffineTransform, shown: CGSize, duration: CMTime
-    ) async throws -> URL {
+    /// A reduced copy of the video with the watermark across it. The mark is laid over every frame with Core Image, which also
+    /// turns the video the way it was filmed, so nothing here depends on the video's own orientation.
+    private static func watermarkedCopy(of asset: AVURLAsset, shown: CGSize, duration: CMTime) async throws -> URL {
         let scale = min(1, PreviewSpec.videoLongEdge / max(shown.width, shown.height))
         // Video encoders want even sizes.
         func even(_ value: CGFloat) -> CGFloat { max(2, (value / 2).rounded() * 2) }
         let renderSize = CGSize(width: even(shown.width * scale), height: even(shown.height * scale))
+        guard let mark = Watermark.overlay(size: renderSize).cgImage.map({ CIImage(cgImage: $0) }) else { throw SlateError.mediaUnreadable }
+        let frame = CGRect(origin: .zero, size: renderSize)
 
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
-        layerInstruction.setTransform(transform.concatenating(CGAffineTransform(scaleX: scale, y: scale)), at: .zero)
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
-        instruction.layerInstructions = [layerInstruction]
-
-        let composition = AVMutableVideoComposition()
+        let composition = AVMutableVideoComposition(asset: asset) { request in
+            let reduced = request.sourceImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            request.finish(with: mark.composited(over: reduced).cropped(to: frame), context: nil)
+        }
         composition.renderSize = renderSize
-        composition.frameDuration = CMTime(value: 1, timescale: 30)
-        composition.instructions = [instruction]
-
-        let parent = CALayer()
-        parent.frame = CGRect(origin: .zero, size: renderSize)
-        let video = CALayer()
-        video.frame = parent.frame
-        let overlay = CALayer()
-        overlay.frame = parent.frame
-        overlay.contents = Watermark.overlay(size: renderSize).cgImage
-        parent.addSublayer(video)
-        parent.addSublayer(overlay)
-        composition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: video, in: parent)
 
         let url = try temporaryURL(ending: "mp4")
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetMediumQuality) else {
