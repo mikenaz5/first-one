@@ -65,6 +65,13 @@ jobs:
             echo "::group::Failed test cases, with what came just before"
             grep -n -B8 -E "Test Case .* failed \(" build/xcodebuild.log | head -250 || true
             echo "::endgroup::"
+            echo "::group::Crashes and restarts"
+            grep -n -iE "restarting after|crashed|fatal error|uncaught exception|terminating app" build/xcodebuild.log | head -40 || true
+            for report in $(ls -t "$HOME"/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -2); do
+              echo "== $report"
+              python3 scripts/crash_report.py "$report" || true
+            done
+            echo "::endgroup::"
             echo "::group::Last 80 lines"
             tail -n 80 build/xcodebuild.log
             echo "::endgroup::"
