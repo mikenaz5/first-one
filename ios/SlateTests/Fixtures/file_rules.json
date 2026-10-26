@@ -1,0 +1,703 @@
+{
+ "_comment": "SPEC 4.4 and 5.5. Read by FileRulesTests (Swift) and supabase/tests/file_rules.py (Postgres): the phone and the database must agree on every case.",
+ "config": {
+  "retentionDays": 30,
+  "draftDays": 7,
+  "warnDays": [
+   7,
+   1
+  ],
+  "quotaGBIndividual": 25,
+  "quotaGBPerSeat": 25,
+  "maxPhotoMB": 100,
+  "maxVideoGB": 4,
+  "maxFiles": 1000,
+  "previewPhotoMaxMB": 5,
+  "previewVideoMaxMB": 150,
+  "urlMinutes": 15,
+  "reservationHours": 24
+ },
+ "now": "2027-02-01T12:00:00Z",
+ "caps": [
+  {
+   "name": "an ordinary photo",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": null
+  },
+  {
+   "name": "a photo at the limit",
+   "kind": "photo",
+   "originalBytes": 100000000,
+   "previewBytes": 5000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": null
+  },
+  {
+   "name": "a photo one byte over",
+   "kind": "photo",
+   "originalBytes": 100000001,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_too_large"
+  },
+  {
+   "name": "a preview one byte over",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 5000001,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "preview_too_large"
+  },
+  {
+   "name": "a video at the limit",
+   "kind": "video",
+   "originalBytes": 4000000000,
+   "previewBytes": 150000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": null
+  },
+  {
+   "name": "a video one byte over",
+   "kind": "video",
+   "originalBytes": 4000000001,
+   "previewBytes": 150000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_too_large"
+  },
+  {
+   "name": "a video preview one byte over",
+   "kind": "video",
+   "originalBytes": 1000000000,
+   "previewBytes": 150000001,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "preview_too_large"
+  },
+  {
+   "name": "a photo can't be as big as a video",
+   "kind": "photo",
+   "originalBytes": 1000000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_too_large"
+  },
+  {
+   "name": "the 1000th file fits",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 999,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": null
+  },
+  {
+   "name": "the 1001st doesn't",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 1000,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "too_many_files"
+  },
+  {
+   "name": "an empty original",
+   "kind": "photo",
+   "originalBytes": 0,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_empty"
+  },
+  {
+   "name": "an empty preview",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 0,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_empty"
+  },
+  {
+   "name": "exactly filling the allowance",
+   "kind": "photo",
+   "originalBytes": 10000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 24989000000,
+   "allowanceBytes": 25000000000,
+   "refusal": null
+  },
+  {
+   "name": "one byte over the allowance",
+   "kind": "photo",
+   "originalBytes": 10000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 24989000001,
+   "allowanceBytes": 25000000000,
+   "refusal": "storage_full"
+  },
+  {
+   "name": "a full allowance",
+   "kind": "photo",
+   "originalBytes": 1000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 25000000000,
+   "allowanceBytes": 25000000000,
+   "refusal": "storage_full"
+  },
+  {
+   "name": "too many wins over too big",
+   "kind": "photo",
+   "originalBytes": 200000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 1000,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "too_many_files"
+  },
+  {
+   "name": "empty wins over too big",
+   "kind": "photo",
+   "originalBytes": 0,
+   "previewBytes": 6000000,
+   "filesInDelivery": 0,
+   "usedBytes": 0,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_empty"
+  },
+  {
+   "name": "too big wins over a full allowance",
+   "kind": "photo",
+   "originalBytes": 200000000,
+   "previewBytes": 1000000,
+   "filesInDelivery": 0,
+   "usedBytes": 25000000000,
+   "allowanceBytes": 25000000000,
+   "refusal": "file_too_large"
+  },
+  {
+   "name": "a big preview wins over a full allowance",
+   "kind": "photo",
+   "originalBytes": 12000000,
+   "previewBytes": 6000000,
+   "filesInDelivery": 0,
+   "usedBytes": 25000000000,
+   "allowanceBytes": 25000000000,
+   "refusal": "preview_too_large"
+  }
+ ],
+ "allowance": [
+  {
+   "name": "an individual",
+   "individual": true,
+   "billedSeats": 0,
+   "bytes": 25000000000
+  },
+  {
+   "name": "a company at the seat floor",
+   "individual": false,
+   "billedSeats": 10,
+   "bytes": 250000000000
+  },
+  {
+   "name": "a company above the floor",
+   "individual": false,
+   "billedSeats": 12,
+   "bytes": 300000000000
+  },
+  {
+   "name": "a company at the seat ceiling",
+   "individual": false,
+   "billedSeats": 250,
+   "bytes": 6250000000000
+  }
+ ],
+ "expiry": [
+  {
+   "name": "thirty days on",
+   "deliveredAt": "2027-01-22T16:00:00Z",
+   "expiresAt": "2027-02-21T16:00:00Z"
+  },
+  {
+   "name": "across a month end",
+   "deliveredAt": "2027-01-31T09:30:00Z",
+   "expiresAt": "2027-03-02T09:30:00Z"
+  },
+  {
+   "name": "across a year end",
+   "deliveredAt": "2026-12-15T00:00:00Z",
+   "expiresAt": "2027-01-14T00:00:00Z"
+  }
+ ],
+ "expiredAt": [
+  {
+   "name": "a second before",
+   "expiresAt": "2027-02-01T12:00:01Z",
+   "expired": false
+  },
+  {
+   "name": "the moment itself",
+   "expiresAt": "2027-02-01T12:00:00Z",
+   "expired": true
+  },
+  {
+   "name": "a day after",
+   "expiresAt": "2027-01-31T12:00:00Z",
+   "expired": true
+  }
+ ],
+ "open": [
+  {
+   "name": "a client previews a delivery",
+   "viewer": "client",
+   "part": "preview",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 25000,
+   "open": true
+  },
+  {
+   "name": "a client can't open an original while a balance is owed",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 25000,
+   "open": false
+  },
+  {
+   "name": "a client can once nothing is owed",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 0,
+   "open": true
+  },
+  {
+   "name": "a revision has no paywall",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "revision",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 25000,
+   "open": true
+  },
+  {
+   "name": "a client can't preview a draft",
+   "viewer": "client",
+   "part": "preview",
+   "deliveryKind": "delivery",
+   "state": "draft",
+   "expiresAt": null,
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "a client can't open an original of a draft",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "draft",
+   "expiresAt": null,
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "nothing opens after the files expire (preview)",
+   "viewer": "client",
+   "part": "preview",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-01-31T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "nothing opens after the files expire (original)",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-01-31T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "an expired delivery stays closed",
+   "viewer": "client",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "expired",
+   "expiresAt": "2027-01-31T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "the creator side sees a draft's preview",
+   "viewer": "provider",
+   "part": "preview",
+   "deliveryKind": "delivery",
+   "state": "draft",
+   "expiresAt": null,
+   "owedCents": 25000,
+   "open": true
+  },
+  {
+   "name": "the creator side sees a draft's original",
+   "viewer": "provider",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "draft",
+   "expiresAt": null,
+   "owedCents": 25000,
+   "open": true
+  },
+  {
+   "name": "the creator side opens a delivered original whatever is owed",
+   "viewer": "provider",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 25000,
+   "open": true
+  },
+  {
+   "name": "the creator side loses it at expiry",
+   "viewer": "provider",
+   "part": "original",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-01-31T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "the creator side has nothing after the state says expired",
+   "viewer": "provider",
+   "part": "preview",
+   "deliveryKind": "revision",
+   "state": "expired",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "anyone else sees nothing (preview)",
+   "viewer": "other",
+   "part": "preview",
+   "deliveryKind": "delivery",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  },
+  {
+   "name": "anyone else sees nothing (original)",
+   "viewer": "other",
+   "part": "original",
+   "deliveryKind": "revision",
+   "state": "delivered",
+   "expiresAt": "2027-02-11T12:00:00Z",
+   "owedCents": 0,
+   "open": false
+  }
+ ],
+ "reminders": [
+  {
+   "name": "a long way off",
+   "daysLeft": 10,
+   "day": null,
+   "expiresAt": "2027-02-11T12:00:00Z"
+  },
+  {
+   "name": "just over a week",
+   "daysLeft": 8,
+   "day": null,
+   "expiresAt": "2027-02-09T12:00:00Z"
+  },
+  {
+   "name": "exactly a week",
+   "daysLeft": 7,
+   "day": 7,
+   "expiresAt": "2027-02-08T12:00:00Z"
+  },
+  {
+   "name": "six and a half days",
+   "daysLeft": 6.5,
+   "day": 7,
+   "expiresAt": "2027-02-08T00:00:00Z"
+  },
+  {
+   "name": "two days",
+   "daysLeft": 2,
+   "day": 7,
+   "expiresAt": "2027-02-03T12:00:00Z"
+  },
+  {
+   "name": "exactly a day",
+   "daysLeft": 1,
+   "day": 1,
+   "expiresAt": "2027-02-02T12:00:00Z"
+  },
+  {
+   "name": "half a day",
+   "daysLeft": 0.5,
+   "day": 1,
+   "expiresAt": "2027-02-02T00:00:00Z"
+  },
+  {
+   "name": "expired",
+   "daysLeft": 0,
+   "day": null,
+   "expiresAt": "2027-02-01T12:00:00Z"
+  },
+  {
+   "name": "long expired",
+   "daysLeft": -3,
+   "day": null,
+   "expiresAt": "2027-01-29T12:00:00Z"
+  }
+ ],
+ "titles": [
+  {
+   "sequence": 1,
+   "title": "Revision 1"
+  },
+  {
+   "sequence": 2,
+   "title": "Revision 2"
+  },
+  {
+   "sequence": 12,
+   "title": "Revision 12"
+  }
+ ],
+ "names": [
+  {
+   "name": "a camera name",
+   "input": "IMG_0042.HEIC",
+   "clean": "IMG_0042.HEIC"
+  },
+  {
+   "name": "padding",
+   "input": "  Sunset.jpg \n",
+   "clean": "Sunset.jpg"
+  },
+  {
+   "name": "slashes become spaces",
+   "input": "../../etc/passwd",
+   "clean": ".. .. etc passwd"
+  },
+  {
+   "name": "a backslash",
+   "input": "C:\\Users\\sam\\a.jpg",
+   "clean": "C: Users sam a.jpg"
+  },
+  {
+   "name": "control characters",
+   "input": "a\u0001b\u0007c\td",
+   "clean": "a b c d"
+  },
+  {
+   "name": "runs of spaces collapse",
+   "input": "a    b",
+   "clean": "a b"
+  },
+  {
+   "name": "nothing left",
+   "input": " \n\t ",
+   "clean": "Untitled"
+  },
+  {
+   "name": "only slashes",
+   "input": "///",
+   "clean": "Untitled"
+  },
+  {
+   "name": "empty",
+   "input": "",
+   "clean": "Untitled"
+  },
+  {
+   "name": "too long",
+   "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "clean": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "name": "accents and emoji stay",
+   "input": "Café 🎉 photo.jpg",
+   "clean": "Café 🎉 photo.jpg"
+  }
+ ],
+ "contentTypes": [
+  {
+   "type": "image/jpeg",
+   "kind": "photo"
+  },
+  {
+   "type": "IMAGE/JPEG",
+   "kind": "photo"
+  },
+  {
+   "type": "image/png",
+   "kind": "photo"
+  },
+  {
+   "type": "image/heic",
+   "kind": "photo"
+  },
+  {
+   "type": "image/heif",
+   "kind": "photo"
+  },
+  {
+   "type": "image/tiff",
+   "kind": "photo"
+  },
+  {
+   "type": "image/webp",
+   "kind": "photo"
+  },
+  {
+   "type": "video/mp4",
+   "kind": "video"
+  },
+  {
+   "type": "video/quicktime",
+   "kind": "video"
+  },
+  {
+   "type": "video/x-m4v",
+   "kind": "video"
+  },
+  {
+   "type": "image/svg+xml",
+   "kind": null
+  },
+  {
+   "type": "application/pdf",
+   "kind": null
+  },
+  {
+   "type": "text/html",
+   "kind": null
+  },
+  {
+   "type": "image/gif",
+   "kind": null
+  },
+  {
+   "type": "",
+   "kind": null
+  },
+  {
+   "type": "video/",
+   "kind": null
+  }
+ ],
+ "firstDeliveryLocked": [
+  {
+   "name": "nothing happened yet",
+   "hasFilesDelivery": false,
+   "linkDelivered": false,
+   "balancePaid": false,
+   "locked": false
+  },
+  {
+   "name": "a link was shared (or the client confirmed it)",
+   "hasFilesDelivery": false,
+   "linkDelivered": true,
+   "balancePaid": false,
+   "locked": true
+  },
+  {
+   "name": "the client paid",
+   "hasFilesDelivery": false,
+   "linkDelivered": false,
+   "balancePaid": true,
+   "locked": true
+  },
+  {
+   "name": "both",
+   "hasFilesDelivery": false,
+   "linkDelivered": true,
+   "balancePaid": true,
+   "locked": true
+  },
+  {
+   "name": "a files delivery is already under way",
+   "hasFilesDelivery": true,
+   "linkDelivered": true,
+   "balancePaid": true,
+   "locked": false
+  }
+ ],
+ "revisionAllowed": [
+  {
+   "name": "no delivery yet",
+   "firstState": "none",
+   "owedCents": 0,
+   "allowed": false
+  },
+  {
+   "name": "a draft first delivery",
+   "firstState": "draft",
+   "owedCents": 0,
+   "allowed": false
+  },
+  {
+   "name": "delivered and paid",
+   "firstState": "delivered",
+   "owedCents": 0,
+   "allowed": true
+  },
+  {
+   "name": "delivered with a balance owed",
+   "firstState": "delivered",
+   "owedCents": 25000,
+   "allowed": false
+  },
+  {
+   "name": "expired and paid",
+   "firstState": "expired",
+   "owedCents": 0,
+   "allowed": true
+  },
+  {
+   "name": "expired with a balance owed",
+   "firstState": "expired",
+   "owedCents": 1,
+   "allowed": false
+  }
+ ]
+}
