@@ -7,8 +7,8 @@
    7,
    1
   ],
-  "quotaGBIndividual": 25,
-  "quotaGBPerSeat": 25,
+  "quotaGBIndividual": 50,
+  "quotaGBPerSeat": 50,
   "maxPhotoMB": 100,
   "maxVideoGB": 4,
   "maxFiles": 1000,
@@ -215,25 +215,25 @@
    "name": "an individual",
    "individual": true,
    "billedSeats": 0,
-   "bytes": 25000000000
+   "bytes": 50000000000
   },
   {
    "name": "a company at the seat floor",
    "individual": false,
    "billedSeats": 10,
-   "bytes": 250000000000
+   "bytes": 500000000000
   },
   {
    "name": "a company above the floor",
    "individual": false,
    "billedSeats": 12,
-   "bytes": 300000000000
+   "bytes": 600000000000
   },
   {
    "name": "a company at the seat ceiling",
    "individual": false,
    "billedSeats": 250,
-   "bytes": 6250000000000
+   "bytes": 12500000000000
   }
  ],
  "expiry": [

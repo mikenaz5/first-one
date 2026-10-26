@@ -93,7 +93,7 @@ final class AppModel {
     var filesConfig: FilesConfig = .standard
     var fileUploads: [UUID: [FileUploadItem]] = [:]
     var fileSaveRuns: [UUID: FileSaveRun] = [:]
-    /// "4.2 of 25 GB used" for the account on screen. Nil until asked, and for a client.
+    /// "4.2 of 50 GB used" for the account on screen. Nil until asked, and for a client.
     var storageMeter: StorageMeter?
     /// The files the person picked, kept so a failed one can be tried again. Nothing here is shown.
     @ObservationIgnored var pendingPicks: [UUID: (pick: PickedFile, booking: UUID)] = [:]

@@ -495,7 +495,7 @@ final class FileBackendTests: XCTestCase {
         await expectError(.bookingNotFound) { try await backend.removeFile(added.reservation.fileID, by: stranger) }
         let before = try await backend.fileStorageMeter(owner: creator.id, for: creator.id)
         XCTAssertEqual(before.usedBytes, 3_400)
-        XCTAssertEqual(before.allowanceBytes, 25 * FilesConfig.gigabyte)
+        XCTAssertEqual(before.allowanceBytes, 50 * FilesConfig.gigabyte)
         try await backend.removeFile(added.reservation.fileID, by: creator.id)
         let after = try await backend.fileStorageMeter(owner: creator.id, for: creator.id)
         XCTAssertEqual(after.usedBytes, 0)
@@ -568,7 +568,7 @@ final class FileRowDecodingTests: XCTestCase {
         XCTAssertEqual(draft.kind, .revision)
         XCTAssertEqual(draft.state, .draft)
         XCTAssertNotNil(files.meter, "The creator side is told the allowance")
-        XCTAssertEqual(files.allowanceBytes, 25 * FilesConfig.gigabyte)
+        XCTAssertEqual(files.allowanceBytes, 50 * FilesConfig.gigabyte)
         XCTAssertFalse(files.canDeliverFiles)
         XCTAssertTrue(files.canSendRevision)
     }
@@ -600,7 +600,7 @@ final class FileRowDecodingTests: XCTestCase {
         XCTAssertEqual(SupabaseBackend.refusal(forToken: refusal.refusal ?? "", kind: .photo, config: .standard), .tooLarge(maxBytes: 100_000_000))
 
         let usage = try load("usage", SupabaseBackend.FileUsageRow.self)
-        XCTAssertEqual(usage.allowanceBytes, 25_000_000_000)
+        XCTAssertEqual(usage.allowanceBytes, 50_000_000_000)
         let saved = try load("saved", SupabaseBackend.FileSaveCountRow.self)
         XCTAssertEqual(saved.saved, 2)
         XCTAssertEqual(saved.total, 2)

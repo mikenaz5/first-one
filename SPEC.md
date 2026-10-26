@@ -195,8 +195,8 @@ Kept in one place per layer (`app_settings` in SQL, `TeamConfig` in Swift) so th
 | `files.retention_days` | 30 | How long a delivery stays available, counted from the moment it is delivered. |
 | `files.draft_days` | 7 | How long files that were uploaded but never delivered are kept. |
 | `files.warn_days` | 7, 1 | Reminders to the client, in days before expiry, while anything is unsaved. |
-| `files.quota_gb.individual` | 25 | Storage allowance of an Individual account. Placeholder (Q25). |
-| `files.quota_gb.per_seat` | 25 | Allowance added per **billed** seat for a company, shared across the company. Placeholder (Q25). |
+| `files.quota_gb.individual` | 50 | Storage allowance of an Individual account. Decided: 50 GB per creator (Q25); the cost side is still to be measured in the pilot (R15). |
+| `files.quota_gb.per_seat` | 50 | Allowance added per **billed** seat for a company, shared across the company. Same 50 GB per creator (Q25). |
 | `files.max_photo_mb` | 100 | Largest photo. |
 | `files.max_video_gb` | 4 | Largest video. |
 | `files.max_files` | 1000 | Most files in one delivery. |
@@ -297,7 +297,7 @@ A creator delivers the finished photos and videos inside Slate. The client sees 
 | Revisions | Once the client has paid, the creator can **Send a revision**: more files with a title ("Revision 2: colour corrections") and a note. The client can save them at once, with no payment step. Each revision has its own 30 days and its own saved count. | MVP |
 | Saving | Per file to Photos or Files, or **Save all** as a queue of downloads that continues in the background. "Saved 12 of 48" is shown to the client and to the creator. | MVP |
 | Expiry | Everything in a delivery is deleted 30 days after delivery. The client is reminded at 7 days and 1 day while anything is unsaved. The creator is told when it ends and how many files were saved. | MVP |
-| Storage meter | "4.2 of 25 GB used" under Settings, for the account on screen (4.4). | MVP |
+| Storage meter | "4.2 of 50 GB used" under Settings, for the account on screen (4.4). | MVP |
 | Remove a file | The creator can remove a file at any time. It is recorded. | MVP |
 | Report a file | Either person can report a file. Reports go to the support console (R16). | MVP |
 | Link delivery | The existing delivery by external link stays, for very large files. It still needs Confirm receipt before the balance is payable. | MVP |
@@ -563,7 +563,7 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 *The creator*
 
 1. Once the shoot has started, the booking shows **Add files**. The creator picks photos and videos from Photos or the Files app. In a company, a member does this on a booking they may manage (4.3).
-2. For each file the app first checks the caps and the allowance. A file that does not fit is refused before it uploads, with "4.2 of 25 GB used" and the choices: remove something, or deliver by link.
+2. For each file the app first checks the caps and the allowance. A file that does not fit is refused before it uploads, with "4.2 of 50 GB used" and the choices: remove something, or deliver by link.
 3. The app makes a reduced, watermarked preview of each file, uploads it, then uploads the original. Uploads continue in the background, so the creator can close the app. A file that fails shows **Retry**. Files that are never delivered are removed after 7 days.
 4. When every file is ready, **Deliver** becomes available. Its confirmation says that {client} can see previews now, can save the originals once the balance is paid, and has until {date, 30 days on}; and that Slate Pro is not an archive, so the creator should keep their own copies. Delivering starts the 30 days, makes the balance payable, and notifies the client.
 
@@ -813,7 +813,7 @@ Defaults in brackets are what this spec assumes if you don't change them.
 | # | Question | Default |
 |---|---|---|
 | Q24 | **Does "expire if not downloaded in time" mean every file is deleted 30 days after delivery, saved or not?** | Yes. Saving does not change the date (A11) |
-| Q25 | **What are the right allowances and caps?** | 25 GB for an Individual and 25 GB per billed seat for a company. Placeholders to tune against real cost (R15) |
+| Q25 | **What are the right allowances and caps?** | **Decided: 50 GB for an Individual and 50 GB per billed seat for a company.** It is a cap on what is stored at once, not a monthly amount: files leave after 30 days and the space comes back. The other caps (100 MB photo, 4 GB video, 1,000 files) are still placeholders to tune against real cost (R15). Paid extra storage is not built. |
 | Q26 | **Should the 30 days be extendable?** | No in the first version |
 | Q27 | **What does the watermark say?** | "PREVIEW" and the creator's business name, repeated diagonally |
 | Q28 | **A video preview: the whole video at reduced size, or a short clip?** | The whole video, reduced and watermarked, within its size cap |

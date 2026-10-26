@@ -32,7 +32,7 @@ struct FilesConfig: Equatable, Codable {
     var reservationHours: Int
 
     static let standard = FilesConfig(
-        retentionDays: 30, draftDays: 7, warnDays: [7, 1], quotaGBIndividual: 25, quotaGBPerSeat: 25,
+        retentionDays: 30, draftDays: 7, warnDays: [7, 1], quotaGBIndividual: 50, quotaGBPerSeat: 50,
         maxPhotoMB: 100, maxVideoGB: 4, maxFiles: 1000, previewPhotoMaxMB: 5, previewVideoMaxMB: 150,
         urlMinutes: 15, reservationHours: 24
     )
@@ -189,7 +189,7 @@ struct BookingFiles: Equatable {
     }
 }
 
-/// "4.2 of 25 GB used".
+/// "4.2 of 50 GB used".
 struct StorageMeter: Equatable {
     var usedBytes: Int64
     var allowanceBytes: Int64

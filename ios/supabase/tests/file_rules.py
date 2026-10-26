@@ -333,7 +333,7 @@ check("the paths are lowercase ids: owner, booking, file", res["original_path"] 
 check("it is uploading, with the sizes reserved", rows("select status, original_bytes, preview_bytes, name from delivery_files where id = %s", (fid,)) == [("uploading", 12_000_000, 800_000, "IMG_0001.HEIC")])
 check("a draft delivery holds it", one("select state || kind || sequence from deliveries where booking_id = %s", (b1,)) == "draftdelivery0")
 check("the space is counted at once", usage(carol) == 12_800_000 and res["used_bytes"] == 12_800_000)
-check("and the allowance is given", res["allowance_bytes"] == 25_000_000_000)
+check("and the allowance is given", res["allowance_bytes"] == 50_000_000_000)
 check("a name is tidied before it is kept", rpc(carol, "files_reserve", b1, "photo", "  ../a\u0001b.heic ", "IMAGE/HEIC", 1, 1, None, 1000, 100)["file_id"] is not None
       and one("select name || '|' || content_type from delivery_files order by created_at desc limit 1") == ".. a b.heic|image/heic")
 a.execute("delete from delivery_files where name = '.. a b.heic'")
@@ -395,7 +395,7 @@ as_creator = rpc(carol, "list_booking_files", b1)
 d0 = as_creator["deliveries"][0]
 check("the creator sees the draft, its files and where they are", len(as_creator["deliveries"]) == 1 and d0["state"] == "draft" and len(d0["files"]) == 2
       and all(f["original_path"] and f["preview_path"] for f in d0["files"]), as_creator)
-check("and the space used", as_creator["used_bytes"] == 18_300_000 and as_creator["allowance_bytes"] == 25_000_000_000, as_creator)
+check("and the space used", as_creator["used_bytes"] == 18_300_000 and as_creator["allowance_bytes"] == 50_000_000_000, as_creator)
 check("and that the files can be delivered", as_creator["can_deliver_files"] is True and as_creator["can_send_revision"] is False)
 as_client = rpc(alice, "list_booking_files", b1)
 check("the client sees nothing yet", as_client["deliveries"] == [] and as_client["used_bytes"] is None and as_client["can_deliver_files"] is False, as_client)
@@ -567,7 +567,7 @@ for t_ in threads:
     t_.join()
 check("four at once, room for one: exactly one gets it", sum(isinstance(o, dict) for o in outs) == 1 and sum(err(o, "storage_full") for o in outs) == 3, outs)
 check("and the space is counted once", usage(racer) == 601_000_000)
-set_files_setting(quota_gb_individual=25, max_photo_mb=100)
+set_files_setting(quota_gb_individual=50, max_photo_mb=100)
 
 # =============================================================================
 print("\n[a company's files]")
@@ -577,12 +577,12 @@ for who, name, ok in [(olivia, "the Owner", True), (dee, "an Admin", True), (mia
     got = rpc(who, "files_reserve", b_acme, "photo", "co.heic", "image/heic", 1, 1, None, 1_000, 100)
     check(f"at a company, {name} {'can' if ok else 'can not'} add files", isinstance(got, dict) if ok else err(got, "not_found"), got)
 check("a company's files count against the company, not the person", usage(ORG) == 4 * 1_100 and usage(cal) == 0)
-check("the company's allowance is per billed seat", one("select files_owner_allowance_bytes(%s)", (ORG,)) == 250_000_000_000)
+check("the company's allowance is per billed seat", one("select files_owner_allowance_bytes(%s)", (ORG,)) == 500_000_000_000)
 a.execute("delete from delivery_files where booking_id = %s", (b_acme,))
-check("who can see the company's figures", rpc(olivia, "files_storage_usage", ORG)["allowance_bytes"] == 250_000_000_000
+check("who can see the company's figures", rpc(olivia, "files_storage_usage", ORG)["allowance_bytes"] == 500_000_000_000
       and rpc(dee, "files_storage_usage", ORG)["used_bytes"] is not None)
 check("not a stranger", err(rpc(stranger, "files_storage_usage", ORG), "not_found"))
-check("a person sees their own", rpc(carol, "files_storage_usage", carol)["allowance_bytes"] == 25_000_000_000)
+check("a person sees their own", rpc(carol, "files_storage_usage", carol)["allowance_bytes"] == 50_000_000_000)
 check("but not someone else's", err(rpc(carol, "files_storage_usage", olivia), "not_found"))
 fa = make_file(cal, b_acme, "co2.heic", original=2_000, preview=200)
 check("the assigned creator finishes and delivers", fa["finalized"]["accepted"] and isinstance(rpc(cal, "files_deliver", b_acme), dict))

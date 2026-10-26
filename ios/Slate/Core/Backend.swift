@@ -149,7 +149,7 @@ protocol SlateBackend {
     /// The client has an original on their phone. Throws `originalsLocked` while a balance is owed.
     func markFileSaved(_ fileID: UUID, by userID: UUID) async throws -> FileSaveCount
     func reportFile(_ fileID: UUID, reason: String, by userID: UUID) async throws
-    /// "4.2 of 25 GB used" for the account the person is working as (a person's own, or a company's).
+    /// "4.2 of 50 GB used" for the account the person is working as (a person's own, or a company's).
     func fileStorageMeter(owner: UUID, for userID: UUID) async throws -> StorageMeter
     /// A way to read a preview or an original right now. The backend decides, as the person asking. Throws `originalsLocked`
     /// or `fileUnavailable`.

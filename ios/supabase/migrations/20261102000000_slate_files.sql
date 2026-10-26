@@ -15,7 +15,7 @@
 --   files_mark_saved(file)           the client, once an original is theirs to open.
 --   files_report(file, reason)       either person.
 --   list_booking_files(booking)      what the person looking is allowed to see, for the screen.
---   files_storage_usage(owner)       "4.2 of 25 GB used".
+--   files_storage_usage(owner)       "4.2 of 50 GB used".
 --   files_expire_due() and the purge functions    for the scheduled job (the expire-files Edge Function).
 --
 -- Who can open which bytes is decided by the policies on storage.objects, at the moment of asking: a signed link is made
@@ -35,7 +35,7 @@
 insert into public.app_settings (key, value) values
   ('files', '{
     "retention_days": 30, "draft_days": 7, "warn_days": [7, 1],
-    "quota_gb_individual": 25, "quota_gb_per_seat": 25,
+    "quota_gb_individual": 50, "quota_gb_per_seat": 50,
     "max_photo_mb": 100, "max_video_gb": 4, "max_files": 1000,
     "preview_photo_max_mb": 5, "preview_video_max_mb": 150,
     "url_minutes": 15, "reservation_hours": 24
@@ -88,8 +88,8 @@ as $$
     'retention_days', public.files_setting_int('retention_days', 30),
     'draft_days', public.files_setting_int('draft_days', 7),
     'warn_days', to_jsonb(public.files_warn_days()),
-    'quota_gb_individual', public.files_setting_int('quota_gb_individual', 25),
-    'quota_gb_per_seat', public.files_setting_int('quota_gb_per_seat', 25),
+    'quota_gb_individual', public.files_setting_int('quota_gb_individual', 50),
+    'quota_gb_per_seat', public.files_setting_int('quota_gb_per_seat', 50),
     'max_photo_mb', public.files_setting_int('max_photo_mb', 100),
     'max_video_gb', public.files_setting_int('max_video_gb', 4),
     'max_files', public.files_setting_int('max_files', 1000),
@@ -136,8 +136,8 @@ security definer
 set search_path = public
 as $$
   select case
-    when p_individual then public.files_setting_int('quota_gb_individual', 25)::bigint * 1000000000
-    else public.files_setting_int('quota_gb_per_seat', 25)::bigint * greatest(coalesce(p_billed_seats, 0), 0) * 1000000000
+    when p_individual then public.files_setting_int('quota_gb_individual', 50)::bigint * 1000000000
+    else public.files_setting_int('quota_gb_per_seat', 50)::bigint * greatest(coalesce(p_billed_seats, 0), 0) * 1000000000
   end;
 $$;
 
@@ -986,7 +986,7 @@ begin
 end;
 $$;
 
--- "4.2 of 25 GB used", for the account on screen: a person's own, or a company's for anyone in it.
+-- "4.2 of 50 GB used", for the account on screen: a person's own, or a company's for anyone in it.
 create or replace function public.files_storage_usage(p_owner uuid)
 returns jsonb
 language plpgsql

@@ -48,7 +48,7 @@ extension AppModel {
         if let latest = try? await backend.loadFilesConfig() { filesConfig = latest }
     }
 
-    /// "4.2 of 25 GB used" for the account on screen. Only the creator side has one.
+    /// "4.2 of 50 GB used" for the account on screen. Only the creator side has one.
     func refreshStorageMeter() async {
         guard let session, let owner = ownerID else { return }
         storageMeter = try? await backend.fileStorageMeter(owner: owner, for: session.userID)
