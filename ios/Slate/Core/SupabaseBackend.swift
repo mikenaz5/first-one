@@ -8,9 +8,16 @@ import Supabase
 /// Supabase dashboard with this app's bundle ID as an authorized client ID.
 final class SupabaseBackend: SlateBackend, @unchecked Sendable {
     let client: SupabaseClient
+    /// The project's address and anon key again, for the few calls the SDK can't make (uploading a big file with progress).
+    let projectURL: URL
+    let anonKey: String
+    /// Slate Files numbers, as the database last said them.
+    var filesConfig: FilesConfig = .standard
 
     init(url: URL, anonKey: String) {
         client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
+        projectURL = url
+        self.anonKey = anonKey
     }
 
     // MARK: - Rows

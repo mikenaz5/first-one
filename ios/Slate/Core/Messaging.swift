@@ -13,6 +13,13 @@ struct MessageEventData: Codable, Equatable, Hashable {
     var revised: Bool?
     /// A review line: the stars given.
     var rating: Int?
+    /// A files line: a revision's title, how many photos and videos were delivered, and how many of the delivery's files
+    /// the client had saved when it ended.
+    var title: String?
+    var photos: Int?
+    var videos: Int?
+    var saved: Int?
+    var total: Int?
     var packageName: String?
     var startAt: Date?
     var timeZone: String?
@@ -35,6 +42,8 @@ struct Message: Identifiable, Codable, Equatable, Hashable {
         case balancePaid = "balance_paid"
         case reviewed
         case cancelled
+        case filesDelivered = "files_delivered"
+        case filesExpired = "files_expired"
     }
 
     var id: UUID
@@ -211,6 +220,22 @@ enum ConversationText {
             return balance > 0
                 ? "\(client) confirmed they have the final files. The balance of \(money(balance)) is now due."
                 : "\(client) confirmed they have the final files. All done."
+        case .filesDelivered:
+            let what = FileRules.countText(photos: message.data.photos ?? 0, videos: message.data.videos ?? 0)
+            let revised = message.data.revised ?? false
+            if viewerIsCreator {
+                return revised ? "You sent a revision: \(what)." : "You delivered \(what)."
+            }
+            return revised
+                ? "\(creator) sent a revision: \(what). Open the booking to see it."
+                : "\(creator) delivered \(what). Open the booking to preview them."
+        case .filesExpired:
+            let total = message.data.total ?? 0
+            let saved = message.data.saved ?? 0
+            let outcome = total == 0 ? "" : (saved >= total ? " All were saved." : " \(saved) of \(total) were saved.")
+            return message.data.revised == true
+                ? "A revision ended and its files were deleted.\(outcome)"
+                : "The delivery ended and its files were deleted.\(outcome)"
         case .reviewed:
             let stars = message.data.rating.map { "\($0)-star " } ?? ""
             return viewerIsClient ? "You left a \(stars)review." : "\(client) left a \(stars)review."

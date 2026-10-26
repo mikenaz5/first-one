@@ -151,14 +151,7 @@ struct FileDelivery: Identifiable, Codable, Equatable, Hashable {
 
     /// "12 photos and 3 videos".
     var countText: String {
-        var parts: [String] = []
-        if photoCount > 0 { parts.append(photoCount == 1 ? "1 photo" : "\(photoCount) photos") }
-        if videoCount > 0 { parts.append(videoCount == 1 ? "1 video" : "\(videoCount) videos") }
-        switch parts.count {
-        case 0: return "No files"
-        case 1: return parts[0]
-        default: return parts.joined(separator: " and ")
-        }
+        readyFiles.isEmpty ? "No files" : FileRules.countText(photos: photoCount, videos: videoCount)
     }
 }
 
@@ -264,9 +257,35 @@ enum FileRefusal: Equatable {
         case .previewTooLarge:
             "The preview of that file came out too large."
         case .storageFull(let used, let allowance):
-            "Your storage is full: \(ByteText.format(used)) of \(ByteText.format(allowance)) used. Remove something, or deliver by link."
+            allowance > 0
+                ? "Your storage is full: \(ByteText.format(used)) of \(ByteText.format(allowance)) used. Remove something, or deliver by link."
+                : "Your storage is full. Remove something, or deliver by link."
         }
     }
+}
+
+/// Where a file's bytes are on the creator's phone, ready to send: the original as it came, and the small watermarked preview.
+struct FileUploadSource: Equatable {
+    var original: URL
+    var preview: URL
+}
+
+/// The backend's verdict once the bytes are in storage.
+enum FileFinalization: Equatable {
+    case accepted
+    case refused(FileRefusal)
+}
+
+/// How many of a delivery's files the client has saved.
+struct FileSaveCount: Equatable {
+    var saved: Int
+    var total: Int
+}
+
+/// Where to read a file from right now: a short-lived link to private storage, or a file on this phone.
+struct FileSource: Equatable {
+    var url: URL
+    var isRemote: Bool
 }
 
 // MARK: - Rules
@@ -386,6 +405,15 @@ enum FileRules {
 
     static func revisionTitle(sequence: Int) -> String { "Revision \(sequence)" }
 
+    /// "12 photos and 2 videos", "1 photo", "3 videos"; "files" when there are none. The notification wording says the same.
+    static func countText(photos: Int, videos: Int) -> String {
+        func part(_ n: Int, _ one: String) -> String { "\(n) \(one)\(n == 1 ? "" : "s")" }
+        if photos > 0, videos > 0 { return "\(part(photos, "photo")) and \(part(videos, "video"))" }
+        if photos > 0 { return part(photos, "photo") }
+        if videos > 0 { return part(videos, "video") }
+        return "files"
+    }
+
     // MARK: Names
 
     /// A file's name as it is kept and shown: no slashes or control characters (they become a space), runs of spaces
@@ -428,7 +456,7 @@ enum PreviewSpec {
     /// The small, unmarked picture that fills a grid tile (and the only picture a revision needs).
     static let thumbnailLongEdge: CGFloat = 480
     static let thumbnailQuality: CGFloat = 0.7
-    /// A video preview is cut at this height and marked the same way.
-    static let videoHeight: CGFloat = 540
+    /// A video preview is scaled so its long edge is at most this (960 by 540 for ordinary video) and marked the same way.
+    static let videoLongEdge: CGFloat = 960
     static let watermarkText = "PREVIEW"
 }

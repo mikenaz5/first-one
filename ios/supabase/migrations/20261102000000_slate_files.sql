@@ -669,7 +669,7 @@ end;
 $$;
 
 -- The bytes are in storage: read their real sizes and accept the file, or delete and refuse one bigger than was reserved.
--- Returns { accepted, refusal, file_id }. (A refusal is an answer, not an error, so that the removal it makes sticks.)
+-- Returns { accepted, refusal, file_id, kind }. (A refusal is an answer, not an error, so that the removal it makes sticks.)
 create or replace function public.files_finalize(p_file_id uuid)
 returns jsonb
 language plpgsql
@@ -696,7 +696,7 @@ begin
     raise exception 'not_found';
   end if;
   if v_f.status = 'ready' then
-    return jsonb_build_object('accepted', true, 'refusal', null, 'file_id', v_f.id);
+    return jsonb_build_object('accepted', true, 'refusal', null, 'file_id', v_f.id, 'kind', v_f.kind);
   end if;
   if v_f.status <> 'uploading' then
     raise exception 'not_found';
@@ -718,13 +718,13 @@ begin
   if v_refusal is not null then
     update public.delivery_files set status = 'removed', removed_at = now(), removed_by = v_uid where id = v_f.id;
     insert into public.storage_purge (path) values (v_f.original_path), (v_f.preview_path) on conflict do nothing;
-    return jsonb_build_object('accepted', false, 'refusal', v_refusal, 'file_id', v_f.id);
+    return jsonb_build_object('accepted', false, 'refusal', v_refusal, 'file_id', v_f.id, 'kind', v_f.kind);
   end if;
 
   update public.delivery_files
      set original_bytes = v_orig, preview_bytes = v_prev, status = 'ready', ready_at = now()
    where id = v_f.id;
-  return jsonb_build_object('accepted', true, 'refusal', null, 'file_id', v_f.id);
+  return jsonb_build_object('accepted', true, 'refusal', null, 'file_id', v_f.id, 'kind', v_f.kind);
 end;
 $$;
 

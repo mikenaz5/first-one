@@ -130,6 +130,31 @@ protocol SlateBackend {
     /// allowed that creator. The amount comes from the booking, never from the caller.
     func chargeSavedCard(bookingID: UUID, by userID: UUID) async throws -> SavedCardCharge
 
+    // Slate Files (hosted delivery of photos and videos)
+    /// The numbers behind it (limits, 30 days, storage), so the app shows what the server enforces.
+    func loadFilesConfig() async throws -> FilesConfig
+    /// Everything about a booking's files the person looking may know: deliveries, previews, whether originals are open.
+    func loadBookingFiles(bookingID: UUID, for userID: UUID) async throws -> BookingFiles
+    /// Checks the file would fit, reserves its space, and says where its two objects go. Nothing is sent yet.
+    /// Throws `fileRefused`, `unsupportedFileType`, `filesNotAllowed`, `firstDeliveryLocked`, `revisionNotAllowed`.
+    func reserveFile(_ request: FileUploadRequest, by userID: UUID) async throws -> FileReservation
+    /// Sends the original and its preview to private storage. `progress` runs from 0 to 1.
+    func uploadFile(_ reservation: FileReservation, from source: FileUploadSource, by userID: UUID, progress: @escaping @Sendable (Double) -> Void) async throws
+    /// Tells the backend the bytes are in. It checks their real sizes and accepts the file, or deletes and refuses it.
+    func finishFile(_ fileID: UUID, by userID: UUID) async throws -> FileFinalization
+    /// Makes the draft a delivery (or a revision): starts the 30 days and, the first time, makes the balance payable.
+    /// Throws `nothingToDeliver`, `filesNotReady`, `deliveryNoteTooLong`, `fileTitleTooLong`.
+    func deliverFiles(bookingID: UUID, title: String?, note: String?, by userID: UUID) async throws -> BookingFiles
+    func removeFile(_ fileID: UUID, by userID: UUID) async throws
+    /// The client has an original on their phone. Throws `originalsLocked` while a balance is owed.
+    func markFileSaved(_ fileID: UUID, by userID: UUID) async throws -> FileSaveCount
+    func reportFile(_ fileID: UUID, reason: String, by userID: UUID) async throws
+    /// "4.2 of 25 GB used" for the account the person is working as (a person's own, or a company's).
+    func fileStorageMeter(owner: UUID, for userID: UUID) async throws -> StorageMeter
+    /// A way to read a preview or an original right now. The backend decides, as the person asking. Throws `originalsLocked`
+    /// or `fileUnavailable`.
+    func fileSource(for file: DeliveryFile, part: FileRules.Part, bookingID: UUID, for userID: UUID) async throws -> FileSource
+
     // Messages (one conversation per booking)
     /// Every conversation the person is part of, newest first, with unread counts. Bookings whose hold ran out have none.
     func loadConversations(for userID: UUID) async throws -> [ConversationSummary]

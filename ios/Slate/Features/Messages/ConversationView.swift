@@ -319,6 +319,8 @@ private struct SystemLine: View {
         case .contractSigned: "signature"
         case .depositPaid, .balancePaid: "creditcard"
         case .deliveryShared: "shippingbox"
+        case .filesDelivered: "photo.on.rectangle"
+        case .filesExpired: "clock.badge.xmark"
         case .receiptConfirmed: "checkmark.seal"
         case .reviewed: "star.fill"
         case .cancelled: "xmark.circle"

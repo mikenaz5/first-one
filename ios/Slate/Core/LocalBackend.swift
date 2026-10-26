@@ -17,6 +17,8 @@ actor LocalBackend: SlateBackend {
     let sendsPushFromServer: Bool
     /// Seat numbers. The database holds the real ones; tests pass small ones.
     let teamConfig: TeamConfig
+    /// Slate Files limits. The database holds the real ones; tests pass small ones.
+    let filesConfig: FilesConfig
 
     /// Whether to start with a few made-up creators, so a client has someone to find and book before there is a
     /// server. Only the app itself turns this on (`BackendFactory`); tests and previews start empty.
@@ -29,11 +31,12 @@ actor LocalBackend: SlateBackend {
 
     init(
         root: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }, sendsPushFromServer: Bool = false,
-        teamConfig: TeamConfig = .standard, offersSampleCreators: Bool = false
+        teamConfig: TeamConfig = .standard, filesConfig: FilesConfig = .standard, offersSampleCreators: Bool = false
     ) {
         self.clock = clock
         self.sendsPushFromServer = sendsPushFromServer
         self.teamConfig = teamConfig
+        self.filesConfig = filesConfig
         self.offersSampleCreators = offersSampleCreators
         let base: URL
         if let root {

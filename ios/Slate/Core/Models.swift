@@ -311,6 +311,18 @@ enum SlateError: LocalizedError, Equatable {
     case cardConsentOutdated
     case cardDeclined
     case cardNeedsApproval
+    case filesNotAllowed
+    case unsupportedFileType
+    case firstDeliveryLocked
+    case revisionNotAllowed
+    case fileRefused(FileRefusal)
+    case uploadIncomplete
+    case nothingToDeliver
+    case filesNotReady
+    case originalsLocked
+    case fileTitleTooLong
+    case fileUnavailable
+    case photosAccessDenied
     case backend(String)
 
     var errorDescription: String? {
@@ -457,6 +469,30 @@ enum SlateError: LocalizedError, Equatable {
             "The card was declined. The client can pay the balance in the app instead."
         case .cardNeedsApproval:
             "The client's bank needs them to approve this payment. They can pay the balance in the app instead."
+        case .filesNotAllowed:
+            "Photos and videos can be delivered once the shoot has started, while the booking is confirmed or complete."
+        case .unsupportedFileType:
+            "Slate Pro takes photos (JPEG, PNG, HEIC, TIFF, WebP) and videos (MP4, MOV, M4V)."
+        case .firstDeliveryLocked:
+            "This booking was already delivered by link, or its balance is paid, so the first delivery can't be sent as files."
+        case .revisionNotAllowed:
+            "A revision can be sent after the first delivery, once nothing is owed."
+        case .fileRefused(let refusal):
+            refusal.message
+        case .uploadIncomplete:
+            "The upload didn't finish. Try sending it again."
+        case .nothingToDeliver:
+            "Add at least one photo or video first."
+        case .filesNotReady:
+            "Some files are still uploading. Wait for them to finish."
+        case .originalsLocked:
+            "The originals unlock when the balance is paid."
+        case .fileTitleTooLong:
+            "Keep the title under 80 characters."
+        case .fileUnavailable:
+            "That file isn't available any more."
+        case .photosAccessDenied:
+            "Allow \(AppConfig.productName) to add to your photos in Settings, or save to Files instead."
         case .backend(let message):
             message
         }
