@@ -74,7 +74,7 @@ struct FileViewer: View {
                 ReportFileSheet(file: file)
             }
             .sheet(item: $exportItem) { item in
-                ActivityView(items: [item.url]) { completed in
+                ShareSheet(items: [item.url]) { completed in
                     exportItem = nil
                     try? FileManager.default.removeItem(at: item.url.deletingLastPathComponent())
                     if completed { Task { await model.markSaved(item.file, bookingID: bookingID); savedCount += 1 } }
@@ -244,7 +244,7 @@ private struct ZoomableImage: View {
 // MARK: - The system's share sheet
 
 /// The share sheet, for "Save to Files" and the like. `completion` says whether the person finished with an action.
-struct ActivityView: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     var completion: (Bool) -> Void = { _ in }
 

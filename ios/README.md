@@ -301,6 +301,44 @@ A client can keep cards with Stripe and allow a creator, by name, to charge the 
 
 **On a device with no server,** *Add a card* adds a pretend card (a made-up number's last four, an expiry three years away) so the whole flow can be tried alone: allow a creator, stop it, remove a card, and, as the creator, charge the balance. No card is read and no money moves.
 
+## Slate Files (photos and videos delivered in the app)
+
+A creator can deliver the finished photos and videos inside Slate Pro instead of sharing a link. On a booking whose shoot has started, **Photos and videos** opens a page where the creator picks files from Photos or the Files app. The client sees small watermarked previews at once, pays the balance to unlock the originals, and saves them to Photos or Files. Everything is deleted **30 days after delivery**. After the first delivery, **revisions** (corrected or extra files) are free and nothing in them is locked.
+
+| Step | Who | What happens |
+|---|---|---|
+| **Add files** | Creator | Each file is checked *before* it is sent: not empty, a photo up to 100 MB or a video up to 4 GB, a delivery of up to 1,000 files, and room in the storage allowance (25 GB for a person; 25 GB per billed seat for a company, shared by everyone in it). The phone makes the small copy (a watermarked picture, or a reduced watermarked video, for the first delivery; only a small unmarked picture for a revision), asks the database for room (`files_reserve`), sends the two files straight to private storage, and asks the database to check what arrived (`files_finalize`). A file that fails shows why and can be retried; one that arrives bigger than it said is deleted and refused. |
+| **Deliver** | Creator | `files_deliver` makes the draft a delivery: it starts the 30 days, marks the booking delivered and received (so the balance becomes payable, with no confirm step), completes a booking that owes nothing, and tells the client. The sheet says what will happen and that Slate Pro is not an archive. |
+| **Preview and pay** | Client | Previews open at once, full screen, with no Save or Share. **Pay to unlock downloads** is the same Apple Pay balance payment as ever. The originals open only when the database says nothing is owed, checked every time a link is made, so a link for a locked original can't be made at all. |
+| **Save** | Client | **Save to Photos**, **Save to Files…**, or **Save all** (one after another, with progress and Cancel). The page shows "Saved 12 of 48", and so does the creator. |
+| **The end** | Scheduled job | `expire-files` ends deliveries whose time is up, deletes their previews and originals, tells the creator how many were saved, warns the client 7 and 1 days before (while anything is unsaved), removes drafts nobody delivered after 7 days and uploads that never finished after 24 hours, and deletes the bytes of everything removed. |
+
+**One way for the first delivery.** The first delivery is by files *or* by link, not both. Once a link has been shared, or the balance paid, files can't be the first delivery. A revision needs a first delivery and nothing owed, so it is never a way round paying.
+
+**Where the rules live.** In the database (`…_slate_files.sql`): the limits, who may reserve, finish, deliver or remove a file, and the policies on the private `deliveries` bucket that decide who can read which bytes. The numbers (30 days, 7 days, 25 GB, the caps) are the `files` row of `app_settings`, read through `files_config()`, so they change without a release. The phone's copies of the rules (`FileRules`, `FilesConfig`) and the SQL are checked against one fixture, `SlateTests/Fixtures/file_rules.json`; `file_rows.json` is what the functions really return (`file_rules.py --dump` rewrites it, and the `Database` workflow fails if the database stops matching it).
+
+**On a device with no server,** the files are copied into the app's own folder and the same rules apply, so the whole flow can be tried alone: add, deliver, preview, "pay", save, revise, and wait for the 30 days (the tests move the clock). There is no push, so no reminders.
+
+### Turning on Slate Files
+
+1. Apply the migrations. They create the private `deliveries` bucket and its policies.
+2. In the Supabase dashboard, **Storage ▸ Settings**, raise the project's **global file size limit**. The default is far below a 4 GB video, and the bucket's own limit can't exceed it. Files over the limit are refused by Supabase and the app says so.
+3. Deploy `expire-files` with `--no-verify-jwt` (it checks for the service role key or `PUSH_CRON_SECRET` itself) and schedule it, once an hour is plenty, the same way as `send-push`:
+   ```sql
+   select cron.schedule('expire-files', '17 * * * *', $$
+     select net.http_post(
+       url := 'https://<project>.supabase.co/functions/v1/expire-files',
+       headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'push_cron_secret')),
+       body := '{}'::jsonb);
+   $$);
+   ```
+   Without the schedule nothing ever expires and nothing is ever deleted from storage.
+4. **Before launch** (risk R16): terms of use that cover hosting other people's files, a way to take a reported file down, and a decision about what to do when a file is reported. Reports are recorded in `file_reports`; nothing acts on them yet.
+
+**Never exercised:** a real upload to Supabase Storage, a signed link, the bucket policies under real Supabase, the scheduled job, a video preview made on a device (the AVFoundation export), and saving to Photos. The database functions and the bucket policies are tested against a real Postgres with a stand-in for storage (`supabase/tests/file_rules.py`: 302 checks, including four phones racing for the last of an allowance), the job's logic with Node (`function-tests/files.test.ts`), and the Swift against the on-device backend and the rows Postgres returned. Photo previews and a tiny generated video are made and checked in the Swift tests.
+
+**Known limits.** Uploads are one plain request per file, so they stop when the app is suspended; resumable background uploads (and uploads over about 5 GB) are not built. The previews are not DRM: a client can screenshot one, which is why they are small and watermarked. Slate Pro is not an archive: deleted files are gone.
+
 ## Layout
 
 ```
@@ -312,9 +350,9 @@ ios/
   Slate/
     App/                      Entry point, root state (AppModel), tabs
     Core/                     Models, rules, AvailabilityEngine, backend protocol + Local and Supabase backends, media
-    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer), notifications (NotificationService)
+    Services/                 EventKit (CalendarService), signed-PDF rendering (ContractPDF), Apple Pay (PaymentAuthorizer), notifications (NotificationService), Slate Files (PreviewMaker, FileTransfer, PickedMedia)
     DesignSystem/             Tokens, card styles, motion, shared components
-    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments, Delivery (files and reviews), Messages, Notifications, Teams (account choice, switcher, settings, members, invites, calendar, billing, activity)
+    Features/                 Auth, Onboarding, Profile, Home, Services, Availability, Booking, Bookings, Contracts, Payments, Delivery (links and reviews), Files (photos and videos), Messages, Notifications, Teams (account choice, switcher, settings, members, invites, calendar, billing, activity)
     Resources/                Asset catalog (accent color, app icon)
   SlateTests/                 Unit tests (rules, engine, pricing, drafts, LocalBackend, booking flow, contracts, PDF, payments)
     Fixtures/contract_golden.json   Contract text both SQL and Swift must reproduce exactly
@@ -326,11 +364,13 @@ ios/
     Fixtures/team_rows.json         What the team functions really return, written by dump_team_rows.py from a real Postgres
     Fixtures/card_rules.json        The card limit, the agreement's version and every expiry case; Swift and Postgres both check it
     Fixtures/card_rows.json         What the card functions really return, written by card_rules.py --dump from a real Postgres
+    Fixtures/file_rules.json        Slate Files limits, allowance, 30 days, who can open what, reminders and names; Swift and Postgres both check it
+    Fixtures/file_rows.json         What the files functions really return, written by file_rules.py --dump from a real Postgres
   supabase/
     migrations/               Schema, security and the booking, contract, payment, messaging and delivery functions
-    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, search_rules.py, featured_rules.py, card_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
-    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts) and the card ones (card-setup, card-sync, card-remove, card-redirect, charge-saved-card; _shared/cards.ts)
-    function-tests/           Node tests and type-check for the payment, push, billing and card logic
+    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, search_rules.py, featured_rules.py, card_rules.py, file_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
+    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts) the card ones (card-setup, card-sync, card-remove, card-redirect, charge-saved-card; _shared/cards.ts) and expire-files (_shared/files.ts)
+    function-tests/           Node tests and type-check for the payment, push, billing, card and files logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.
