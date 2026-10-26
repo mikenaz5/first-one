@@ -1072,7 +1072,8 @@ begin
     select * into v_b from public.bookings where id = v_d.booking_id;
     if public.push_enqueue(v_b.client_id, 'files_expiring', v_b.id, jsonb_build_object(
          'bookingId', v_b.id, 'role', 'client', 'creatorName', v_b.creator_name, 'packageName', v_b.package_name,
-         'revised', v_d.kind = 'revision', 'title', v_d.title, 'days', v_day, 'unsaved', v_unsaved, 'total', v_total),
+         'revised', v_d.kind = 'revision', 'title', v_d.title, 'days', v_day, 'unsaved', v_unsaved, 'total', v_total,
+         'balanceCents', public.booking_owed_cents(v_b.id), 'currency', v_b.currency_code),
          'files_expiring:' || v_d.id || ':' || v_day) then
       v_warned := v_warned + 1;
     end if;

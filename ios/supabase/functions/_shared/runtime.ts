@@ -17,6 +17,7 @@
 //   APNS_TEAM_ID            your Apple developer Team ID
 //   APNS_TOPIC              the app's bundle identifier, e.g. com.example.slate
 //   PUSH_CRON_SECRET        optional: a long random secret the scheduler can send instead of the service role key
+//                           (expire-files, which tidies Slate Files, takes the same one)
 // Supabase provides SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY itself.
 
 import Stripe from "npm:stripe@17";
@@ -26,6 +27,7 @@ import type { Db, Deps, HttpResult } from "./payments.ts";
 import { createApnsSender } from "./apns.ts";
 import type { BillingDeps } from "./billing.ts";
 import type { CardDeps } from "./cards.ts";
+import type { FilesDeps } from "./files.ts";
 import type { PushDeps } from "./push.ts";
 
 let cached: Deps | null = null;
@@ -181,7 +183,24 @@ export function makePushDeps(): PushDeps | null {
   };
 }
 
-/** Who may call send-push: the service role key, or PUSH_CRON_SECRET. */
+/** Everything expire-files needs: the database and private storage, both as the service role. */
+export function makeFilesDeps(): FilesDeps {
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+  return {
+    db: adminDb(),
+    storage: {
+      async remove(paths) {
+        const { error } = await admin.storage.from("deliveries").remove(paths);
+        if (error) throw new Error(error.message);
+      },
+    },
+    log: (message, detail) => console.error(message, detail ?? ""),
+  };
+}
+
+/** Who may call send-push and expire-files: the service role key, or PUSH_CRON_SECRET. */
 export function pushSecrets(): (string | undefined)[] {
   return [Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), Deno.env.get("PUSH_CRON_SECRET")];
 }

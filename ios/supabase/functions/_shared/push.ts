@@ -26,6 +26,9 @@ export type PushKind =
   | "delivery_shared"
   | "receipt_confirmed"
   | "review_received"
+  | "files_delivered"
+  | "files_expiring"
+  | "files_expired"
   | "message"
   | "shoot_reminder";
 
@@ -181,6 +184,15 @@ export function tidy(value: unknown, max: number, fallback = ""): string {
   return characters.length <= max ? clean : `${characters.slice(0, max - 1).join("").trimEnd()}…`;
 }
 
+/** "12 photos and 2 videos", "1 photo", "3 videos"; "files" if the counts are missing. */
+export function fileCounts(photos: number, videos: number): string {
+  const part = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  if (photos > 0 && videos > 0) return `${part(photos, "photo")} and ${part(videos, "video")}`;
+  if (photos > 0) return part(photos, "photo");
+  if (videos > 0) return part(videos, "video");
+  return "files";
+}
+
 function whole(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
 }
@@ -271,6 +283,49 @@ export function compose(row: Pick<QueuedPush, "kind" | "booking_id" | "data">, n
       const reviewer = tidy(d.reviewerName, 60, "A client");
       const stars = Math.min(5, Math.max(1, whole(d.rating)));
       return notice(`${reviewer} left a ${stars}-star review`, pkg);
+    }
+    case "files_delivered": {
+      // The balance is mentioned only while it is owed: previews are free to look at, originals wait for it.
+      const creator = tidy(d.creatorName, 60, "Your creator");
+      const what = fileCounts(whole(d.photos), whole(d.videos));
+      const balance = whole(d.balanceCents);
+      if (d.revised === true) {
+        const label = tidy(d.title, 80, "a revision");
+        return notice("Revised files are ready", `${creator} sent ${label} for ${pkg}: ${what}.`);
+      }
+      return notice(
+        "Your photos and videos are ready",
+        balance > 0
+          ? `${creator} delivered ${what} for ${pkg}. Preview them now; pay the ${money(balance, currency)} balance to save the originals.`
+          : `${creator} delivered ${what} for ${pkg}. Open Slate Pro to save them.`,
+      );
+    }
+    case "files_expiring": {
+      const creator = tidy(d.creatorName, 60, "Your creator");
+      const days = Math.max(1, whole(d.days));
+      const unsaved = whole(d.unsaved);
+      const total = Math.max(unsaved, whole(d.total));
+      const balance = whole(d.balanceCents);
+      const left = unsaved >= total ? `${total === 1 ? "The file" : `All ${total} files`}` : `${unsaved} of ${total} files`;
+      return notice(
+        days <= 1 ? "Last day to save your files" : `Your files are deleted in ${days} days`,
+        balance > 0
+          ? `${left} from ${creator} for ${pkg} can't be saved until the ${money(balance, currency)} balance is paid.`
+          : `${left} from ${creator} for ${pkg} ${unsaved === 1 ? "isn't" : "aren't"} saved yet. Open Slate Pro to save ${unsaved === 1 ? "it" : "them"}.`,
+      );
+    }
+    case "files_expired": {
+      const client = tidy(d.clientName, 60, "your client");
+      const saved = whole(d.saved);
+      const total = Math.max(saved, whole(d.total));
+      const outcome = total === 0
+        ? "Nothing was left to save."
+        : saved >= total
+        ? `${total === 1 ? "The file was" : `All ${total} files were`} saved.`
+        : saved === 0
+        ? `None of the ${total} files were saved.`
+        : `${saved} of ${total} files were saved.`;
+      return notice("Delivery ended", dotted(`${pkg} for ${client}`, outcome));
     }
     case "message": {
       return notice(tidy(d.senderName, 60, "New message"), tidy(d.preview, 160, "Sent you a message"), {

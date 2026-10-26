@@ -8,6 +8,7 @@ import {
   clock,
   compose,
   dayLabel,
+  fileCounts,
   isAuthorized,
   localParts,
   money,
@@ -186,6 +187,56 @@ describe("wording each kind of notification", () => {
   it("falls back to plain names when the facts lack them", () => {
     assert.equal(compose(row("delivery_shared", { ...base }), NOW).body, "Your creator shared the final files for Wedding day. Open Slate Pro to confirm you have them.");
     assert.equal(compose(row("receipt_confirmed", { ...base, balanceCents: 100 }), NOW).title, "Your client confirmed receipt");
+  });
+
+  it("counts photos and videos in plain words", () => {
+    assert.equal(fileCounts(12, 2), "12 photos and 2 videos");
+    assert.equal(fileCounts(1, 1), "1 photo and 1 video");
+    assert.equal(fileCounts(1, 0), "1 photo");
+    assert.equal(fileCounts(0, 3), "3 videos");
+    assert.equal(fileCounts(0, 0), "files");
+  });
+
+  it("tells a client their photos and videos are ready, and what unlocks the originals", () => {
+    const owed = compose(row("files_delivered", { ...base, role: "client", creatorName: "Maya Chen", photos: 40, videos: 2, balanceCents: 90000 }), NOW);
+    assert.equal(owed.title, "Your photos and videos are ready");
+    assert.equal(owed.body, "Maya Chen delivered 40 photos and 2 videos for Wedding day. Preview them now; pay the $900 balance to save the originals.");
+    assert.equal(owed.url, `slate://booking/${BOOKING}`);
+    const paid = compose(row("files_delivered", { ...base, role: "client", creatorName: "Maya Chen", photos: 1, videos: 0, balanceCents: 0 }), NOW);
+    assert.equal(paid.body, "Maya Chen delivered 1 photo for Wedding day. Open Slate Pro to save them.");
+  });
+
+  it("words a revision as a revision, with its title", () => {
+    const n = compose(row("files_delivered", { ...base, role: "client", creatorName: "Maya Chen", revised: true, title: "Final colour", photos: 3, videos: 0 }), NOW);
+    assert.equal(n.title, "Revised files are ready");
+    assert.equal(n.body, "Maya Chen sent Final colour for Wedding day: 3 photos.");
+    assert.equal(compose(row("files_delivered", { ...base, revised: true, photos: 1, videos: 0 }), NOW).body, "Your creator sent a revision for Wedding day: 1 photo.");
+  });
+
+  it("warns a client before their files are deleted", () => {
+    const week = compose(row("files_expiring", { ...base, role: "client", creatorName: "Maya Chen", days: 7, unsaved: 5, total: 5, balanceCents: 0 }), NOW);
+    assert.equal(week.title, "Your files are deleted in 7 days");
+    assert.equal(week.body, "All 5 files from Maya Chen for Wedding day aren't saved yet. Open Slate Pro to save them.");
+    const some = compose(row("files_expiring", { ...base, creatorName: "Maya Chen", days: 7, unsaved: 3, total: 5 }), NOW);
+    assert.equal(some.body, "3 of 5 files from Maya Chen for Wedding day aren't saved yet. Open Slate Pro to save them.");
+    const last = compose(row("files_expiring", { ...base, creatorName: "Maya Chen", days: 1, unsaved: 1, total: 1 }), NOW);
+    assert.equal(last.title, "Last day to save your files");
+    assert.equal(last.body, "The file from Maya Chen for Wedding day isn't saved yet. Open Slate Pro to save it.");
+  });
+
+  it("tells a client who hasn't paid that the balance is what stands in the way", () => {
+    const n = compose(row("files_expiring", { ...base, creatorName: "Maya Chen", days: 7, unsaved: 5, total: 5, balanceCents: 90000 }), NOW);
+    assert.equal(n.body, "All 5 files from Maya Chen for Wedding day can't be saved until the $900 balance is paid.");
+  });
+
+  it("tells a creator how a delivery ended", () => {
+    const some = compose(row("files_expired", { ...base, clientName: "Alex", saved: 8, total: 12 }), NOW);
+    assert.equal(some.title, "Delivery ended");
+    assert.equal(some.body, "Wedding day for Alex · 8 of 12 files were saved.");
+    assert.equal(compose(row("files_expired", { ...base, clientName: "Alex", saved: 12, total: 12 }), NOW).body, "Wedding day for Alex · All 12 files were saved.");
+    assert.equal(compose(row("files_expired", { ...base, clientName: "Alex", saved: 1, total: 1 }), NOW).body, "Wedding day for Alex · The file was saved.");
+    assert.equal(compose(row("files_expired", { ...base, clientName: "Alex", saved: 0, total: 12 }), NOW).body, "Wedding day for Alex · None of the 12 files were saved.");
+    assert.equal(compose(row("files_expired", { ...base, saved: 0, total: 0 }), NOW).body, "Wedding day for your client · Nothing was left to save.");
   });
 
   it("shows a message as its sender and words, and opens the conversation", () => {

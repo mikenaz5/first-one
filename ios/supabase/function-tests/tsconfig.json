@@ -17,6 +17,7 @@
     "*.test.ts",
     "../functions/_shared/payments.ts",
     "../functions/_shared/cards.ts",
+    "../functions/_shared/files.ts",
     "../functions/_shared/push.ts",
     "../functions/_shared/apns.ts"
   ]
