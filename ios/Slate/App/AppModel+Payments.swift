@@ -77,6 +77,8 @@ extension AppModel {
                     try await backend.completeSimulatedPayment(info.paymentID)
                 }
                 guard await waitForPayment(bookingID: booking.id, kind: kind) else { return .processing }
+                // Paying the balance is what unlocks the originals of delivered photos and videos.
+                if kind == .balance { await loadFiles(for: booking.id) }
                 if let confirmed = bookings.first(where: { $0.id == booking.id }), kind == .deposit,
                    let contract = await contract(for: confirmed), contract.status == .executed {
                     afterConfirmed(confirmed, contract: contract)

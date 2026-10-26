@@ -298,6 +298,8 @@ struct BookingDetailView: View {
 
             SavedCardSection(booking: booking)
 
+            FilesSection(booking: booking, tick: shootStarted)
+
             DeliverySection(booking: booking, tick: shootStarted)
 
             ReviewSection(booking: booking)
@@ -397,6 +399,11 @@ struct BookingDetailView: View {
         .sheet(item: $assignTarget) { target in AssignSheet(booking: target) }
         .cancelFlow($pendingCancel)
         .task(id: booking.status) { await model.loadReview(for: booking) }
+        // The photos and videos on a booking, again when it changes status or the shoot starts.
+        .task(id: [booking.status.rawValue, String(shootStarted)]) {
+            guard booking.status == .confirmed || booking.status == .completed, booking.startAt <= model.clock() else { return }
+            await model.loadFiles(for: booking.id)
+        }
         .task(id: booking.startAt) { await waitForShootToStart(booking) }
         .alert("Couldn't add to Calendar", isPresented: Binding(get: { calendarMessage != nil }, set: { if !$0 { calendarMessage = nil } })) {
             Button("OK", role: .cancel) {}

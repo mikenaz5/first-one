@@ -23,6 +23,10 @@ final class AppModel {
     }
 
     let backend: any SlateBackend
+    /// Makes the small copy of a photo or video that the client sees. A stand-in for tests.
+    let filePreparer: any FilePreparing
+    /// Fetches delivered files and saves them to Photos. A stand-in for tests.
+    let fileTransfer: any FileTransferring
     /// Shows the payment sheet. Apple Pay with a real server; an instant pretend one on-device.
     let authorizer: any PaymentAuthorizer
     /// The system's notification center, or a stand-in for tests and previews.
@@ -84,6 +88,20 @@ final class AppModel {
     var cardPermissions: [CardPermission] = []
     /// What each booking on screen says about a saved-card permission, for the person looking at it.
     var cardAccessByBooking: [UUID: CardAccess] = [:]
+    /// Slate Files: what each booking's files look like to this person, the limits, what is being sent, and what is being saved.
+    var bookingFiles: [UUID: BookingFiles] = [:]
+    var filesConfig: FilesConfig = .standard
+    var fileUploads: [UUID: [FileUploadItem]] = [:]
+    var fileSaveRuns: [UUID: FileSaveRun] = [:]
+    /// "4.2 of 25 GB used" for the account on screen. Nil until asked, and for a client.
+    var storageMeter: StorageMeter?
+    /// The files the person picked, kept so a failed one can be tried again. Nothing here is shown.
+    @ObservationIgnored var pendingPicks: [UUID: (pick: PickedFile, booking: UUID)] = [:]
+    /// The space reserved for each picked file that got that far, so a file that fails can give it back.
+    @ObservationIgnored var reservedFileIDs: [UUID: UUID] = [:]
+    @ObservationIgnored var fileRunsCancelled: Set<UUID> = []
+    /// Small pictures of delivered files, kept so scrolling a grid doesn't fetch them again.
+    @ObservationIgnored let fileImages = FileImageCache()
     var calendarPrefs = CalendarPreferences.load()
     var calendarAccess: CalendarService.Access = .notDetermined
     /// Which tab is showing. Lives here so deep links can switch tabs.
@@ -121,9 +139,13 @@ final class AppModel {
         backend: any SlateBackend,
         authorizer: (any PaymentAuthorizer)? = nil,
         notifications: (any NotificationCenterClient)? = nil,
-        widget: (any WidgetPublisher)? = nil
+        widget: (any WidgetPublisher)? = nil,
+        filePreparer: (any FilePreparing)? = nil,
+        fileTransfer: (any FileTransferring)? = nil
     ) {
         self.backend = backend
+        self.filePreparer = filePreparer ?? PreviewMaker()
+        self.fileTransfer = fileTransfer ?? FileTransfer()
         self.authorizer = authorizer ?? PaymentAuthorizerFactory.make(for: backend)
         self.notifications = notifications ?? InertNotificationCenter()
         self.widget = widget ?? InertWidgetPublisher()
@@ -306,6 +328,13 @@ final class AppModel {
         cards = []
         cardPermissions = []
         cardAccessByBooking = [:]
+        bookingFiles = [:]
+        fileUploads = [:]
+        fileSaveRuns = [:]
+        storageMeter = nil
+        pendingPicks = [:]
+        reservedFileIDs = [:]
+        fileImages.removeAll()
         presentedPage = nil
         pendingBookingHandle = nil
         clientPlace = nil

@@ -18,7 +18,8 @@ struct DeliverySection: View {
     @State private var paymentMessage: String?
 
     var body: some View {
-        if let summary = model.deliverySummary(for: booking, now: model.clock()) {
+        // Files delivered inside the app have their own section; there is no link to share or confirm.
+        if !model.isHostedDelivery(booking), let summary = model.deliverySummary(for: booking, now: model.clock()) {
             Section {
                 card(summary)
                     .padding(.vertical, Space.xs)

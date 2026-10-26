@@ -26,6 +26,15 @@ struct PickedFile: Identifiable, Equatable {
     var name: String
     /// What the system says it is, such as `image/heic`. Nil when it couldn't tell.
     var contentType: String?
+
+    /// What it is filed under: what the system said if Slate Pro takes that, otherwise what the ending says. Nil if neither is
+    /// a photo or video type Slate Pro takes.
+    var resolvedContentType: String? {
+        if let said = contentType?.lowercased(), FileRules.kind(forContentType: said) != nil { return said }
+        return FileNames.contentType(forExtension: url.pathExtension.isEmpty ? (name as NSString).pathExtension : url.pathExtension)
+    }
+
+    var kind: FileKind? { resolvedContentType.flatMap(FileRules.kind(forContentType:)) }
 }
 
 /// A picked file with its small copy made and its facts read, ready to reserve and send.
@@ -121,6 +130,22 @@ struct FileSaveRun: Equatable {
 }
 
 enum FileNames {
+    /// The content type a file ending stands for, for the types Slate Pro takes.
+    static func contentType(forExtension ending: String) -> String? {
+        switch ending.lowercased() {
+        case "jpg", "jpeg": "image/jpeg"
+        case "png": "image/png"
+        case "heic": "image/heic"
+        case "heif": "image/heif"
+        case "tif", "tiff": "image/tiff"
+        case "webp": "image/webp"
+        case "mp4": "video/mp4"
+        case "m4v": "video/x-m4v"
+        case "mov": "video/quicktime"
+        default: nil
+        }
+    }
+
     /// The extension a content type is saved with, so a file opens in the right app.
     static func fileExtension(forContentType type: String) -> String {
         switch type.lowercased() {

@@ -69,6 +69,7 @@ targets:
         SlateAppGroup: $(APP_GROUP_ID)
         NSCalendarsFullAccessUsageDescription: Slate Pro reads your calendars so clients can't book times when you're busy. Only the start and end times of busy events are shared, never their titles or details.
         NSCalendarsWriteOnlyAccessUsageDescription: Slate Pro adds your bookings to your calendar.
+        NSPhotoLibraryAddUsageDescription: Slate Pro saves the photos and videos your creator delivered to your photo library, only when you tap Save.
         NSLocationWhenInUseUsageDescription: Slate Pro uses your approximate location, once, to show creators who work near you. It is rounded to your city and never shared with other people.
         CFBundleURLTypes:
           - CFBundleURLName: com.example.slate

@@ -405,6 +405,12 @@ enum FileRules {
 
     static func revisionTitle(sequence: Int) -> String { "Revision \(sequence)" }
 
+    /// Whether a file's preview is a short video rather than a picture. The first delivery's video preview is a reduced,
+    /// watermarked video; a revision is never locked, so its preview is only the small picture a tile needs.
+    static func previewIsVideo(kind: FileKind, deliveryKind: DeliveryKind) -> Bool {
+        kind == .video && deliveryKind == .delivery
+    }
+
     /// "12 photos and 2 videos", "1 photo", "3 videos"; "files" when there are none. The notification wording says the same.
     static func countText(photos: Int, videos: Int) -> String {
         func part(_ n: Int, _ one: String) -> String { "\(n) \(one)\(n == 1 ? "" : "s")" }

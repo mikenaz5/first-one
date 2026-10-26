@@ -80,6 +80,8 @@ enum Metrics {
     /// A tile in the explore grid on a client's Home (width over height), and the narrowest a column of them gets.
     static let exploreTileAspect: CGFloat = 0.8
     static let exploreColumnMinWidth: CGFloat = 130
+    /// Slate Files: the narrowest a picture tile in a delivery's grid is allowed to get.
+    static let fileTileMinWidth: CGFloat = 104
 
     /// The signature pad, a typed signature's preview, and a signature shown on a signed contract.
     static let signaturePadHeight: CGFloat = 150

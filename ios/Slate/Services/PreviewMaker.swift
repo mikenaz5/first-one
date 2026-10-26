@@ -1,7 +1,6 @@
 import AVFoundation
 import ImageIO
 import UIKit
-import UniformTypeIdentifiers
 
 /// Makes the small copy of a photo or video that goes to the client, and reads the facts about the original.
 ///
@@ -27,13 +26,8 @@ struct PreviewMaker: FilePreparing {
 
     /// The content type the file will be filed under: what the picker said, or what its ending says.
     static func contentType(of pick: PickedFile) throws -> String {
-        if let said = pick.contentType?.lowercased(), FileRules.kind(forContentType: said) != nil { return said }
-        let ending = pick.url.pathExtension
-        if !ending.isEmpty, let mime = UTType(filenameExtension: ending)?.preferredMIMEType?.lowercased(),
-           FileRules.kind(forContentType: mime) != nil {
-            return mime
-        }
-        throw SlateError.unsupportedFileType
+        guard let type = pick.resolvedContentType else { throw SlateError.unsupportedFileType }
+        return type
     }
 
     static func byteCount(at url: URL) -> Int64 {

@@ -144,6 +144,7 @@ extension AppModel {
         teamInvites = []
         assignmentQueue = []
         packageMembers = [:]
+        storageMeter = nil
     }
 
     /// Makes a company the account on screen and loads it. Used after starting, upgrading to or joining one.
