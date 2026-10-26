@@ -62,6 +62,9 @@ jobs:
             echo "::group::Errors"
             grep -E "error:" build/xcodebuild.log | sort -u | head -100 || true
             echo "::endgroup::"
+            echo "::group::Failed test cases, with what came just before"
+            grep -n -B8 -E "Test Case .* failed \(" build/xcodebuild.log | head -250 || true
+            echo "::endgroup::"
             echo "::group::Last 80 lines"
             tail -n 80 build/xcodebuild.log
             echo "::endgroup::"

@@ -165,13 +165,25 @@ struct PreviewMaker: FilePreparing {
         session.outputURL = url
         session.outputFileType = .mp4
         session.shouldOptimizeForNetworkUse = true
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            session.exportAsynchronously { continuation.resume() }
+        session.exportAsynchronously {}
+        // Watch it rather than wait for a callback, so a stuck export gives up (and stops when the task is cancelled).
+        let started = Date()
+        let limit = max(120, duration.seconds * 3)
+        while true {
+            switch session.status {
+            case .completed:
+                return url
+            case .failed, .cancelled:
+                throw SlateError.backend(session.error?.localizedDescription ?? "The preview couldn't be made.")
+            default:
+                break
+            }
+            if Task.isCancelled || Date().timeIntervalSince(started) > limit {
+                session.cancelExport()
+                throw SlateError.backend("The preview took too long to make.")
+            }
+            try await Task.sleep(for: .milliseconds(200))
         }
-        guard session.status == .completed else {
-            throw SlateError.backend(session.error?.localizedDescription ?? "The preview couldn't be made.")
-        }
-        return url
     }
 }
 

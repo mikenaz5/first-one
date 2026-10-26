@@ -225,6 +225,10 @@ final class FileModelTests: XCTestCase {
         let booking = try await shotBooking()
         await model.addFiles([try pick("a.heic"), try pick("b.heic"), try pick("c.heic")], to: booking)
         _ = await model.deliverFiles(for: booking, title: nil, note: nil)
+        // The client is the same person here, so the originals can be saved once the balance is paid.
+        let paid = await model.pay(.balance, for: try XCTUnwrap(model.bookings.first { $0.id == booking.id }))
+        XCTAssertEqual(paid, .confirmed)
+        await model.loadFiles(for: booking.id)
         let delivery = try XCTUnwrap(model.files(for: booking.id)?.firstDelivery)
 
         await model.saveAll(delivery, bookingID: booking.id)
@@ -243,6 +247,10 @@ final class FileModelTests: XCTestCase {
         let booking = try await shotBooking()
         await model.addFiles([try pick("a.heic"), try pick("b.heic"), try pick("c.heic")], to: booking)
         _ = await model.deliverFiles(for: booking, title: nil, note: nil)
+        // The client is the same person here, so the originals can be saved once the balance is paid.
+        let paid = await model.pay(.balance, for: try XCTUnwrap(model.bookings.first { $0.id == booking.id }))
+        XCTAssertEqual(paid, .confirmed)
+        await model.loadFiles(for: booking.id)
         let delivery = try XCTUnwrap(model.files(for: booking.id)?.firstDelivery)
 
         transfer.failSave(number: 2)
@@ -427,7 +435,13 @@ final class PreviewMakerTests: XCTestCase {
 
     func testAVideosFirstDeliveryCopyIsAReducedMarkedVideo() async throws {
         let original = try await clip()
-        let prepared = try await PreviewMaker().prepare(original, kind: .video, style: .watermarked)
+        let prepared: PreparedFile
+        do {
+            prepared = try await PreviewMaker().prepare(original, kind: .video, style: .watermarked)
+        } catch {
+            XCTFail("Making the video preview failed: \(error)")
+            return
+        }
         XCTAssertEqual(prepared.previewURL.pathExtension, "mp4")
         XCTAssertGreaterThan(prepared.previewBytes, 0)
         XCTAssertLessThanOrEqual(prepared.previewBytes, FileRules.maxPreviewBytes(.video))
