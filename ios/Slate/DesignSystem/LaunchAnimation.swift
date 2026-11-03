@@ -6,10 +6,12 @@ import SwiftUI
 enum LaunchStage: Int, Comparable, CaseIterable {
     /// Nothing on screen yet.
     case hidden
-    /// The board fades in with its clapper open.
-    case arriving
-    /// The clapper snaps shut.
-    case clapped
+    /// The app icon appears and its three lines slide in from the sides, one after another, lying flat.
+    case lines
+    /// The lines swing round to the icon's angle and tighten into the logo.
+    case turn
+    /// A glint runs along the lines and a soft glow breathes out. The phone gives a firm tap.
+    case settled
     /// The name rises in underneath.
     case named
     /// Everything fades away and the app is there.
@@ -18,18 +20,19 @@ enum LaunchStage: Int, Comparable, CaseIterable {
     static func < (lhs: LaunchStage, rhs: LaunchStage) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
-/// When each step starts, in seconds from the beginning. With Reduce Motion on, nothing moves: the board is already shut,
-/// and the picture simply fades in, rests, and fades out, in about half the time.
+/// When each step starts, in seconds from the beginning. With Reduce Motion on, nothing moves: the finished logo and the
+/// name simply fade in, rest, and fade out, in about half the time.
 struct LaunchTimeline: Equatable {
     var reduceMotion: Bool
 
     func start(of stage: LaunchStage) -> Double {
         switch stage {
         case .hidden: 0
-        case .arriving: 0
-        case .clapped: reduceMotion ? 0 : 0.55
-        case .named: reduceMotion ? 0.15 : 0.85
-        case .leaving: reduceMotion ? 0.95 : 1.75
+        case .lines: 0
+        case .turn: reduceMotion ? 0 : 0.6
+        case .settled: reduceMotion ? 0 : 1.1
+        case .named: reduceMotion ? 0.15 : 1.25
+        case .leaving: reduceMotion ? 0.95 : 2.0
         }
     }
 
@@ -39,13 +42,17 @@ struct LaunchTimeline: Equatable {
     /// From the start to the app being fully showing.
     var total: Double { start(of: .leaving) + fadeOut }
 
+    /// How long each of the three lines waits before it slides in, top to bottom.
+    var slideDelays: [Double] { reduceMotion ? [0, 0, 0] : [0, 0.09, 0.18] }
+
     func animation(for stage: LaunchStage) -> Animation? {
         if reduceMotion { return .easeInOut(duration: stage == .leaving ? fadeOut : 0.25) }
         switch stage {
         case .hidden: return nil
-        case .arriving: return .smooth(duration: 0.4)
-        // Quick and a little bouncy: a clap, not a close.
-        case .clapped: return .spring(duration: 0.2, bounce: 0.35)
+        case .lines: return .smooth(duration: 0.4)
+        // A little overshoot, so the lines swing past and settle.
+        case .turn: return .spring(duration: 0.65, bounce: 0.3)
+        case .settled: return .easeOut(duration: 0.6)
         case .named: return .smooth(duration: 0.45)
         case .leaving: return .easeIn(duration: fadeOut)
         }
@@ -70,40 +77,132 @@ enum LaunchPolicy {
     }
 }
 
-// MARK: - The picture
+// MARK: - The logo
 
-/// The mark: a film slate (a clapperboard) with its name under it. `LaunchView` shows its final frame while the app is
-/// still starting, so the animation and what follows it are the same picture.
+/// The app icon, drawn from its design (`Design/SlatePro-AppIcon.svg`): three rounded lines, white, lavender and violet,
+/// getting shorter, turned 35 degrees on a near-black tile. Drawn in code so it can move; it needs no image file.
+///
+/// `stage` says how far along the opening animation it is. At `.named` or later it is the finished icon, which is what the
+/// app shows while it starts.
+struct SlateLogo: View {
+    static let lavender = Color(red: 0.655, green: 0.545, blue: 0.980)
+    static let violet = Color(red: 0.486, green: 0.227, blue: 0.929)
+    /// How far the lines tilt in the finished logo.
+    static let tilt = -35.0
+
+    var side: CGFloat = 156
+    var stage: LaunchStage = .named
+    /// How long each line waits before sliding in.
+    var slideDelays: [Double] = [0, 0, 0]
+
+    /// One line, in the icon's own units (a 1024 square): its length, and how far from the middle it sits, up or down,
+    /// before the group is turned. `from` is the side it slides in from.
+    private struct Line {
+        let length: CGFloat
+        let offset: CGFloat
+        let color: Color
+        let from: CGFloat
+    }
+
+    private var lines: [Line] {
+        [
+            Line(length: 424, offset: -100, color: .white, from: -1),
+            Line(length: 330, offset: 0, color: Self.lavender, from: 1),
+            Line(length: 236, offset: 100, color: Self.violet, from: -1),
+        ]
+    }
+
+    var body: some View {
+        // The icon draws its lines at 1.12 times, so a unit here is that much of the tile.
+        let unit = side / 1024 * 1.12
+        let slidIn = stage >= .lines
+        let turned = stage >= .turn
+        let glint = stage >= .settled
+        let tile = RoundedRectangle(cornerRadius: side * 0.2237, style: .continuous)
+
+        ZStack {
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                Capsule()
+                    .fill(line.color)
+                    .overlay { Glint(on: glint, delay: Double(index) * 0.07) }
+                    .frame(width: line.length * unit, height: 64 * unit)
+                    // Lying flat and spread apart until they turn; sliding in from outside the tile (which clips them).
+                    .offset(x: slidIn ? 0 : line.from * side, y: line.offset * unit * (turned ? 1 : 1.9))
+                    .animation(.smooth(duration: 0.5).delay(slideDelays[index]), value: slidIn)
+            }
+        }
+        .rotationEffect(.degrees(turned ? Self.tilt : 0))
+        .animation(.spring(duration: 0.65, bounce: 0.3), value: turned)
+        .frame(width: side, height: side)
+        .background(
+            tile.fill(LinearGradient(
+                colors: [Color(red: 0.110, green: 0.102, blue: 0.133), Color(red: 0.020, green: 0.020, blue: 0.024)],
+                startPoint: .top, endPoint: .bottom
+            ))
+        )
+        .clipShape(tile)
+        .overlay { tile.strokeBorder(Color.white.opacity(0.12), lineWidth: 1) }
+        .background { glow(on: glint) }
+    }
+
+    /// A soft violet halo that breathes out once when the logo settles.
+    private func glow(on: Bool) -> some View {
+        Circle()
+            .fill(RadialGradient(
+                colors: [Self.violet.opacity(0.7), .clear], center: .center, startRadius: 0, endRadius: side * 0.8
+            ))
+            .frame(width: side * 1.6, height: side * 1.6)
+            .keyframeAnimator(initialValue: GlowValues(), trigger: on) { content, value in
+                content.scaleEffect(value.scale).opacity(value.opacity)
+            } keyframes: { _ in
+                KeyframeTrack(\.scale) {
+                    CubicKeyframe(1.15, duration: 0.7)
+                }
+                KeyframeTrack(\.opacity) {
+                    CubicKeyframe(0.9, duration: 0.15)
+                    CubicKeyframe(0.0, duration: 0.55)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// What the halo is like at one moment.
+private struct GlowValues {
+    var scale = 0.7
+    var opacity = 0.0
+}
+
+/// A bright band that runs along one line, once, and leaves the line as it was.
+private struct Glint: View {
+    var on: Bool
+    var delay: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                colors: [.clear, .white.opacity(0.8), .clear], startPoint: .leading, endPoint: .trailing
+            )
+            .frame(width: geometry.size.width * 0.45)
+            .offset(x: on ? geometry.size.width * 1.05 : -geometry.size.width * 0.5)
+            .animation(.easeInOut(duration: 0.55).delay(delay), value: on)
+        }
+        .clipShape(Capsule())
+        .allowsHitTesting(false)
+    }
+}
+
+/// The logo with the name under it. `LaunchView` shows the finished one while the app is still starting, so the animation
+/// and what follows it are the same picture.
 struct LaunchBrand: View {
-    /// The clapper is lifted.
-    var open = false
+    var stage: LaunchStage = .named
     /// Shows the name.
     var named = true
-    /// A ring that spreads out from the board, once, at the clap.
-    var ring = false
+    var slideDelays: [Double] = [0, 0, 0]
 
     var body: some View {
         VStack(spacing: Space.xl) {
-            ClapperBoard(open: open)
-                .frame(width: ClapperBoard.width, height: ClapperBoard.height)
-                .background {
-                    // The ring starts bright and fades as it spreads; it plays when `ring` turns on.
-                    Circle()
-                        .strokeBorder(Color.accentColor, lineWidth: 2)
-                        .frame(width: ClapperBoard.width, height: ClapperBoard.width)
-                        .keyframeAnimator(initialValue: RingValues(), trigger: ring) { content, value in
-                            content.scaleEffect(value.scale).opacity(value.opacity)
-                        } keyframes: { _ in
-                            KeyframeTrack(\.scale) {
-                                CubicKeyframe(2.0, duration: 0.6)
-                            }
-                            KeyframeTrack(\.opacity) {
-                                CubicKeyframe(0.7, duration: 0.05)
-                                LinearKeyframe(0.0, duration: 0.55)
-                            }
-                        }
-                        .accessibilityHidden(true)
-                }
+            SlateLogo(stage: stage, slideDelays: slideDelays)
 
             Text(AppConfig.productName)
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -116,93 +215,17 @@ struct LaunchBrand: View {
     }
 }
 
-/// What the ring is like at one moment.
-private struct RingValues {
-    var scale = 0.75
-    var opacity = 0.0
-}
-
-/// A clapperboard drawn from shapes, so it follows the app's colours in light and dark and needs no image file.
-struct ClapperBoard: View {
-    static let width: CGFloat = 132
-    static let height: CGFloat = 120
-
-    /// The clapper stick is lifted.
-    var open: Bool
-
-    private let stickHeight: CGFloat = 26
-    private let gap: CGFloat = 4
-    private let corner: CGFloat = 10
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            // The board.
-            RoundedRectangle(cornerRadius: corner, style: .continuous)
-                .fill(Color.slateCard)
-                .overlay {
-                    VStack(alignment: .leading, spacing: 11) {
-                        ForEach(0..<3, id: \.self) { row in
-                            Capsule()
-                                .fill(Color.slateHairline)
-                                .frame(width: row == 2 ? 56 : 92, height: 5)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .padding(.leading, 16)
-                    .padding(.top, 14)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 2.5)
-                }
-                .frame(width: Self.width, height: Self.height - stickHeight - gap)
-                .offset(y: stickHeight + gap)
-
-            // The clapper stick, hinged at its left end.
-            ZStack {
-                RoundedRectangle(cornerRadius: corner * 0.6, style: .continuous)
-                    .fill(Color.slateCard)
-                ClapperStripes()
-                    .fill(Color.accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: corner * 0.6, style: .continuous))
-                RoundedRectangle(cornerRadius: corner * 0.6, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 2.5)
-            }
-            .frame(width: Self.width, height: stickHeight)
-            .rotationEffect(.degrees(open ? -24 : 0), anchor: .bottomLeading)
-        }
-        .frame(width: Self.width, height: Self.height, alignment: .topLeading)
-        .accessibilityHidden(true)
-    }
-}
-
-/// The slanted stripes on a clapper stick.
-private struct ClapperStripes: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let step = rect.width / 6
-        for index in stride(from: 0, to: 6, by: 2) {
-            let x = CGFloat(index) * step
-            path.move(to: CGPoint(x: x, y: rect.maxY))
-            path.addLine(to: CGPoint(x: x + step * 0.7, y: rect.minY))
-            path.addLine(to: CGPoint(x: x + step * 1.7, y: rect.minY))
-            path.addLine(to: CGPoint(x: x + step, y: rect.maxY))
-            path.closeSubpath()
-        }
-        return path
-    }
-}
-
 // MARK: - The animation
 
-/// Plays once over the app when it opens: the slate arrives with its clapper up, snaps shut with a tap you can feel, the
-/// name rises in, and it all fades away. Touching the screen skips it.
+/// Plays once over the app when it opens: the icon appears, its three lines slide in and swing round into place, a glint
+/// runs along them with a tap you can feel, the name rises in, and it all fades away. Touching the screen skips it.
 struct LaunchAnimationView: View {
     /// Called once, when the animation is over (or skipped), so the app can take it away.
     let onFinish: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stage = LaunchStage.hidden
-    @State private var clapCount = 0
+    @State private var settleCount = 0
     @State private var finished = false
 
     private var timeline: LaunchTimeline { LaunchTimeline(reduceMotion: reduceMotion) }
@@ -210,18 +233,19 @@ struct LaunchAnimationView: View {
     var body: some View {
         ZStack {
             Color.slateBackground.ignoresSafeArea()
+            // With Reduce Motion on the logo is already finished: only the fades remain.
             LaunchBrand(
-                open: !reduceMotion && stage < .clapped,
+                stage: reduceMotion ? .named : stage,
                 named: stage >= .named,
-                ring: stage >= .clapped && !reduceMotion
+                slideDelays: timeline.slideDelays
             )
-            .opacity(stage >= .arriving ? 1 : 0)
-            .scaleEffect(stage >= .arriving ? 1 : 0.88)
+            .opacity(stage >= .lines ? 1 : 0)
+            .scaleEffect(stage >= .lines ? 1 : 0.9)
         }
         .opacity(stage == .leaving ? 0 : 1)
         .contentShape(Rectangle())
         .onTapGesture { finish() }
-        .sensoryFeedback(.impact(weight: .medium), trigger: clapCount)
+        .sensoryFeedback(.impact(weight: .medium), trigger: settleCount)
         .task { await play() }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Skips the opening animation")
@@ -229,7 +253,7 @@ struct LaunchAnimationView: View {
 
     private func play() async {
         var previous = 0.0
-        for next in [LaunchStage.arriving, .clapped, .named, .leaving] {
+        for next in [LaunchStage.lines, .turn, .settled, .named, .leaving] {
             let at = timeline.start(of: next)
             if at > previous {
                 try? await Task.sleep(for: .seconds(at - previous))
@@ -237,7 +261,7 @@ struct LaunchAnimationView: View {
             }
             if Task.isCancelled || finished { return }
             withAnimation(timeline.animation(for: next)) { stage = next }
-            if next == .clapped, !reduceMotion { clapCount += 1 }
+            if next == .settled, !reduceMotion { settleCount += 1 }
         }
         try? await Task.sleep(for: .seconds(timeline.fadeOut))
         finish()
@@ -252,4 +276,11 @@ struct LaunchAnimationView: View {
 
 #Preview("Launch animation") {
     LaunchAnimationView {}
+}
+
+#Preview("The finished logo") {
+    ZStack {
+        Color.slateBackground.ignoresSafeArea()
+        LaunchBrand()
+    }
 }

@@ -23,7 +23,8 @@ final class LaunchAnimationTests: XCTestCase {
         let full = LaunchTimeline(reduceMotion: false)
         XCTAssertLessThan(calm.total, full.total)
         XCTAssertGreaterThan(calm.fadeOut, 0)
-        XCTAssertEqual(calm.start(of: .clapped), 0, "Nothing snaps shut: it is already shut")
+        XCTAssertEqual(calm.start(of: .turn), 0, "Nothing swings round: the logo is already finished")
+        XCTAssertEqual(calm.start(of: .settled), 0, "No glint, no tap")
     }
 
     func testEveryStepAfterTheFirstHasAnAnimation() {
@@ -36,12 +37,25 @@ final class LaunchAnimationTests: XCTestCase {
     }
 
     func testStagesCompareByOrder() {
-        XCTAssertLessThan(LaunchStage.hidden, .arriving)
-        XCTAssertLessThan(LaunchStage.arriving, .clapped)
-        XCTAssertLessThan(LaunchStage.clapped, .named)
+        XCTAssertLessThan(LaunchStage.hidden, .lines)
+        XCTAssertLessThan(LaunchStage.lines, .turn)
+        XCTAssertLessThan(LaunchStage.turn, .settled)
+        XCTAssertLessThan(LaunchStage.settled, .named)
         XCTAssertLessThan(LaunchStage.named, .leaving)
     }
 
+    func testTheThreeLinesSlideInOneAfterAnotherUnlessMotionIsReduced() {
+        let delays = LaunchTimeline(reduceMotion: false).slideDelays
+        XCTAssertEqual(delays.count, 3, "One for each line of the logo")
+        XCTAssertEqual(delays, delays.sorted())
+        XCTAssertLessThan(delays[0], delays[2])
+        XCTAssertEqual(LaunchTimeline(reduceMotion: true).slideDelays, [0, 0, 0])
+    }
+
+    func testTheLogoEndsAtTheIconsAngle() {
+        // Design/SlatePro-AppIcon.svg turns its lines -35 degrees.
+        XCTAssertEqual(SlateLogo.tilt, -35)
+    }
     func testItPlaysWheneverTheAppIsOpened() {
         XCTAssertTrue(LaunchPolicy.shouldPlay(arguments: ["Slate"], environment: [:]))
     }
