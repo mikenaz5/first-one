@@ -1,0 +1,6 @@
+{
+  "comment": "Numbers the database and the app must agree on for messaging before a booking. Checked by supabase/tests/inquiry_rules.py and by the Swift tests.",
+  "inquiriesPerDay": 10,
+  "unansweredLimit": 5,
+  "maxMessageLength": 2000
+}
