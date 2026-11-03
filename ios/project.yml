@@ -49,7 +49,9 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: Slate Pro
-        UILaunchScreen: {}
+        # The same colour the app opens on, so there's no white flash before the opening animation.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

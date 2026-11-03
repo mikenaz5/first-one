@@ -6,6 +6,8 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
+    /// The opening animation, over everything, once each time the app is opened.
+    @State private var showLaunchAnimation = LaunchPolicy.shouldPlay()
 
     var body: some View {
         @Bindable var model = model
@@ -33,6 +35,13 @@ struct RootView: View {
             }
         }
         .motionSafe(.slateSmooth, value: model.phase)
+        .overlay {
+            if showLaunchAnimation {
+                // It fades itself out, so taking it away needs no animation of its own.
+                LaunchAnimationView { showLaunchAnimation = false }
+                    .transition(.identity)
+            }
+        }
         .onOpenURL { model.handle(url: $0) }
         .sheet(item: $model.presentedPage) { page in
             ClientPageSheet(page: page)
@@ -80,14 +89,12 @@ struct RootView: View {
     }
 }
 
+/// While the account loads: the last frame of the opening animation, so there is no jump between the two.
 private struct LaunchView: View {
     var body: some View {
         ZStack {
             Color.slateBackground.ignoresSafeArea()
-            Image(systemName: "camera.aperture")
-                .heroSymbol(56, weight: .light)
-                .foregroundStyle(Color.accentColor)
-                .accessibilityLabel(AppConfig.productName)
+            LaunchBrand()
         }
     }
 }
