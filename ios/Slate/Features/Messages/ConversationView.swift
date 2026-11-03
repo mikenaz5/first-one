@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A booking's conversation: what people wrote, what happened to the booking, and a box to write in.
+/// A conversation: what people wrote, what happened to the booking (when there is one), and a box to write in. Before
+/// a booking it is a question to the creator, with only typed text.
 struct ConversationView: View {
     @Environment(AppModel.self) private var app
     let bookingID: UUID
@@ -76,8 +77,11 @@ private struct ConversationContent: View {
     }
 
     private var booking: Booking? { conversation.booking }
-    private var name: String { booking.map(app.counterpartName(for:)) ?? "Conversation" }
+    private var isInquiry: Bool { booking == nil && app.isInquiry(conversation.bookingID) }
+    private var name: String { booking.map(app.counterpartName(for:)) ?? app.inquiryTitle(for: conversation.bookingID) ?? "Conversation" }
     private var isOpen: Bool { booking.map(app.canMessage) ?? true }
+    /// For the person asking: the creator's page, where they can book.
+    private var creatorToBook: UUID? { isInquiry ? app.inquiryCreatorID(for: conversation.bookingID) : nil }
 
     // MARK: Body
 
@@ -96,6 +100,14 @@ private struct ConversationContent: View {
                     Button("Try Again") { Task { await conversation.load() } }
                         .buttonStyle(.slatePrimary)
                 }
+            } else if rows.isEmpty, isInquiry {
+                ContentUnavailableView {
+                    Label("Ask \(name) a question", systemImage: "bubble.left.and.text.bubble.right")
+                } description: {
+                    Text(creatorToBook != nil
+                         ? "Say what you're planning and when. They'll reply here. To book, choose a package on their page."
+                         : "Nothing here yet.")
+                }
             } else {
                 thread(rows)
             }
@@ -108,19 +120,31 @@ private struct ConversationContent: View {
                     Text(name).font(.headline)
                     if let booking {
                         Text(booking.packageName).font(.caption).foregroundStyle(.secondary)
+                    } else if isInquiry {
+                        Text("Before booking").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    app.openBooking(conversation.bookingID)
-                } label: {
-                    Image(systemName: "calendar")
-                        .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
+                if let creatorID = creatorToBook {
+                    Button {
+                        Task { await app.openCreatorPage(creatorID) }
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
+                    }
+                    .accessibilityLabel("View \(name)'s page")
+                } else if !isInquiry {
+                    Button {
+                        app.openBooking(conversation.bookingID)
+                    } label: {
+                        Image(systemName: "calendar")
+                            .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
+                    }
+                    .accessibilityLabel("Open booking")
                 }
-                .accessibilityLabel("Open booking")
             }
         }
         .task(id: scenePhase) {

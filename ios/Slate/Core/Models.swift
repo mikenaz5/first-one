@@ -281,6 +281,9 @@ enum SlateError: LocalizedError, Equatable {
     case invalidMessage
     case messageTooLong
     case rateLimited
+    case cannotMessageYourself
+    case tooManyInquiries
+    case awaitingReply
     case notFound
     case notAllowed
     case invalidInput
@@ -409,6 +412,12 @@ enum SlateError: LocalizedError, Equatable {
             "Messages can be up to \(MessageRules.maxLength.formatted()) characters."
         case .rateLimited:
             "You're sending messages very quickly. Wait a moment and try again."
+        case .cannotMessageYourself:
+            "That's your own page, so there's no one to message."
+        case .tooManyInquiries:
+            "You've started a lot of new conversations today. Try again tomorrow, or write to someone you've already messaged."
+        case .awaitingReply:
+            "You've sent a few messages already. Wait for a reply before sending more."
         case .notFound:
             "That couldn't be found."
         case .notAllowed:

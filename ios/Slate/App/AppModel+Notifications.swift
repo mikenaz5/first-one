@@ -66,6 +66,7 @@ extension AppModel {
     /// After signing out: nothing of the old account should still be scheduled or showing on the icon.
     func resetNotifications() async {
         conversations = []
+        startedInquiries = [:]
         bookingsPath = []
         messagesPath = []
         openConversationID = nil

@@ -155,7 +155,7 @@ protocol SlateBackend {
     /// or `fileUnavailable`.
     func fileSource(for file: DeliveryFile, part: FileRules.Part, bookingID: UUID, for userID: UUID) async throws -> FileSource
 
-    // Messages (one conversation per booking)
+    // Messages (one conversation per booking, and one per client and creator before a booking)
     /// Every conversation the person is part of, newest first, with unread counts. Bookings whose hold ran out have none.
     func loadConversations(for userID: UUID) async throws -> [ConversationSummary]
     /// A conversation in time order. With `since`, only what came after (the app asks for a little before the last
@@ -166,6 +166,11 @@ protocol SlateBackend {
     func sendMessage(_ body: String, bookingID: UUID, clientMessageID: UUID, from userID: UUID) async throws -> Message
     /// Marks everything in the conversation as read.
     func markConversationRead(bookingID: UUID, for userID: UUID) async throws
+    /// The conversation between this person and a creator (or company) before any booking, made if it isn't there yet.
+    /// Nothing shows in anyone's Messages list until a first message is sent. The conversation's id works with
+    /// `loadMessages`, `sendMessage` and `markConversationRead` like a booking's.
+    /// Throws `cannotMessageYourself`, `tooManyInquiries` (new conversations are limited per day) and `notFound`.
+    func startInquiry(with creator: CreatorProfile, clientName: String, by userID: UUID) async throws -> Inquiry
 
     // Notifications
     /// True when a server queues and sends push notifications, shoot reminders included. Then the app registers its

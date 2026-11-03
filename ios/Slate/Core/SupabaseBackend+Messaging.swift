@@ -3,8 +3,8 @@ import Supabase
 
 /// Conversations and notifications on Supabase.
 ///
-/// Who may read or write what is decided in the database (`…_messaging_notifications.sql`): people read the
-/// conversation on their own bookings, text goes through `send_message`, and system lines are written by triggers on
+/// Who may read or write what is decided in the database (`…_messaging_notifications.sql`, and `…_inquiries.sql` for
+/// questions asked before booking): people read the conversation on their own bookings, text goes through `send_message`, and system lines are written by triggers on
 /// the booking itself. Push notifications are queued there too and sent by the `send-push` Edge Function; this file
 /// only registers the device and reads and saves the person's settings.
 extension SupabaseBackend {
@@ -12,9 +12,11 @@ extension SupabaseBackend {
 
     // MARK: - Rows
 
-    private struct MessageRow: Decodable {
+    struct MessageRow: Decodable {
         var id: String
-        var bookingId: String
+        /// Set for a booking's line; an inquiry's line has `inquiryId` instead. Exactly one is set.
+        var bookingId: String?
+        var inquiryId: String?
         var senderId: String?
         var kind: String
         var body: String
@@ -26,6 +28,7 @@ extension SupabaseBackend {
         enum CodingKeys: String, CodingKey {
             case id, kind, body, event, data
             case bookingId = "booking_id"
+            case inquiryId = "inquiry_id"
             case senderId = "sender_id"
             case clientId = "client_id"
             case createdAt = "created_at"
@@ -33,20 +36,23 @@ extension SupabaseBackend {
 
         /// Nil for a line this version of the app doesn't understand (a newer kind of event), which is skipped.
         var message: Message? {
-            guard let id = UUID(uuidString: id), let bookingID = UUID(uuidString: bookingId), let kind = Message.Kind(rawValue: kind) else { return nil }
+            guard let id = UUID(uuidString: id), let conversation = (bookingId ?? inquiryId).flatMap(UUID.init(uuidString:)),
+                  let kind = Message.Kind(rawValue: kind)
+            else { return nil }
             var event: Message.Event?
             if kind == .system {
                 guard let known = self.event.flatMap(Message.Event.init(rawValue:)) else { return nil }
                 event = known
             }
             return Message(
-                id: id, bookingID: bookingID, senderID: senderId.flatMap(UUID.init(uuidString:)), kind: kind,
+                id: id, bookingID: conversation, senderID: senderId.flatMap(UUID.init(uuidString:)), kind: kind,
                 body: body, event: event, data: data, clientMessageID: clientId.flatMap(UUID.init(uuidString:)), createdAt: createdAt
             )
         }
     }
 
-    private struct ConversationRow: Decodable {
+    struct ConversationRow: Decodable {
+        /// The booking's id, or the inquiry's when `isInquiry`.
         var bookingId: String
         var lastMessageId: String
         var lastKind: String
@@ -56,6 +62,10 @@ extension SupabaseBackend {
         var lastSenderId: String?
         var lastAt: Date
         var unreadCount: Int
+        var isInquiry: Bool?
+        var counterpartName: String?
+        var creatorId: String?
+        var iAmClient: Bool?
 
         enum CodingKeys: String, CodingKey {
             case bookingId = "booking_id"
@@ -67,6 +77,10 @@ extension SupabaseBackend {
             case lastSenderId = "last_sender_id"
             case lastAt = "last_at"
             case unreadCount = "unread_count"
+            case isInquiry = "is_inquiry"
+            case counterpartName = "counterpart_name"
+            case creatorId = "creator_id"
+            case iAmClient = "i_am_client"
         }
 
         var summary: ConversationSummary? {
@@ -82,7 +96,14 @@ extension SupabaseBackend {
                 id: messageID, bookingID: bookingID, senderID: lastSenderId.flatMap(UUID.init(uuidString:)), kind: kind,
                 body: lastBody, event: event, data: lastData, clientMessageID: nil, createdAt: lastAt
             )
-            return ConversationSummary(bookingID: bookingID, last: last, unreadCount: unreadCount)
+            let inquiry = isInquiry ?? false
+            let other = counterpartName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return ConversationSummary(
+                bookingID: bookingID, last: last, unreadCount: unreadCount, isInquiry: inquiry,
+                counterpartName: (other?.isEmpty ?? true) ? nil : other,
+                creatorID: inquiry ? creatorId.flatMap(UUID.init(uuidString:)) : nil,
+                iAmClient: inquiry && (iAmClient ?? false)
+            )
         }
     }
 
@@ -107,6 +128,16 @@ extension SupabaseBackend {
             case pBookingId = "p_booking_id"
             case pBody = "p_body"
             case pClientId = "p_client_id"
+        }
+    }
+
+    private struct StartInquiryParams: Encodable {
+        var pCreatorId: String
+        var pClientName: String
+
+        enum CodingKeys: String, CodingKey {
+            case pCreatorId = "p_creator_id"
+            case pClientName = "p_client_name"
         }
     }
 
@@ -184,6 +215,23 @@ extension SupabaseBackend {
         }
     }
 
+    func startInquiry(with creator: CreatorProfile, clientName: String, by userID: UUID) async throws -> Inquiry {
+        do {
+            let id: UUID = try await client
+                .rpc("start_inquiry", params: StartInquiryParams(pCreatorId: Self.key(creator.id), pClientName: InquiryRules.cleanName(clientName)))
+                .execute()
+                .value
+            return Inquiry(
+                id: id, clientID: userID, creatorID: creator.id, clientName: InquiryRules.cleanName(clientName),
+                creatorName: creator.displayName, createdAt: Date()
+            )
+        } catch {
+            // Here a missing creator is not a missing booking.
+            if "\(error)".contains("not_found") { throw SlateError.notFound }
+            throw Self.mapMessageError(error)
+        }
+    }
+
     // MARK: - Notification settings and devices
 
     func loadNotificationPreferences(for userID: UUID) async throws -> NotificationPreferences {
@@ -207,7 +255,11 @@ extension SupabaseBackend {
     /// The SQL functions raise plain tokens such as `conversation_closed`; turn them into typed errors.
     static func mapMessageError(_ error: Error) -> Error {
         if error is SlateError { return error }
-        if "\(error)".contains("not_found") { return SlateError.bookingNotFound }
+        let text = "\(error)"
+        if text.contains("not_found") { return SlateError.bookingNotFound }
+        if text.contains("cannot_message_yourself") { return SlateError.cannotMessageYourself }
+        if text.contains("too_many_inquiries") { return SlateError.tooManyInquiries }
+        if text.contains("awaiting_reply") { return SlateError.awaitingReply }
         return mapBookingError(error)
     }
 }

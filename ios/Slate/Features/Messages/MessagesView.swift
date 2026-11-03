@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Messages tab: one conversation per booking, newest first.
+/// Messages tab: one conversation per booking, and one per creator a client has written to first, newest first.
 struct MessagesView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -14,7 +14,9 @@ struct MessagesView: View {
                     ContentUnavailableView {
                         Label("No messages yet", systemImage: "bubble.left.and.bubble.right")
                     } description: {
-                        Text("Each booking gets its own conversation with your client. It opens as soon as someone books.")
+                        Text(model.isClientOnly
+                             ? "Tap Message on a creator's page to ask a question before you book. Each booking gets its own conversation too."
+                             : "Clients can message you from your page before they book, and each booking gets its own conversation.")
                     }
                 } else {
                     list
@@ -59,7 +61,9 @@ struct MessagesView: View {
                             Task { await model.markConversationRead(summary.bookingID) }
                         }
                     }
-                    Button("Open booking", systemImage: "calendar") { model.openBooking(summary.bookingID) }
+                    if !summary.isInquiry {
+                        Button("Open booking", systemImage: "calendar") { model.openBooking(summary.bookingID) }
+                    }
                 }
             }
 
@@ -88,7 +92,13 @@ struct ConversationRow: View {
     let summary: ConversationSummary
 
     private var booking: Booking? { model.booking(withID: summary.bookingID) }
-    private var name: String { booking.map(model.counterpartName(for:)) ?? "Conversation" }
+    private var name: String {
+        if let booking { return model.counterpartName(for: booking) }
+        if summary.isInquiry { return summary.counterpartName ?? (summary.iAmClient ? "Creator" : "Client") }
+        return "Conversation"
+    }
+    /// The line under the name: the package for a booking, "Before booking" for a question.
+    private var subtitle: String? { booking?.packageName ?? (summary.isInquiry ? "Before booking" : nil) }
     private var unread: Bool { summary.unreadCount > 0 }
 
     private var preview: String {
@@ -110,8 +120,8 @@ struct ConversationRow: View {
                         .font(.caption)
                         .foregroundStyle(unread ? Color.accentColor : Color.secondary)
                 }
-                if let booking {
-                    Text(booking.packageName)
+                if let subtitle {
+                    Text(subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -138,7 +148,7 @@ struct ConversationRow: View {
         .frame(minHeight: Metrics.minTapTarget)
         .motionSafe(.slateSnappy, value: summary.unreadCount)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name), \(booking?.packageName ?? ""). \(unread ? "\(summary.unreadCount) unread. " : "")\(preview)")
+        .accessibilityLabel("\(name), \(subtitle ?? ""). \(unread ? "\(summary.unreadCount) unread. " : "")\(preview)")
     }
 
     /// "10:42 AM" today, "Yesterday", or the date.

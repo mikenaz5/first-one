@@ -148,6 +148,7 @@ actor LocalBackend: SlateBackend {
             throw SlateError.lastOwner
         }
         try endAllMemberships(of: session.userID)
+        try removeInquiries(involving: session.userID)
         try? fileManager.removeItem(at: userDirectory(session.userID))
         var accounts = read([String: UUID].self, from: accountsURL) ?? [:]
         accounts = accounts.filter { $0.value != session.userID }

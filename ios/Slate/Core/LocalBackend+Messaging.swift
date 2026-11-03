@@ -2,7 +2,8 @@ import Foundation
 
 /// Conversations and notification settings for the on-device backend.
 ///
-/// Every booking has one conversation. Text is written by `sendMessage`; the "booked", "deposit paid" and other
+/// Every booking has one conversation, and so does every inquiry (a client's questions before booking; see
+/// `LocalBackend+Inquiries.swift`). Text is written by `sendMessage`; the "booked", "deposit paid" and other
 /// system lines are added by this backend's own booking, payment and cancellation code, so nobody can type one.
 /// Unread counts follow a read marker per person and conversation, kept as "the last message they have read" rather
 /// than a time, so two messages in the same second can't be confused.
@@ -70,13 +71,25 @@ extension LocalBackend {
             let unread = unreadCount(in: conversation, bookingID: booking.id, userID: userID, marks: marks)
             found.append((position, ConversationSummary(bookingID: booking.id, last: last, unreadCount: unread)))
         }
+        // Questions asked before booking. They show once someone has written.
+        for inquiry in readInquiries() where inquiryAccess(userID, inquiry, .view, in: orgs) {
+            let conversation = messages.filter { $0.bookingID == inquiry.id }
+            guard let last = conversation.last, let position = messages.lastIndex(where: { $0.id == last.id }) else { continue }
+            let unread = unreadCount(in: conversation, bookingID: inquiry.id, userID: userID, marks: marks)
+            let other = userID == inquiry.clientID ? inquiry.creatorName : inquiry.clientName
+            found.append((position, ConversationSummary(
+                bookingID: inquiry.id, last: last, unreadCount: unread, isInquiry: true,
+                counterpartName: other.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : other, creatorID: inquiry.creatorID,
+                iAmClient: userID == inquiry.clientID
+            )))
+        }
         // Newest first; the stored order is the order things happened.
         return found.sorted { $0.position > $1.position }.map(\.summary)
     }
 
     func loadMessages(bookingID: UUID, since: Date?, for userID: UUID) async throws -> [Message] {
         // Like the database, a stranger just sees nothing.
-        guard partyBooking(bookingID, for: userID) != nil else { return [] }
+        guard partyBooking(bookingID, for: userID) != nil || partyInquiry(bookingID, for: userID) != nil else { return [] }
         let conversation = readMessages().filter { $0.bookingID == bookingID }
         guard let since else { return conversation }
         return conversation.filter { $0.createdAt > since }
@@ -85,7 +98,13 @@ extension LocalBackend {
     func sendMessage(_ body: String, bookingID: UUID, clientMessageID: UUID, from userID: UUID) async throws -> Message {
         try expireLapsedHolds()
         let now = wholeSecondNow
-        guard let booking = partyBooking(bookingID, for: userID, level: .manage) else { throw SlateError.bookingNotFound }
+        guard let booking = partyBooking(bookingID, for: userID, level: .manage) else {
+            // Not a booking: perhaps a question asked before one.
+            if let inquiry = partyInquiry(bookingID, for: userID, level: .manage) {
+                return try sendInquiryMessage(body, inquiry: inquiry, clientMessageID: clientMessageID, from: userID)
+            }
+            throw SlateError.bookingNotFound
+        }
 
         var messages = readMessages()
         // Sending again after a dropped connection returns the message already stored.
@@ -114,12 +133,18 @@ extension LocalBackend {
     }
 
     func markConversationRead(bookingID: UUID, for userID: UUID) async throws {
-        guard partyBooking(bookingID, for: userID) != nil else { throw SlateError.bookingNotFound }
+        guard partyBooking(bookingID, for: userID) != nil || partyInquiry(bookingID, for: userID) != nil else { throw SlateError.bookingNotFound }
         guard let last = readMessages().last(where: { $0.bookingID == bookingID }) else { return }
         try setReadMark(bookingID: bookingID, userID: userID, lastMessageID: last.id)
     }
 
-    private func setReadMark(bookingID: UUID, userID: UUID, lastMessageID: UUID) throws {
+    /// Removes whole conversations: their messages and every person's read marker. Used when an account is deleted.
+    func dropConversations(_ ids: Set<UUID>) throws {
+        try write(readMessages().filter { !ids.contains($0.bookingID) }, to: messagesURL)
+        try write(readMarks().filter { !ids.contains($0.bookingID) }, to: readMarksURL)
+    }
+
+    func setReadMark(bookingID: UUID, userID: UUID, lastMessageID: UUID) throws {
         var marks = readMarks()
         if let index = marks.firstIndex(where: { $0.bookingID == bookingID && $0.userID == userID }) {
             marks[index].lastMessageID = lastMessageID

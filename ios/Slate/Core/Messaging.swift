@@ -47,6 +47,8 @@ struct Message: Identifiable, Codable, Equatable, Hashable {
     }
 
     var id: UUID
+    /// The conversation this line belongs to: a booking's id, or an inquiry's id (a conversation that began before any
+    /// booking). The backend works out which, so the screens treat the id as simply "the conversation".
     var bookingID: UUID
     /// Nil for system lines, and for a person who has since deleted their account.
     var senderID: UUID?
@@ -66,11 +68,48 @@ struct Message: Identifiable, Codable, Equatable, Hashable {
 
 /// A conversation in the Messages list: the latest line and how many of the other person's messages are unread.
 struct ConversationSummary: Identifiable, Equatable, Hashable {
+    /// The booking's id, or the inquiry's id when `isInquiry`.
     var bookingID: UUID
     var last: Message
     var unreadCount: Int
+    /// A conversation that began from the Message button on a creator's page, before any booking.
+    var isInquiry = false
+    /// The other side as this person should see them, when the server says so. Always set for an inquiry (a booking's
+    /// is worked out from the booking itself).
+    var counterpartName: String?
+    /// The creator or company the conversation is with. Set for inquiries.
+    var creatorID: UUID?
+    /// For an inquiry: whether this person is the one asking (the client), rather than answering for the creator.
+    var iAmClient = false
 
     var id: UUID { bookingID }
+}
+
+/// A conversation between a client and a creator (or company) that began before any booking: someone asking a question.
+/// One per client and creator. It has no booking, no system lines and no contract, only typed text.
+struct Inquiry: Identifiable, Equatable, Hashable, Codable {
+    var id: UUID
+    var clientID: UUID
+    var creatorID: UUID
+    /// As they were when it started, the way a booking keeps names.
+    var clientName: String
+    var creatorName: String
+    var createdAt: Date
+}
+
+/// What keeps strangers from flooding a creator. `inquiry_rules.json` holds the numbers; the database and the app
+/// are both tested against it.
+enum InquiryRules {
+    /// New conversations one client may start in a day.
+    static let perDay = 10
+    /// Messages a client may send in a row without an answer. Any reply from the creator's side lifts it.
+    static let unansweredLimit = 5
+    static let nameMaxLength = 80
+
+    /// A name tidied the way the database keeps it: trimmed, and cut to the limit.
+    static func cleanName(_ name: String) -> String {
+        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(nameMaxLength))
+    }
 }
 
 /// A message the person has sent that the server hasn't confirmed yet, shown in the thread right away.

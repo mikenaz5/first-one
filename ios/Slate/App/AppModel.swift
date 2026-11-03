@@ -111,6 +111,9 @@ final class AppModel {
     var messagesPath: [UUID] = []
     /// Every conversation the person is part of, newest first.
     var conversations: [ConversationSummary] = []
+    /// Questions this person has just started from a creator's page. They aren't in `conversations` until someone writes,
+    /// but the conversation can already open and carry the creator's name.
+    var startedInquiries: [UUID: Inquiry] = [:]
     /// The conversation on screen, if any. A push about it doesn't need a banner.
     var openConversationID: UUID?
     var notificationPreferences = NotificationPreferences()

@@ -87,6 +87,8 @@ struct CreatorPageView: View {
     @State private var bookingTarget: BookingTarget?
     /// A person the client has chosen to book directly. Nil means whoever is free.
     @State private var chosenMember: UUID?
+    /// While the conversation is being opened, so a second tap doesn't start another.
+    @State private var openingMessage = false
 
     /// Editing tools show only on your own page, and only to a role that may change it.
     private var canEditPage: Bool { mode == .owner && model.can(.companyEdit) }
@@ -234,9 +236,33 @@ struct CreatorPageView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+            if mode != .owner {
+                messageButton
+            }
         }
         .frame(maxWidth: .infinity)
         .card(padding: Space.xl)
+    }
+
+    /// Opens a conversation with the creator before any booking. In the preview of your own page it explains that
+    /// there's no one to message, the way the real thing would.
+    private var messageButton: some View {
+        Button {
+            guard !openingMessage else { return }
+            openingMessage = true
+            Task {
+                await model.messageCreator(profile)
+                openingMessage = false
+            }
+        } label: {
+            Label("Message", systemImage: "bubble.left")
+                .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+        }
+        .buttonStyle(.slateOutline)
+        .controlSize(.large)
+        .disabled(openingMessage)
+        .accessibilityHint("Ask \(profile.displayName) a question before you book")
     }
 }
 
