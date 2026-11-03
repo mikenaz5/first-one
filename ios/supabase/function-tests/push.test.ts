@@ -663,7 +663,7 @@ describe("the APNs request", () => {
       if (answer instanceof Error) throw answer;
       return { status: answer.status, text: async () => answer.body ?? "" };
     };
-    const apns = createApnsSender({ keyPem: pem, keyId: "KEY1234567", teamId: "TEAM123456", topic: "com.example.slate" }, fetchImpl, () => clock.now);
+    const apns = createApnsSender({ keyPem: pem, keyId: "KEY1234567", teamId: "TEAM123456", topic: "com.slateproapp.app" }, fetchImpl, () => clock.now);
     return { apns, requests, clock };
   }
 
@@ -675,7 +675,7 @@ describe("the APNs request", () => {
     assert.equal(url, `https://api.sandbox.push.apple.com/3/device/${"ab".repeat(32)}`);
     assert.equal(init.method, "POST");
     assert.match(init.headers.authorization, /^bearer [\w-]+\.[\w-]+\.[\w-]+$/);
-    assert.equal(init.headers["apns-topic"], "com.example.slate");
+    assert.equal(init.headers["apns-topic"], "com.slateproapp.app");
     assert.equal(init.headers["apns-push-type"], "alert");
     assert.equal(init.headers["apns-priority"], "10");
     assert.equal(init.headers["apns-expiration"], "1800000000");

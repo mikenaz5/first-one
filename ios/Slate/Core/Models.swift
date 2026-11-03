@@ -506,8 +506,16 @@ enum AppConfig {
     /// and placeholder domain keep the working name "Slate"; nothing a person reads should.
     static let productName = "Slate Pro"
 
-    /// Placeholder host for public booking links (`.example` is reserved and never resolves).
-    static let bookingLinkHost = "slate.example"
+    /// The website's address, which public booking links (`slateproapp.com/<link name>`) are under. The web booking page
+    /// behind them is not built yet, so a link does not open anything until it is.
+    static let bookingLinkHost = "slateproapp.com"
+    /// The pages Apple asks for (a privacy policy and a support address) and the terms. The text is in `site/` at the root
+    /// of the repository; handles such as "privacy", "terms" and "support" are reserved so a creator can't take them.
+    static let privacyURL = URL(string: "https://\(bookingLinkHost)/privacy")!
+    static let termsURL = URL(string: "https://\(bookingLinkHost)/terms")!
+    static let supportURL = URL(string: "https://\(bookingLinkHost)/support")!
+    static let supportEmail = "support@\(bookingLinkHost)"
+    static let supportMailURL = URL(string: "mailto:\(supportEmail)")!
     static let portfolioLimit = 12
     /// How many reviews a creator's page loads at a time.
     static let reviewsPageSize = 20

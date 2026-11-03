@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "ios/**"
+      - "site/**"
       - ".github/workflows/ios.yml"
   pull_request:
     paths:
       - "ios/**"
+      - "site/**"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 
@@ -30,6 +32,9 @@ jobs:
 
       - name: Check the product name
         run: python3 scripts/check_product_name.py
+
+      - name: Check the website against the app
+        run: python3 scripts/check_site.py
 
       - name: Show toolchain
         run: |

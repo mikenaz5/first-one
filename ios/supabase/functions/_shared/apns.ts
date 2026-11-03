@@ -21,7 +21,7 @@ export interface ApnsConfig {
   keyId: string;
   /** Your Apple developer Team ID. */
   teamId: string;
-  /** The app's bundle identifier, e.g. com.example.slate. */
+  /** The app's bundle identifier, e.g. com.slateproapp.app. */
   topic: string;
 }
 

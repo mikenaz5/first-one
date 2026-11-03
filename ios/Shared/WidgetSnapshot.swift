@@ -58,7 +58,7 @@ enum WidgetStore {
     static let fileName = "next-bookings.json"
     /// Used when the build doesn't say which group it belongs to. `Config/App.xcconfig` sets `APP_GROUP_ID`, and both
     /// targets' Info.plists carry it as `SlateAppGroup`.
-    static let fallbackGroupID = "group.com.example.slate"
+    static let fallbackGroupID = "group.com.slateproapp.app"
 
     static var groupID: String {
         let value = Bundle.main.object(forInfoDictionaryKey: "SlateAppGroup") as? String

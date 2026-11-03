@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Handles
 
-/// Rules for the `slate.example/<handle>` booking link name.
+/// Rules for the `slateproapp.com/<handle>` booking link name.
 /// Keep in sync with the CHECK constraint in supabase/migrations.
 enum HandleRules {
     static let minLength = 3

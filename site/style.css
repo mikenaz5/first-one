@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f5fb;
+  --card: #ffffff;
+  --line: #e0daee;
+  --text: #1c1730;
+  --muted: #5d5675;
+  --accent: #7a3fe0;
+  --accent-text: #6a2fd0;
+  --warn-bg: #fff4d6;
+  --warn-text: #5c4300;
+  --mark: #ffe9a8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0a14;
+    --card: #17121f;
+    --line: #2d2540;
+    --text: #f1edf9;
+    --muted: #a79fbd;
+    --accent: #8a4df5;
+    --accent-text: #b48cff;
+    --warn-bg: #3a2e0a;
+    --warn-text: #ffe9a8;
+    --mark: #5a4710;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+header, main, footer { width: 100%; max-width: 46rem; margin: 0 auto; padding: 0 1.25rem; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1.25rem; padding-bottom: 1.25rem; }
+header a.brand { color: var(--text); font-weight: 700; font-size: 1.15rem; text-decoration: none; }
+nav a { color: var(--muted); text-decoration: none; margin-left: 1rem; font-size: 0.95rem; }
+nav a:hover, nav a:focus { color: var(--accent-text); text-decoration: underline; }
+main { padding-top: 1rem; padding-bottom: 3rem; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 1rem 0 0.5rem; }
+h2 { font-size: 1.3rem; margin: 2.2rem 0 0.4rem; }
+h3 { font-size: 1.05rem; margin: 1.4rem 0 0.2rem; }
+p, li { color: var(--text); }
+.muted { color: var(--muted); }
+a { color: var(--accent-text); }
+ul { padding-left: 1.25rem; }
+li { margin: 0.3rem 0; }
+.lead { font-size: 1.25rem; color: var(--muted); margin: 0.25rem 0 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 1.1rem 1.25rem; margin: 1rem 0; }
+.draft { background: var(--warn-bg); color: var(--warn-text); border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.95rem; margin: 1rem 0; }
+mark { background: var(--mark); color: inherit; padding: 0 0.2em; border-radius: 4px; }
+.button { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 0.8rem 1.2rem; border-radius: 14px; font-weight: 600; }
+footer { padding-top: 1.5rem; padding-bottom: 2.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer a { color: var(--muted); margin-right: 1rem; }

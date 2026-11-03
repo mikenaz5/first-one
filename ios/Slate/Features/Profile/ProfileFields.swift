@@ -51,7 +51,7 @@ struct AvatarPicker: View {
 
 // MARK: - Handle
 
-/// The `slate.example/<handle>` row, with a debounced availability check.
+/// The `slateproapp.com/<handle>` row, with a debounced availability check.
 struct HandleField: View {
     @Bindable var draft: ProfileDraft
     @Environment(AppModel.self) private var model

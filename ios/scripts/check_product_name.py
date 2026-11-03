@@ -2,7 +2,7 @@
 """Fails when text a person can read says "Slate" on its own instead of "Slate Pro".
 
 The product is called Slate Pro. The working name "Slate" lives on in code nobody reads (the module, folders, the slate://
-link scheme, bundle ids, storage keys, slate.example), so this only looks at string literals in the app and widget
+link scheme, bundle ids, storage keys, the website address), so this only looks at string literals in the app and widget
 sources, the permission messages and name in project.yml, and the notification wording in the Edge Functions.
 
     python3 ios/scripts/check_product_name.py

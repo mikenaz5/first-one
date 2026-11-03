@@ -162,7 +162,7 @@ final class LinksAndSettingsTests: XCTestCase {
     }
 
     func testOtherLinksAreIgnored() {
-        XCTAssertNil(AppLink(url: URL(string: "https://slate.example/maya")!))
+        XCTAssertNil(AppLink(url: URL(string: "https://\(AppConfig.bookingLinkHost)/maya")!))
         XCTAssertNil(AppLink(url: URL(string: "slate://unknown/thing")!))
         XCTAssertNil(AppLink(url: URL(string: "slate://book")!))
         XCTAssertNil(AppLink(url: URL(string: "slate://book/")!))

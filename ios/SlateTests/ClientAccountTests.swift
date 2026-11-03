@@ -38,16 +38,17 @@ final class EmailCodeRulesTests: XCTestCase {
 
 final class BookingLinkTextTests: XCTestCase {
     func testEveryWayOfWritingALinkFindsTheName() {
+        let host = AppConfig.bookingLinkHost
         for text in [
-            "slate://book/dana-lens", "https://slate.example/dana-lens", "http://slate.example/dana-lens/", "slate.example/dana-lens",
-            "SLATE.EXAMPLE/Dana-Lens", "@dana-lens", "dana-lens", "  dana-lens  ", "https://slate.example/dana-lens?ref=card",
+            "slate://book/dana-lens", "https://\(host)/dana-lens", "http://\(host)/dana-lens/", "\(host)/dana-lens",
+            "\(host.uppercased())/Dana-Lens", "@dana-lens", "dana-lens", "  dana-lens  ", "https://\(host)/dana-lens?ref=card",
         ] {
             XCTAssertEqual(BookingLinkText.handle(from: text), "dana-lens", text)
         }
     }
 
     func testTextThatCannotBeANameFindsNothing() {
-        for text in ["", "  ", "no", "slate://booking/\(UUID().uuidString)", "slate://join/abc", "has spaces here", "https://slate.example/", "admin"] {
+        for text in ["", "  ", "no", "slate://booking/\(UUID().uuidString)", "slate://join/abc", "has spaces here", "https://\(AppConfig.bookingLinkHost)/", "admin"] {
             XCTAssertNil(BookingLinkText.handle(from: text), "\"\(text)\" should find nothing")
         }
     }

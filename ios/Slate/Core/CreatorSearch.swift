@@ -18,7 +18,7 @@ enum CreatorSearchRules {
     }
 
     /// Whether what was typed is a link rather than something to search for ("slate://book/maya",
-    /// "slate.example/maya", "https://…"), so it can open the page straight away.
+    /// "slateproapp.com/maya", "https://…"), so it can open the page straight away.
     static func looksLikeLink(_ raw: String) -> Bool {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return text.contains("://") || text.hasPrefix(AppConfig.bookingLinkHost.lowercased() + "/")

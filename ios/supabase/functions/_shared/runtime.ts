@@ -15,7 +15,7 @@
 //   APNS_KEY_P8             the contents of the AuthKey_XXXX.p8 file from your Apple developer account
 //   APNS_KEY_ID             that key's ID
 //   APNS_TEAM_ID            your Apple developer Team ID
-//   APNS_TOPIC              the app's bundle identifier, e.g. com.example.slate
+//   APNS_TOPIC              the app's bundle identifier, com.slateproapp.app
 //   PUSH_CRON_SECRET        optional: a long random secret the scheduler can send instead of the service role key
 //                           (expire-files, which tidies Slate Files, takes the same one)
 // Supabase provides SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY itself.

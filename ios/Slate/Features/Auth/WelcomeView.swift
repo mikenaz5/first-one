@@ -124,8 +124,9 @@ struct WelcomeView: View {
                 }
                 #endif
 
-                Text("By continuing you agree to the Terms and Privacy Policy.")
+                Text(legalText)
                     .font(.footnote)
+                    .tint(Color.slateAccentText)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -133,6 +134,14 @@ struct WelcomeView: View {
         }
         .padding(.horizontal, Space.page)
         .padding(.bottom, Space.l)
+    }
+
+    /// "By continuing you agree to the Terms of Use and the Privacy Policy." with both names opening their pages.
+    private var legalText: AttributedString {
+        var text = AttributedString("By continuing you agree to the Terms of Use and the Privacy Policy.")
+        if let range = text.range(of: "Terms of Use") { text[range].link = AppConfig.termsURL }
+        if let range = text.range(of: "Privacy Policy") { text[range].link = AppConfig.privacyURL }
+        return text
     }
 
     private func handle(_ result: Result<ASAuthorization, Error>) {

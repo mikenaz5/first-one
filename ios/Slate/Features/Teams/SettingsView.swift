@@ -48,6 +48,8 @@ struct SettingsView: View {
             }
                 .listRowBackground(Color.slateCard)
 
+            AboutSection()
+
             Section {
                 Button {
                     confirmSignOut = true

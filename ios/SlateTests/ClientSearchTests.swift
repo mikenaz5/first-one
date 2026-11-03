@@ -23,8 +23,8 @@ final class CreatorSearchRulesTests: XCTestCase {
 
     func testLinksAreToldApartFromWords() {
         XCTAssertTrue(CreatorSearchRules.looksLikeLink("slate://book/maya"))
-        XCTAssertTrue(CreatorSearchRules.looksLikeLink("https://slate.example/maya"))
-        XCTAssertTrue(CreatorSearchRules.looksLikeLink("  Slate.Example/maya"))
+        XCTAssertTrue(CreatorSearchRules.looksLikeLink("https://\(AppConfig.bookingLinkHost)/maya"))
+        XCTAssertTrue(CreatorSearchRules.looksLikeLink("  \(AppConfig.bookingLinkHost.capitalized)/maya"))
         XCTAssertFalse(CreatorSearchRules.looksLikeLink("maya"))
         XCTAssertFalse(CreatorSearchRules.looksLikeLink("real estate"))
         XCTAssertFalse(CreatorSearchRules.looksLikeLink("weddings in austin"))

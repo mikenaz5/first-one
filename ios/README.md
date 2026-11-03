@@ -80,13 +80,13 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
    supabase db push         # applies supabase/migrations/*.sql
    supabase functions deploy delete-account
    ```
-2. In the dashboard: **Authentication → Providers → Apple**, enable it and add this app's bundle ID (`com.example.slate`) to the authorized client IDs.
+2. In the dashboard: **Authentication → Providers → Apple**, enable it and add this app's bundle ID (`com.slateproapp.app`) to the authorized client IDs.
 3. `cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig` and fill in the project URL, the **anon** key and your Apple team ID. Never put the `service_role` key in the app.
 4. Regenerate and run. The app switches to `SupabaseBackend` whenever both values are set.
 
 ### Signing and capabilities
 
-Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The default build uses one capability, Sign in with Apple (`Config/Slate.entitlements`); Apple Pay and push notifications are switched on through `Config/Secrets.xcconfig` (see "Turning on real payments" and "Turning on notifications"). Apple's free "Personal Team" doesn't support any of them; use a paid developer account. Change the bundle ID (`com.example.slate` in `project.yml`) before shipping.
+Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The default build uses one capability, Sign in with Apple (`Config/Slate.entitlements`); Apple Pay and push notifications are switched on through `Config/Secrets.xcconfig` (see "Turning on real payments" and "Turning on notifications"). Apple's free "Personal Team" doesn't support any of them; use a paid developer account. The bundle ID is `com.slateproapp.app` (in `project.yml`), with `com.slateproapp.app.widgets` for the widget; register exactly these in your Apple developer account.
 
 ## Packages, availability and booking
 
@@ -193,7 +193,7 @@ Notifications on a server-backed build need Apple, Supabase and a schedule. None
 3. **Functions**, from `ios/`:
    ```sh
    supabase db push
-   supabase secrets set APNS_KEY_P8="$(cat AuthKey_XXXXXXXXXX.p8)" APNS_KEY_ID=XXXXXXXXXX APNS_TEAM_ID=YYYYYYYYYY APNS_TOPIC=com.example.slate PUSH_CRON_SECRET="$(openssl rand -hex 32)"
+   supabase secrets set APNS_KEY_P8="$(cat AuthKey_XXXXXXXXXX.p8)" APNS_KEY_ID=XXXXXXXXXX APNS_TEAM_ID=YYYYYYYYYY APNS_TOPIC=com.slateproapp.app PUSH_CRON_SECRET="$(openssl rand -hex 32)"
    supabase functions deploy send-push --no-verify-jwt
    ```
    `send-push` is for the scheduler, not for people: it answers only a request carrying the service role key or `PUSH_CRON_SECRET`, and answers `503` (touching nothing) until the four `APNS_*` values are set.
@@ -233,7 +233,7 @@ What stayed Apple-native: the system fonts in text styles, SF Symbols, the tab b
 
 **The home screen widget** shows your next confirmed booking: *when* (today, tomorrow or the date, in the shoot's own time zone), the package and who it is with. Small and medium sizes for the home screen (medium lists the next three), rectangular and inline for the lock screen. Tapping opens that booking (`slate://booking/<id>`). It never touches the network: the app writes a small file into an **App Group** whenever its bookings change (`AppModel.bookingsChanged()` → `WidgetSnapshot`), and the widget reads it. It moves on by itself as shoots finish and the day changes. The other person's name is marked privacy-sensitive, so it is hidden while the phone is locked.
 
-To use it on a device you must register the App Group once: in your developer account add an **App Group** (default `group.com.example.slate`, set by `APP_GROUP_ID` in `Config/App.xcconfig`; change it there, in one place, if you change the bundle ID), and let Xcode add it to both the app and the *SlateWidgets* target (both entitlements files already ask for it). Without the group the app still builds and runs; the widget simply has nothing to show.
+To use it on a device you must register the App Group once: in your developer account add an **App Group** (default `group.com.slateproapp.app`, set by `APP_GROUP_ID` in `Config/App.xcconfig`; change it there, in one place, if you change the bundle ID), and let Xcode add it to both the app and the *SlateWidgets* target (both entitlements files already ask for it). Without the group the app still builds and runs; the widget simply has nothing to show.
 
 ## Companies and teams
 
@@ -339,6 +339,15 @@ A creator can deliver the finished photos and videos inside Slate Pro instead of
 
 **Known limits.** Uploads are one plain request per file, so they stop when the app is suspended; resumable background uploads (and uploads over about 5 GB) are not built. The previews are not DRM: a client can screenshot one, which is why they are small and watermarked. Slate Pro is not an archive: deleted files are gone.
 
+## Website and legal pages
+
+The website is in `site/` at the root of the repository: a front page, a support page, a privacy policy and terms of use (drafts), for
+`slateproapp.com`. The app links to them (Settings ▸ About, a client's Profile, and the welcome screen), Apple asks for the
+privacy and support addresses on the store page, and `scripts/check_site.py` (run by CI) fails if the app and the pages disagree.
+`site/README.md` says how to publish it. The identifiers also come from the domain: bundle ID `com.slateproapp.app` (widget
+`.widgets`), App Group `group.com.slateproapp.app`, Apple Pay merchant `merchant.com.slateproapp.app`, and support at
+`support@slateproapp.com`. Register these exactly in your Apple developer account.
+
 ## Layout
 
 ```
@@ -395,7 +404,7 @@ The payment and push logic in the Edge Functions (`_shared/payments.ts`, `push.t
 - **Nothing chases anyone.** The client gets one notification when files are shared and the creator one when the client confirms; nothing repeats them. A client who never confirms leaves the balance unpayable, and one who confirms but never pays isn't followed up or flagged as overdue. There is no automatic confirmation after some number of days, which many creators would want, but it is a policy decision (and a dispute risk) that is yours to make. (`balance_due` is still a notification kind in the queue, kept for a future reminder; nothing sends it.)
 - **No disputes, chargebacks, payout screens or earnings summary.** Stripe's dashboard has them.
 - **Apple Pay's country comes from the device's region**, not the creator's. For creators outside that country it needs to come from their Stripe account.
-- **Delivery is a link, not a file.** Slate Pro never hosts, fetches or checks the files or the link (it can't tell that a link works, or that it has the right files in it), the client can open the link before paying the balance, and money is not held back until they confirm (see "Delivery and reviews").
+- **A delivery by link is still just a link.** Slate Pro never fetches or checks it (it can't tell that a link works, or that it has the right files in it), the client can open it before paying the balance, and money is not held back until they confirm (see "Delivery and reviews"). Files delivered in the app are different: see "Slate Files".
 - **Reviews are plain.** One per booking, no editing or deleting, no reply from the creator, no reporting or moderation (Apple's guideline 1.2 expects a way to report objectionable user content, so add one before submitting), and no photos. Only stars and text.
 - **Calendar busy time is device-synced**, so it can be stale, and events written with write-only access can't be removed again on cancel.
 - **Messages are fetched by polling**, every few seconds while a conversation is open, not streamed. There are no typing indicators, no read receipts shown to the other person, no photos or files, and a message can't be edited or deleted.
@@ -407,7 +416,7 @@ The payment and push logic in the Edge Functions (`_shared/payments.ts`, `push.t
 - **A booking left unassigned sends no reminder.** With assignment set to manual it waits in the "Needs a person" list until a Manager takes it; nothing nudges anyone.
 - **Per-member services are an "Offered by" choice on a company service**, not a separate kind of service owned by a member.
 - **The company screens have never talked to a live Supabase project or Stripe Billing**, and a second real phone has never joined through an invite link (see "Companies and teams").
-- **Booking links don't resolve.** `slate.example` is a reserved placeholder host. The Home tab says so.
+- **Booking links don't open anything yet.** They are `slateproapp.com/<name>`, but the web booking page isn't built (Q4 in `SPEC.md`), so the website only has its front, support, privacy and terms pages. The Home tab says so. Opening them in the app also needs Universal Links (an Associated Domains capability and an `apple-app-site-association` file on the website), which comes with that page.
 - **Apple token revocation on account deletion** is not implemented (Apple requires it). It needs a client secret signed with your Apple key; see the TODO in `supabase/functions/delete-account/index.ts`.
 - **The Apple user ID is kept in `UserDefaults`**, not the Keychain. It's an identifier, not a secret, but Keychain is the better home.
 - **The widget is one widget.** It shows the next bookings and nothing else: no choice of what it shows, no buttons in it, no per-creator filter. It updates when the app is running and its bookings change, and on a schedule from what it already has; a booking made from another device appears only after the app next opens or refreshes (nothing wakes the app in the background to update it).

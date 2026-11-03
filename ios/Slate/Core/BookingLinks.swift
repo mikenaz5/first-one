@@ -1,7 +1,7 @@
 import Foundation
 
-/// Finds the creator's name in whatever a client pasted: `slate://book/maya`, `https://slate.example/maya`,
-/// `slate.example/maya`, `@maya` or just `maya`.
+/// Finds the creator's name in whatever a client pasted: `slate://book/maya`, `https://slateproapp.com/maya`,
+/// `slateproapp.com/maya`, `@maya` or just `maya`.
 enum BookingLinkText {
     static func handle(from raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
