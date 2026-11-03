@@ -217,4 +217,4 @@ if [[ -n "$shot" ]]; then
   say "Saved a screenshot to $shot"
 fi
 
-say "Slate Pro is running. On the welcome screen, tap \"Continue with a demo account\"."
+say "Slate Pro is running. A short animation plays first (touch the screen to skip it). On the welcome screen, tap \"Continue with a demo account\"."
