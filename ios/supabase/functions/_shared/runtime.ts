@@ -26,6 +26,7 @@ import { DbError } from "./payments.ts";
 import type { Db, Deps, HttpResult } from "./payments.ts";
 import { createApnsSender } from "./apns.ts";
 import type { BillingDeps } from "./billing.ts";
+import type { CalendarDeps } from "./calendar.ts";
 import type { CardDeps } from "./cards.ts";
 import type { FilesDeps } from "./files.ts";
 import type { PushDeps } from "./push.ts";
@@ -178,6 +179,15 @@ export function makePushDeps(): PushDeps | null {
     db: adminDb(),
     // Deno's fetch speaks HTTP/2 to Apple, which APNs requires.
     apns: createApnsSender({ keyPem, keyId, teamId, topic }, (url, init) => fetch(url, init)),
+    now: () => new Date(),
+    log: (message, detail) => console.error(message, detail ?? ""),
+  };
+}
+
+/** Everything calendar-feed needs: the database as the service role (the secret in the address is the only gate). */
+export function makeCalendarDeps(): CalendarDeps {
+  return {
+    db: adminDb(),
     now: () => new Date(),
     log: (message, detail) => console.error(message, detail ?? ""),
   };
