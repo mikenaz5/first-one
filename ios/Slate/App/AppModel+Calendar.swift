@@ -64,12 +64,42 @@ extension AppModel {
         updateCalendarPrefs { $0.addBookingsToCalendar = false }
     }
 
+    /// Adds the team events that are for this person to the calendar too. Needs full access, because keeping them in step
+    /// means finding them again to change or remove them.
+    func enableAddTeamEventsToCalendar() async -> Bool {
+        if !calendar.access.canRead {
+            _ = await calendar.requestFullAccess()
+        }
+        calendarAccess = calendar.access
+        guard calendarAccess.canRead else { return false }
+
+        let destination = calendar.defaultDestinationCalendarID()
+        updateCalendarPrefs { prefs in
+            prefs.addTeamEventsToCalendar = true
+            if prefs.destinationCalendarID == nil { prefs.destinationCalendarID = destination }
+        }
+        await syncTeamEvents()
+        return true
+    }
+
+    /// Stops adding them, and takes the ones this app added back out, so the calendar is as it was.
+    func disableAddTeamEventsToCalendar() {
+        for mark in calendarPrefs.teamEventMarks.values {
+            try? calendar.removeEvent(identifier: mark.eventID)
+        }
+        updateCalendarPrefs { prefs in
+            prefs.addTeamEventsToCalendar = false
+            prefs.teamEventMarks = [:]
+        }
+    }
+
     // MARK: - Syncing
 
     func syncCalendar() async {
         calendarAccess = calendar.access
         await syncBusyTime()
         await syncBookingEvents()
+        await syncTeamEvents()
     }
 
     /// Uploads merged busy intervals from the chosen calendars. Never titles, places or people.
@@ -114,6 +144,44 @@ extension AppModel {
                 removeCalendarEvent(for: booking)
             }
         }
+    }
+
+    /// Keeps the team events that are for this person in the calendar: adds new ones, brings changed ones up to date, and
+    /// removes those that were cancelled or are no longer theirs. Looks six months ahead.
+    func syncTeamEvents() async {
+        guard calendarPrefs.addTeamEventsToCalendar, calendar.access.canRead, let userID = session?.userID else { return }
+        let now = Date()
+        let horizon = now.addingTimeInterval(180 * 86_400)
+        guard let mine = try? await backend.loadMyTeamEvents(from: now.addingTimeInterval(-86_400), to: horizon, for: userID) else { return }
+
+        var marks = calendarPrefs.teamEventMarks
+        for event in mine {
+            let fingerprint = Self.fingerprint(of: event)
+            if let mark = marks[event.id] {
+                guard mark.fingerprint != fingerprint else { continue }
+                // If the person deleted it from their calendar themselves, it stays deleted; only the note is brought up to date.
+                _ = try? calendar.updateEvent(identifier: mark.eventID, for: event)
+                marks[event.id] = TeamEventMark(eventID: mark.eventID, fingerprint: fingerprint, startsAt: event.startsAt, endsAt: event.endsAt)
+            } else if event.endsAt > now,
+                      let eventID = try? calendar.addEvent(for: event, calendarID: calendarPrefs.destinationCalendarID) {
+                marks[event.id] = TeamEventMark(eventID: eventID, fingerprint: fingerprint, startsAt: event.startsAt, endsAt: event.endsAt)
+            }
+        }
+        let seen = Set(mine.map(\.id))
+        for (id, mark) in marks where !seen.contains(id) {
+            // One that is over is just forgotten. One inside the stretch we looked at that didn't come back was removed.
+            if mark.endsAt > now.addingTimeInterval(-86_400), mark.startsAt < horizon {
+                try? calendar.removeEvent(identifier: mark.eventID)
+            }
+            marks[id] = nil
+        }
+        updateCalendarPrefs { $0.teamEventMarks = marks }
+    }
+
+    /// What an event says, for telling when it has changed.
+    static func fingerprint(of event: TeamEvent) -> String {
+        [event.title, event.location, event.notes, event.organizationName, "\(event.startsAt.timeIntervalSince1970)",
+         "\(event.endsAt.timeIntervalSince1970)", event.allDay ? "day" : "timed"].joined(separator: "\u{1F}")
     }
 
     func removeCalendarEvent(for booking: Booking) {

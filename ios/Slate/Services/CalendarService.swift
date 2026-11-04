@@ -10,6 +10,16 @@ struct CalendarInfo: Identifiable, Hashable {
     let isNoisy: Bool
 }
 
+/// A team event that was put in this phone's calendar, so it can be changed or removed when the event is.
+struct TeamEventMark: Codable, Equatable {
+    /// EventKit's identifier for the calendar event.
+    var eventID: String
+    /// What the event said when it was last copied, to tell when it has changed.
+    var fingerprint: String
+    var startsAt: Date
+    var endsAt: Date
+}
+
 /// Per-device calendar settings. Calendar identifiers only mean something on the device that
 /// owns them, so these are stored locally and never sent to the server.
 struct CalendarPreferences: Codable, Equatable {
@@ -24,6 +34,26 @@ struct CalendarPreferences: Codable, Equatable {
     /// Booking id to the event it created, so nothing is added twice and cancellations can remove it.
     var eventIDs: [UUID: String] = [:]
     var lastBusySync: Date?
+    /// Add the team events that are for this person to the calendar too, and keep them up to date.
+    var addTeamEventsToCalendar = false
+    /// Team event id to what was copied, so changes and removals follow.
+    var teamEventMarks: [UUID: TeamEventMark] = [:]
+
+    init() {}
+
+    /// Settings saved by an older version don't have the newer keys; they keep what they had.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        blockBusyTimes = try container.decodeIfPresent(Bool.self, forKey: .blockBusyTimes) ?? false
+        busyCalendarIDs = try container.decodeIfPresent(Set<String>.self, forKey: .busyCalendarIDs) ?? []
+        includeAllDayEvents = try container.decodeIfPresent(Bool.self, forKey: .includeAllDayEvents) ?? false
+        addBookingsToCalendar = try container.decodeIfPresent(Bool.self, forKey: .addBookingsToCalendar) ?? false
+        destinationCalendarID = try container.decodeIfPresent(String.self, forKey: .destinationCalendarID)
+        eventIDs = try container.decodeIfPresent([UUID: String].self, forKey: .eventIDs) ?? [:]
+        lastBusySync = try container.decodeIfPresent(Date.self, forKey: .lastBusySync)
+        addTeamEventsToCalendar = try container.decodeIfPresent(Bool.self, forKey: .addTeamEventsToCalendar) ?? false
+        teamEventMarks = try container.decodeIfPresent([UUID: TeamEventMark].self, forKey: .teamEventMarks) ?? [:]
+    }
 
     private static let key = "slate.calendarPreferences"
 
@@ -165,6 +195,41 @@ final class CalendarService {
 
         try store.save(event, span: .thisEvent, commit: true)
         return event.eventIdentifier ?? ""
+    }
+
+    // MARK: Writing team events
+
+    /// Adds a team event to the calendar and returns the event's identifier. The link back into the app is what keeps
+    /// the busy-time reader from counting it again (the server already counts an event that blocks bookings).
+    func addEvent(for event: TeamEvent, calendarID: String?) throws -> String {
+        let created = EKEvent(eventStore: store)
+        let chosen = calendarID.flatMap { store.calendar(withIdentifier: $0) }
+        created.calendar = (chosen?.allowsContentModifications == true ? chosen : nil) ?? store.defaultCalendarForNewEvents
+        fill(created, from: event)
+        try store.save(created, span: .thisEvent, commit: true)
+        return created.eventIdentifier ?? ""
+    }
+
+    /// Brings an event already in the calendar up to date. False when it can't be found (the person removed it).
+    func updateEvent(identifier: String, for event: TeamEvent) throws -> Bool {
+        guard access.canRead, !identifier.isEmpty, let existing = store.event(withIdentifier: identifier) else { return false }
+        fill(existing, from: event)
+        try store.save(existing, span: .thisEvent, commit: true)
+        return true
+    }
+
+    private func fill(_ target: EKEvent, from event: TeamEvent) {
+        target.title = event.title
+        target.location = event.location.isEmpty ? nil : event.location
+        let about = [event.organizationName.isEmpty ? nil : "\(event.organizationName) team event", event.notes.isEmpty ? nil : event.notes]
+            .compactMap { $0 }.joined(separator: "\n\n")
+        target.notes = about.isEmpty ? nil : about
+        target.isAllDay = event.allDay
+        target.startDate = event.startsAt
+        // An all-day event runs to the end of its last day, so it ends a moment before the midnight it is stored with.
+        target.endDate = event.allDay ? event.endsAt.addingTimeInterval(-1) : event.endsAt
+        target.url = URL(string: "\(AppConfig.urlScheme)://event/\(event.id.uuidString.lowercased())")
+        target.alarms = event.allDay ? [] : [EKAlarm(relativeOffset: -900)]
     }
 
     /// Removes a previously added event. Needs full access to find it again; with write-only

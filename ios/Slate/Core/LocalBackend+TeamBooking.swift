@@ -59,7 +59,7 @@ extension LocalBackend {
     /// Can this person take a booking of this length starting then? Mirrors `public.member_slot_state`: their hours
     /// (the company's, narrowed by their own), their own calendar, and every booking already assigned to them.
     func memberSlotState(
-        _ userID: UUID, memberHours: [DayHours]?, settings: AvailabilitySettings,
+        _ userID: UUID, organizationID: UUID, memberHours: [DayHours]?, settings: AvailabilitySettings,
         start: Date, end: Date, blockedUntil: Date, ignoring: UUID? = nil
     ) -> SlotState {
         let parts = settings.calendar.dateComponents([.weekday, .hour, .minute], from: start)
@@ -82,6 +82,11 @@ extension LocalBackend {
         let buffer = TimeInterval(settings.bufferMinutes) * 60
         for block in readBusy(userID) {
             let reach = DateInterval(start: block.start, end: block.end.addingTimeInterval(buffer))
+            if IntervalMath.overlaps(reach, wanted) { return .unavailable }
+        }
+        // A team event that blocks bookings takes the time of the people it is for, with the usual buffer after it.
+        for event in readTeamEvents() where event.organizationID == organizationID && event.blocksBookings && event.isFor(userID) {
+            let reach = DateInterval(start: event.startsAt, end: event.endsAt.addingTimeInterval(buffer))
             if IntervalMath.overlaps(reach, wanted) { return .unavailable }
         }
         let now = self.now
@@ -118,6 +123,7 @@ extension LocalBackend {
         let now = self.now
         let bookings = readBookings().filter { $0.effectiveStatus(at: now).blocksTime }
         let buffer = TimeInterval(settings.bufferMinutes) * 60
+        let events = readTeamEvents().filter { $0.organizationID == org.id }
 
         var members: [MemberSchedule] = []
         let eligible = eligibleMembers(org, packageID: package.id).sorted {
@@ -129,6 +135,8 @@ extension LocalBackend {
                 busy += bookings.filter { $0.occupant == member.userID }.map(\.blockedRange)
             }
             busy += readBusy(member.userID).map { DateInterval(start: $0.start, end: $0.end.addingTimeInterval(buffer)) }
+            busy += events.filter { $0.blocksBookings && $0.isFor(member.userID) }
+                .map { DateInterval(start: $0.startsAt, end: $0.endsAt.addingTimeInterval(buffer)) }
             members.append(MemberSchedule(
                 userID: member.userID, displayName: personName(member.userID),
                 weekly: TeamAvailability.effectiveHours(company: settings.weekly, member: member.weekly),
@@ -209,7 +217,7 @@ extension LocalBackend {
             let state: SlotState
             if let settings {
                 state = memberSlotState(
-                    member.userID, memberHours: member.weekly, settings: settings,
+                    member.userID, organizationID: org.id, memberHours: member.weekly, settings: settings,
                     start: booking.startAt, end: booking.endAt, blockedUntil: booking.blockedUntil, ignoring: booking.id
                 )
             } else {
@@ -250,7 +258,7 @@ extension LocalBackend {
 
         if let settings = read(AvailabilitySettings.self, from: availabilityURL(org.id)) {
             let state = memberSlotState(
-                memberID, memberHours: candidate.weekly, settings: settings,
+                memberID, organizationID: org.id, memberHours: candidate.weekly, settings: settings,
                 start: booking.startAt, end: booking.endAt, blockedUntil: booking.blockedUntil, ignoring: booking.id
             )
             guard state == .ok else { throw SlateError.slotTaken }
@@ -293,6 +301,7 @@ extension LocalBackend {
         let now = self.now
         let bookings = readBookings().filter { $0.effectiveStatus(at: now).blocksTime && IntervalMath.overlaps($0.blockedRange, window) }
         let orgs = readOrganizations()
+        let orgEvents = readTeamEvents().filter { $0.organizationID == org.id }
 
         func entry(_ booking: Booking) -> CalendarBooking {
             let mayOpen = providerAccess(userID, booking, .view, in: orgs)
@@ -310,6 +319,8 @@ extension LocalBackend {
             var busy = readBusy(member.userID).filter { IntervalMath.overlaps($0, window) }.map { BusyRange(range: $0, kind: .external) }
             busy += bookings.filter { $0.assignedTo == member.userID && $0.creatorID != org.id }
                 .map { BusyRange(range: $0.blockedRange, kind: .personal) }
+            busy += orgEvents.filter { $0.blocksBookings && $0.isFor(member.userID) && IntervalMath.overlaps($0.interval, window) }
+                .map { BusyRange(range: $0.interval, kind: .event) }
             let weekly = member.bookable && settings != nil
                 ? TeamAvailability.effectiveHours(company: settings?.weekly ?? [], member: member.weekly)
                 : []

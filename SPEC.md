@@ -51,6 +51,8 @@ Decisions made with the product owner:
 | D24 | **A charge to a saved card goes through the same rules as any balance payment.** The database works out the amount, Stripe's signed webhook is the only thing that records money as received, and the client is told at once with the usual "payment received" notice. If the card is declined, or the bank wants the client to approve it, nothing is recorded as paid, the creator is told, and the client pays in the app as before. There is no automatic retry. | Section 8.14. A decline notice to the client is Q45. |
 | D25 | **Who may charge:** whoever can manage that booking: a person selling alone, for their own bookings; at a company, the Owner, Admin and Manager, and the Creator the booking is assigned to. A Viewer cannot. | The same access as marking a booking delivered or cancelling it (`provider_access(…, 'manage')`), so no new permission exists to keep in step across three places. |
 | D26 | **A client can message a creator before booking.** A **Message** button on every creator's page (and on a company's page) opens a conversation with them, called an inquiry: one per client and creator, with typed text only (no booking lines, because nothing has happened to a booking). At a person it goes to the person; at a company it goes to the Owner, Admins and Managers (Viewers can read it; a Creator-role member sees only the jobs assigned to them, and an inquiry has nobody assigned). It appears in both people's Messages lists as soon as the first message is sent, marked *Before booking*. Booking later starts a separate conversation for the booking; the question stays where it was. | Section 8.15. Unlimited free messaging between strangers invites spam, so there are limits (R27). |
+| D27 | **A company can put events on its team calendar that aren't bookings** (a meeting, an editing day, time off). Owners, Admins, Managers and Creators add them; the person who made one changes or removes it, and Owners, Admins and Managers change or remove anyone's; Viewers look. Everyone on the team sees every event. An event is for the whole team or for people named, and **by default it takes their time**: a client can't book them while it lasts, and the usual buffer after it applies. An event can be set to not block bookings, and then it is only a note. An event added over a booking that already exists leaves the booking alone. A lapsed plan makes events read only. | Section 8.16. Uses the same busy-time rule as a person's own calendar, so a person is still never in two places. |
+| D28 | **Calendar links, and the phone's calendar.** Each person gets one private web address that other calendar apps subscribe to (Apple Calendar, Google Calendar, Outlook, anything that reads a calendar link). It shows their bookings (as the person doing the job, or as the client) and the team events that are for them: names and times, never money, contracts, a booking's notes or contact details. It can be replaced at any time, which stops the old address at once. The app also adds those same bookings and team events to a calendar on the phone itself, including a Google or Outlook account added in the iPhone's Settings, which is instant and works offline. We do not log in to someone's Google account ourselves. | Section 8.16 and R28. Google Calendar refreshes a subscribed link only about once a day, so the screen says that plainly and points to the phone option for instant changes. |
 
 Assumptions, open to change (section 13):
 
@@ -171,6 +173,8 @@ Every row is a permission key. The same matrix is implemented in SQL (`org_role_
 | `reports.view` earnings and booking reports | ✓ | ✓ | ✓ | | ✓ |
 | `bookings.manage_assigned` act on bookings assigned to me | ✓ | ✓ | ✓ | ✓ | |
 | `calendar.manage_own` my availability and busy times | ✓ | ✓ | ✓ | ✓ | |
+| `events.add` add an event to the team calendar, and change or remove your own | ✓ | ✓ | ✓ | ✓ | |
+| `events.manage_all` change or remove anyone's event | ✓ | ✓ | ✓ | | |
 | `calendar.view_team` the team calendar | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `team.view` the member list | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -430,6 +434,8 @@ erDiagram
 | **CardPermission** | client id, **owner (creator id)**, card id, consent version, allowed at | At most one per client and creator. Ends when the client stops it, the card is removed, or either account is deleted. Creators do not read this table; they are told only whether the booking in front of them has one (brand only). |
 | **CardPermissionLog** | client id, creator id, action (allowed, stopped, card removed), card brand and last four at the time, consent version, at | Append only, kept for the client's own record and to show when an agreement was given if a charge is ever disputed. Removed with the account. |
 | **Conversation / Message** | booking id, participants; sender, kind (text, system), body, sent at, read by | System messages are generated for booking, signing, payment and change events. |
+| **TeamEvent** | company, title, notes, place, starts, ends, all day, for everyone or named people, blocks bookings, author | Read by the whole team; written only by `team_event_save` / `team_event_delete`. Counted as busy time by `member_slot_state`, `team_availability` and `team_calendar`. |
+| **CalendarFeed** | user id, secret, made at, replaced at | One per person. Never readable by the API; the `calendar-feed` Edge Function reads it as the service role. |
 | **Device / NotificationPreference** | user id, APNs token, environment; per-event toggles | |
 | **Delivery** (files) | booking id, owner (the provider party, whose allowance is used), kind (delivery or revision), sequence (0 for the delivery, 1, 2 and so on for revisions), title and note (for a revision), state (draft, delivered, expired), delivered by and at, expires at, expired at, file count, bytes | One delivery and any number of revisions per booking (A12). A revision can be created only when nothing is owed. Written by backend functions only, never directly. The link delivery already on a booking is separate and unchanged. |
 | **DeliveryFile** | delivery id, kind (photo or video), display name, content type, width and height, duration (video), original path and bytes, preview path and bytes, status (uploading, which covers a reserved file whose bytes are on their way; ready; removed; expired), created by, reserved at, saved by the client at (first save), removed at and by | Rows outlive the bytes: after expiry or removal they keep name, kind, size and whether the file was saved. The paths are cleared. |
@@ -663,6 +669,25 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 7. There is no way yet to **report or block** someone from a conversation. That is needed before wide release (R27).
 
 
+### 8.16 Team events and calendar links
+
+*Events*
+
+1. **Team calendar ▸ ⋯ ▸ Add an event** (or **Add** in the Events card) opens a form: a name, **All day** or a start and an end, **Who it's for** (the whole team, or chosen people, Viewers included), whether it **keeps clients from booking them**, a place and notes. Times are the company's time zone, wherever the phone is.
+2. The day showing lists its events above the people. Tap one to change or remove it; if the role may not change it, it opens to read.
+3. An event of up to 31 days can be made (for leave or a trip); a company can have up to 500 that haven't ended; an event names up to 50 people. Titles are cut to 80 characters, places to 120 and notes to 500.
+4. While an event that blocks bookings lasts, the people it is for are busy: the booking page doesn't offer them, they are skipped when a booking is given to someone, a client can't book one of them by name, and a Manager can't assign a booking to one. The team calendar draws it as busy time. The usual buffer after busy time applies.
+5. Removing a member takes them out of the events that named them. Moving or removing an event frees its time at once.
+6. Adding, changing and removing are in the company's activity log ("Added the event …").
+
+*Connecting calendars (Profile ▸ Settings ▸ Connect your calendar, also on a client's Profile)*
+
+7. **Your calendar link** has one-tap **Add to Apple Calendar** and **Add to Google Calendar**, **Copy link** (for Outlook and others) and **Make a new link…**. It needs an online account; on a phone-only account the screen says so.
+8. **On this iPhone** is the existing "Apple Calendar" section: block times I'm busy, add bookings to my calendar, and now **add team events to my calendar** (needs full calendar access, so a change or a cancellation can follow; turning it off takes the events the app added back out). The **Add to** calendar can be any calendar on the phone, so a Google account added in the iPhone's Settings works here.
+9. **Calendar accounts on this iPhone** lists the accounts the phone has (iCloud, Google, Outlook …) and tells the person how to add one.
+10. What the app writes into the phone's calendar carries a `slate://` link, so the busy-time reader never counts it twice.
+
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -791,6 +816,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R25 | **Card networks have rules for saving a card and charging it later when the client is not there,** and some banks will insist the client approves a charge. Wording that is too vague can lose a dispute. | The agreement wording is plain, versioned and kept with the permission. Charges that need approval fail safely and fall back to the client paying in the app. **The wording and terms need a lawyer's review before launch.** |
 | R26 | **The card at Stripe and the row here can disagree** after a dropped connection: a card removed at one and not the other. | Removal deletes at Stripe first, then here. A refresh compares the two lists and fixes the difference. A charge to a card that no longer exists fails before any money moves. |
 | R27 | **Messages between strangers invite spam, harassment and scams,** and App Review guideline 1.2 expects an app with user-generated content to offer a way to report and block. | The limits in 8.15 slow a flood but do not stop a determined person. Before opening to the public: add *Report* and *Block* to every conversation, a way for the creator to turn off messages from people they have not worked with, and a place to review reports. Until then, keep testing to people you know. |
+| R28 | **A calendar link is a secret anyone holding it can read,** and it may end up in a chat or on a shared computer. It shows names and times of bookings and team events. | The address holds 128 random bits, reading is the only thing it can do, it is shown only to its owner, and **Make a new link** replaces it at once. It leaves out money, contracts, notes and contact details. A person who leaves a company stops seeing that company's events in the link straight away. |
 
 ## 13. Open questions
 

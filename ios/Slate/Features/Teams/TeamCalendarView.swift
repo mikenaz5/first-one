@@ -19,6 +19,22 @@ struct TeamCalendarView: View {
     @State private var filter: Set<UUID> = []
     @State private var phase: Phase = .loading
     @State private var assignTarget: Booking?
+    @State private var events: [TeamEvent] = []
+    @State private var eventTarget: EventTarget?
+    @State private var showConnect = false
+
+    /// What the event sheet is for: a new event on the day showing, or one that exists.
+    private enum EventTarget: Identifiable {
+        case new
+        case existing(TeamEvent)
+
+        var id: String {
+            switch self {
+            case .new: "new"
+            case .existing(let event): event.id.uuidString
+            }
+        }
+    }
 
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -56,6 +72,31 @@ struct TeamCalendarView: View {
         .refreshable { await load() }
         .task(id: weekStart) { await load() }
         .sheet(item: $assignTarget) { booking in AssignSheet(booking: booking) }
+        .sheet(item: $eventTarget) { target in
+            switch target {
+            case .new:
+                EventEditorSheet(editing: nil, day: day, timeZone: data.timeZone) { Task { await load() } }
+            case .existing(let event) where event.canEdit && model.canAddEvents:
+                EventEditorSheet(editing: event, day: day, timeZone: data.timeZone) { Task { await load() } }
+            case .existing(let event):
+                EventDetailSheet(event: event, timeZone: data.timeZone)
+            }
+        }
+        .navigationDestination(isPresented: $showConnect) { CalendarConnectView() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if model.canAddEvents {
+                        Button("Add an event", systemImage: "plus") { eventTarget = .new }
+                    }
+                    Button("Connect your calendar", systemImage: "link") { showConnect = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .frame(width: Metrics.minTapTarget, height: Metrics.minTapTarget)
+                }
+                .accessibilityLabel("More")
+            }
+        }
         .onChange(of: model.assignmentQueue.count) { _, _ in Task { await load() } }
         .motionSafe(.slateSmooth, value: filter)
     }
@@ -142,6 +183,11 @@ struct TeamCalendarView: View {
         let shown = dayRows
         let axis = MemberDayLayout.axis(for: shown.map(\.layout), timeZone: data.timeZone)
 
+        let dayEvents = events(on: day)
+        if !dayEvents.isEmpty || model.canAddEvents {
+            eventsCard(dayEvents)
+        }
+
         let waiting = data.unassigned.filter { sameDay($0.startAt) }
         if !waiting.isEmpty {
             waitingCard(waiting)
@@ -174,6 +220,70 @@ struct TeamCalendarView: View {
         data.filtered(to: filter).members
             .map { DayRow(member: $0, layout: MemberDayLayout.make(member: $0, on: day, timeZone: data.timeZone)) }
             .filter { $0.member.bookable || !$0.layout.bookings.isEmpty }
+    }
+
+    /// What is on the team calendar that day besides bookings: meetings, editing days, time off.
+    private func eventsCard(_ dayEvents: [TeamEvent]) -> some View {
+        let names = Dictionary(model.teamMembers.map { ($0.userID, $0.displayName) }, uniquingKeysWith: { first, _ in first })
+        return VStack(alignment: .leading, spacing: Space.s) {
+            HStack {
+                Label("Events", systemImage: "calendar.badge.clock").font(.headline)
+                Spacer(minLength: Space.s)
+                if model.canAddEvents {
+                    Button {
+                        eventTarget = .new
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minHeight: Metrics.minTapTarget)
+                    }
+                    .accessibilityLabel("Add an event")
+                }
+            }
+            if dayEvents.isEmpty {
+                Text("Nothing on the calendar this day except bookings.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(dayEvents) { event in
+                Button {
+                    eventTarget = .existing(event)
+                } label: {
+                    HStack(alignment: .top, spacing: Space.m) {
+                        RoundedRectangle(cornerRadius: Radius.s / 3, style: .continuous)
+                            .fill(Color.accentColor)
+                            .frame(width: Space.xs)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            Text(event.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                            Text(EventText.short(event, formatter: formatter)).font(.footnote).foregroundStyle(.secondary)
+                            Text(event.audience(names: names)).font(.footnote).foregroundStyle(.secondary)
+                            if !event.blocksBookings {
+                                Text("Clients can still book").font(.caption).foregroundStyle(Color.slateAccentText)
+                            }
+                        }
+                        Spacer(minLength: Space.s)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(minHeight: Metrics.minTapTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .card()
+    }
+
+    /// The events that touch the day showing.
+    private func events(on day: Date) -> [TeamEvent] {
+        let start = calendar.startOfDay(for: day)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        let range = DateInterval(start: start, end: end)
+        return events.filter { IntervalMath.overlaps($0.interval, range) }
     }
 
     private func waitingCard(_ waiting: [CalendarBooking]) -> some View {
@@ -231,7 +341,9 @@ struct TeamCalendarView: View {
         let start = weekStart
         guard let end = calendar.date(byAdding: .day, value: 7, to: start) else { return }
         do {
+            async let loadedEvents = model.loadTeamEvents(from: start, to: end)
             data = try await model.loadTeamCalendar(from: start, to: end)
+            events = (try? await loadedEvents) ?? []
             // People who have left the team drop out of the filter.
             filter = filter.intersection(Set(data.members.map(\.userID)))
             phase = .ready

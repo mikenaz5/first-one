@@ -74,6 +74,10 @@ enum OrgPermission: String, CaseIterable, Codable, Hashable {
     case reportsView = "reports.view"
     case bookingsManageAssigned = "bookings.manage_assigned"
     case calendarManageOwn = "calendar.manage_own"
+    /// Add an event to the team calendar, and change or remove your own.
+    case eventsAdd = "events.add"
+    /// Change or remove anyone's event.
+    case eventsManageAll = "events.manage_all"
     case calendarViewTeam = "calendar.view_team"
     case teamView = "team.view"
 
@@ -83,11 +87,11 @@ enum OrgPermission: String, CaseIterable, Codable, Hashable {
             [.owner]
         case .companyEdit, .teamInvite, .teamManage, .servicesManage, .templatesManage, .signerDesignate, .activityView:
             [.owner, .admin]
-        case .bookingsAssign, .bookingsManage:
+        case .bookingsAssign, .bookingsManage, .eventsManageAll:
             [.owner, .admin, .manager]
         case .bookingsViewAll, .reportsView:
             [.owner, .admin, .manager, .viewer]
-        case .bookingsManageAssigned, .calendarManageOwn:
+        case .bookingsManageAssigned, .calendarManageOwn, .eventsAdd:
             [.owner, .admin, .manager, .creator]
         case .calendarViewTeam, .teamView:
             [.owner, .admin, .manager, .creator, .viewer]
@@ -638,6 +642,8 @@ struct BusyRange: Equatable, Hashable {
         case external
         /// A booking they have as an individual.
         case personal
+        /// A team event that blocks bookings and is for them.
+        case event
     }
 
     var range: DateInterval

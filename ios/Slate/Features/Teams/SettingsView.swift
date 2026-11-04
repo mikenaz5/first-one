@@ -45,6 +45,12 @@ struct SettingsView: View {
                         .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+                NavigationLink {
+                    CalendarConnectView()
+                } label: {
+                    Label("Connect your calendar", systemImage: "link")
+                        .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                }
             }
                 .listRowBackground(Color.slateCard)
 

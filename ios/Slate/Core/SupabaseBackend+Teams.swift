@@ -696,6 +696,11 @@ extension SupabaseBackend {
             ("handle_taken", .handleTaken),
             ("invalid_input", .invalidInput),
             ("billing_not_configured", .billingUnavailable),
+            ("invalid_event", .invalidEvent),
+            ("event_text_too_long", .eventTextTooLong),
+            ("event_too_long", .eventTooLong),
+            ("too_many_events", .tooManyEvents),
+            ("invalid_attendee", .invalidAttendee),
         ]
         // The longest token first: `signer_role_not_allowed` contains `not_allowed`.
         for entry in known.sorted(by: { $0.token.count > $1.token.count }) where text.contains(entry.token) { return entry.error }

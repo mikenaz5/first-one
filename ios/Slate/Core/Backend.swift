@@ -263,6 +263,22 @@ protocol SlateBackend {
     /// The people who offer a package. Empty means everyone who can take bookings.
     func loadPackageMembers(packageID: UUID) async throws -> [UUID]
     func setPackageMembers(_ memberIDs: [UUID], packageID: UUID, by userID: UUID) async throws
+
+    // Team events and calendar links
+    /// The events on a company's team calendar in a window (at most 62 days), in time order.
+    func loadTeamEvents(organizationID: UUID, from: Date, to: Date, for userID: UUID) async throws -> [TeamEvent]
+    /// The events of every company the person is in that are for them (the whole team's, and those naming them), for
+    /// putting in the phone's own calendar. At most 400 days.
+    func loadMyTeamEvents(from: Date, to: Date, for userID: UUID) async throws -> [TeamEvent]
+    /// Adds an event, or changes the one in `draft.id`. Throws `notFound` (not in the company), `notAllowed`, `invalidEvent`,
+    /// `eventTextTooLong`, `eventTooLong`, `invalidAttendee` and `tooManyEvents`.
+    func saveTeamEvent(_ draft: TeamEventDraft, organizationID: UUID, by userID: UUID) async throws -> TeamEvent
+    func deleteTeamEvent(_ eventID: UUID, by userID: UUID) async throws
+    /// The private address other calendar apps read to show the person's bookings and team events, made the first time.
+    /// Nil when there is no server to serve one (on-device mode).
+    func calendarLink(for userID: UUID) async throws -> CalendarLink?
+    /// A new secret, so the old address stops working at once. Nil with no server.
+    func resetCalendarLink(for userID: UUID) async throws -> CalendarLink?
 }
 
 enum BackendFactory {

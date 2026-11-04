@@ -423,6 +423,12 @@ struct ClientProfileView: View {
                             .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                    NavigationLink {
+                        CalendarConnectView()
+                    } label: {
+                        Label("Connect your calendar", systemImage: "link")
+                            .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                    }
                 } header: {
                     Text("Preferences")
                 }

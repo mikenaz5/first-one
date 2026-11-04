@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// The "Apple Calendar" part of the availability form. Two independent features:
-/// reading busy time (so clients can't book over your other commitments) and writing bookings.
+/// The "Apple Calendar" part of the availability form, and "On this iPhone" in Connect your calendar. Independent
+/// features: reading busy time (so clients can't book over your other commitments), writing bookings, and, for people
+/// in a company, writing the team events that are for them.
 struct CalendarSyncSection: View {
     @Environment(AppModel.self) private var model
     @Binding var note: String?
+    var title = "Apple Calendar"
 
     private var prefs: CalendarPreferences { model.calendarPrefs }
     private var access: CalendarService.Access { model.calendarAccess }
@@ -43,7 +45,12 @@ struct CalendarSyncSection: View {
             Toggle("Add bookings to my calendar", isOn: addBookings)
                 .frame(minHeight: Metrics.minTapTarget)
 
-            if prefs.addBookingsToCalendar, access.canRead {
+            if !model.accounts.companies.isEmpty {
+                Toggle("Add team events to my calendar", isOn: addTeamEvents)
+                    .frame(minHeight: Metrics.minTapTarget)
+            }
+
+            if (prefs.addBookingsToCalendar || prefs.addTeamEventsToCalendar), access.canRead {
                 Picker("Add to", selection: destination) {
                     ForEach(model.calendar.calendars().filter(\.allowsModifications)) { calendar in
                         Text(calendar.title).tag(String?.some(calendar.id))
@@ -61,11 +68,14 @@ struct CalendarSyncSection: View {
                 .frame(minHeight: Metrics.minTapTarget)
             }
         } header: {
-            Text("Apple Calendar")
+            Text(title)
         } footer: {
             VStack(alignment: .leading, spacing: Space.xs) {
                 if let note { Text(note).foregroundStyle(Color.slateWarning) }
                 Text("Only start and end times of your busy events are shared, never their titles, places or guests. Busy time is as fresh as the last time Slate Pro synced, which happens when you open the app.")
+                if !model.accounts.companies.isEmpty {
+                    Text("Team events need full calendar access, so that a change or a cancellation can follow. Turning them off takes the ones Slate Pro added back out.")
+                }
             }
         }
             .listRowBackground(Color.slateCard)
@@ -84,6 +94,23 @@ struct CalendarSyncSection: View {
                     } else {
                         note = nil
                         await model.disableBlockBusyTimes()
+                    }
+                }
+            }
+        )
+    }
+
+    private var addTeamEvents: Binding<Bool> {
+        Binding(
+            get: { prefs.addTeamEventsToCalendar },
+            set: { on in
+                Task {
+                    if on {
+                        let ok = await model.enableAddTeamEventsToCalendar()
+                        note = ok ? nil : "Full calendar access wasn't granted, so team events can't be added."
+                    } else {
+                        note = nil
+                        model.disableAddTeamEventsToCalendar()
                     }
                 }
             }

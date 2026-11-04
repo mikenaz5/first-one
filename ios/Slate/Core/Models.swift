@@ -284,6 +284,12 @@ enum SlateError: LocalizedError, Equatable {
     case cannotMessageYourself
     case tooManyInquiries
     case awaitingReply
+    case invalidEvent
+    case eventTextTooLong
+    case eventTooLong
+    case tooManyEvents
+    case invalidAttendee
+    case calendarLinkUnavailable
     case notFound
     case notAllowed
     case invalidInput
@@ -418,6 +424,18 @@ enum SlateError: LocalizedError, Equatable {
             "You've started a lot of new conversations today. Try again tomorrow, or write to someone you've already messaged."
         case .awaitingReply:
             "You've sent a few messages already. Wait for a reply before sending more."
+        case .invalidEvent:
+            "Give the event a name, an end that comes after its start, and at least one person if it isn't for everyone."
+        case .eventTextTooLong:
+            "The name can be up to \(EventRules.titleMaxLength) characters, the place up to \(EventRules.locationMaxLength) and the notes up to \(EventRules.notesMaxLength)."
+        case .eventTooLong:
+            "An event can run for up to \(EventRules.maxDays) days."
+        case .tooManyEvents:
+            "The team calendar is full of events that haven't happened yet. Remove some that are no longer needed."
+        case .invalidAttendee:
+            "Everyone named has to be on the team."
+        case .calendarLinkUnavailable:
+            "Calendar links need an online account. On this phone, use the options under On this iPhone."
         case .notFound:
             "That couldn't be found."
         case .notAllowed:

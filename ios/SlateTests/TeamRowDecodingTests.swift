@@ -376,7 +376,7 @@ final class TeamRowDecodingTests: XCTestCase {
         }
         var tokens = Set<String>()
         let pattern = try NSRegularExpression(pattern: "raise exception '([a-z_]+)'")
-        for file in files where ["organizations", "company_booking", "seat_billing"].contains(where: { file.lastPathComponent.contains($0) }) {
+        for file in files where ["organizations", "company_booking", "seat_billing", "team_events"].contains(where: { file.lastPathComponent.contains($0) }) {
             let text = try String(contentsOf: file, encoding: .utf8)
             for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
                 if let range = Range(match.range(at: 1), in: text) { tokens.insert(String(text[range])) }
