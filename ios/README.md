@@ -75,6 +75,8 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
 
 ### Using a real Supabase project
 
+**The short way:** make the project in the Supabase dashboard, then from `ios/` run `bash scripts/setup-server.sh`. It asks for the project URL and the *publishable* key (never the secret key; it refuses one), logs in to Supabase, links the folder, puts the database and the first functions (`delete-account`, `calendar-feed`) online, and offers to point the app at the project. Pointing the app at a server removes the on-device demo account (delete `Config/Secrets.xcconfig` to get it back), and creators then sign in with Sign in with Apple, which needs the steps below. The payments, push and billing functions are turned on in their own sections further down. The long way, step by step:
+
 1. Create a project. Install the [Supabase CLI](https://supabase.com/docs/guides/cli), then from `ios/`:
    ```sh
    supabase init            # creates supabase/config.toml; keep the existing migrations folder
