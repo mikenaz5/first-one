@@ -82,6 +82,17 @@
    "manager",
    "creator"
   ],
+  "events.add": [
+   "owner",
+   "admin",
+   "manager",
+   "creator"
+  ],
+  "events.manage_all": [
+   "owner",
+   "admin",
+   "manager"
+  ],
   "calendar.view_team": [
    "owner",
    "admin",

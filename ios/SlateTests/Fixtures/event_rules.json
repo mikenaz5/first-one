@@ -1,0 +1,75 @@
+{
+  "comment": "Numbers and text rules the database and the app must agree on for team events. Checked by supabase/tests/event_rules.py and by the Swift tests.",
+  "titleMaxLength": 80,
+  "notesMaxLength": 500,
+  "locationMaxLength": 120,
+  "maxDays": 31,
+  "maxUpcoming": 500,
+  "maxPeople": 50,
+  "cleanLine": [
+    {
+      "input": "Team meeting",
+      "expected": "Team meeting"
+    },
+    {
+      "input": "  Team   meeting  ",
+      "expected": "Team meeting"
+    },
+    {
+      "input": "Edit day\nat home",
+      "expected": "Edit day at home"
+    },
+    {
+      "input": "Edit day\r\nat home",
+      "expected": "Edit day at home"
+    },
+    {
+      "input": "tab\there",
+      "expected": "tab here"
+    },
+    {
+      "input": "a \t \n b",
+      "expected": "a b"
+    },
+    {
+      "input": "bell\u0007 ring",
+      "expected": "bell ring"
+    },
+    {
+      "input": "null\u0001ish",
+      "expected": "nullish"
+    },
+    {
+      "input": "delete",
+      "expected": "delete"
+    },
+    {
+      "input": "carriage\rreturn",
+      "expected": "carriage return"
+    },
+    {
+      "input": "emoji 📸 ok",
+      "expected": "emoji 📸 ok"
+    },
+    {
+      "input": "ünïcödé — dashes “quotes”",
+      "expected": "ünïcödé — dashes “quotes”"
+    },
+    {
+      "input": " nbsp ",
+      "expected": " nbsp "
+    },
+    {
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "input": "\n\t\n",
+      "expected": ""
+    },
+    {
+      "input": "\u0001\u0007",
+      "expected": ""
+    }
+  ]
+}

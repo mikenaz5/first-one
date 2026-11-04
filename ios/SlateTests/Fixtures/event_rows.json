@@ -1,0 +1,102 @@
+{
+  "event": {
+    "all_day": false,
+    "blocks_bookings": true,
+    "can_edit": true,
+    "created_by": "c460b2d4-1a0a-4e99-9aa2-47cdc1703a57",
+    "created_by_name": "Dee Okafor",
+    "ends_at": "2027-01-05T16:00:00+00:00",
+    "everyone": false,
+    "id": "de94d740-056d-4234-93f8-e138d9bab444",
+    "location": "l",
+    "member_ids": [
+      "bf6ffecf-478f-4d9c-be5f-e2a4f9c98219"
+    ],
+    "notes": "n",
+    "organization_id": "a076b707-a1a7-4cff-af5f-2979117826fd",
+    "starts_at": "2027-01-05T15:00:00+00:00",
+    "title": "Shape check"
+  },
+  "events": [
+    {
+      "all_day": false,
+      "blocks_bookings": true,
+      "can_edit": true,
+      "created_by": "c460b2d4-1a0a-4e99-9aa2-47cdc1703a57",
+      "created_by_name": "Dee Okafor",
+      "ends_at": "2027-01-05T16:00:00+00:00",
+      "everyone": false,
+      "id": "de94d740-056d-4234-93f8-e138d9bab444",
+      "location": "l",
+      "member_ids": [
+        "bf6ffecf-478f-4d9c-be5f-e2a4f9c98219"
+      ],
+      "notes": "n",
+      "organization_id": "a076b707-a1a7-4cff-af5f-2979117826fd",
+      "starts_at": "2027-01-05T15:00:00+00:00",
+      "title": "Shape check"
+    }
+  ],
+  "feed": {
+    "bookings": [
+      {
+        "client_name": "Test Client",
+        "creator_name": "Acme Films",
+        "end_at": "2026-12-16T17:00:00+00:00",
+        "id": "b1d833a5-7ed5-4119-8055-bdbe92502e12",
+        "package_name": "Wedding film",
+        "role": "provider",
+        "start_at": "2026-12-16T16:00:00+00:00",
+        "status": "confirmed",
+        "time_zone": "America/Chicago"
+      }
+    ],
+    "events": [
+      {
+        "all_day": false,
+        "ends_at": "2026-12-17T19:00:00+00:00",
+        "id": "1dbfbc6f-fc8c-4745-8f18-fb188028d881",
+        "location": "The deli",
+        "notes": "Bring an appetite",
+        "organization_name": "Acme Films",
+        "starts_at": "2026-12-17T18:00:00+00:00",
+        "time_zone": "America/Chicago",
+        "title": "Team lunch",
+        "updated_at": "2026-11-04T19:05:07.014783+00:00"
+      },
+      {
+        "all_day": false,
+        "ends_at": "2026-12-18T16:00:00+00:00",
+        "id": "c852a8ba-2159-4f7f-b08d-a5365d59bd55",
+        "location": "",
+        "notes": "",
+        "organization_name": "Acme Films",
+        "starts_at": "2026-12-18T15:00:00+00:00",
+        "time_zone": "America/Chicago",
+        "title": "Only the assignee",
+        "updated_at": "2026-11-04T19:05:07.033252+00:00"
+      }
+    ]
+  },
+  "mine": [
+    {
+      "all_day": false,
+      "blocks_bookings": true,
+      "can_edit": false,
+      "created_by": "c460b2d4-1a0a-4e99-9aa2-47cdc1703a57",
+      "created_by_name": "Dee Okafor",
+      "ends_at": "2027-01-05T16:00:00+00:00",
+      "everyone": false,
+      "id": "de94d740-056d-4234-93f8-e138d9bab444",
+      "location": "l",
+      "member_ids": [
+        "bf6ffecf-478f-4d9c-be5f-e2a4f9c98219"
+      ],
+      "notes": "n",
+      "organization_id": "a076b707-a1a7-4cff-af5f-2979117826fd",
+      "organization_name": "Acme Films",
+      "starts_at": "2027-01-05T15:00:00+00:00",
+      "title": "Shape check"
+    }
+  ]
+}
