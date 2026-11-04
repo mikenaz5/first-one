@@ -64,8 +64,15 @@ if [[ "$key" == eyJ* ]]; then
 fi
 
 # 2. Log in, link this folder to the project and put the database online.
-if ! supabase projects list >/dev/null 2>&1; then
-  say "Logging in to Supabase (a browser window opens; approve it there)"
+projects=$(supabase projects list 2>/dev/null || true)
+if [[ -n "$projects" ]] && ! grep -q "$ref" <<<"$projects"; then
+  # Logged in, but to another Supabase account than the one that owns this project (for example after making a new one).
+  say "This Mac is logged in to a different Supabase account than the one that owns that project. Logging in again."
+  supabase logout --yes >/dev/null 2>&1 || true
+  projects=""
+fi
+if [[ -z "$projects" ]]; then
+  say "Logging in to Supabase (a browser window opens; approve it there, using the account that owns the project)"
   supabase login
 fi
 
