@@ -245,6 +245,7 @@ if [[ -n "$shot" ]]; then
 fi
 
 say "Slate Pro is running. A short animation plays first (touch the screen to skip it). On the welcome screen, tap \"Continue with a demo account\"."
+echo "To try getting paid: Profile, then Settings, then the Get paid card at the top. (With the demo account Stripe is pretend and already linked; add a payment link there.) Then sign out, choose \"Continue with a demo client\", book that creator, and you should see \"Pay through ...\" beside the pay button. Sign back in as the creator, open the booking and tap \"Mark deposit received\"." >&2
 if [[ $duo -eq 1 ]]; then
   say "This is the iPhone Duo simulator. If its window offers a fold or unfold control, try the app both ways, and look at the tab bar and the buttons at the top, which Duo moves to the side."
 fi

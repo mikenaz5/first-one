@@ -60,7 +60,9 @@ final class DirectChargeTests: XCTestCase {
 
     private func booking(_ id: UUID) async throws -> Booking {
         let session = try XCTUnwrap(model.session)
-        return try XCTUnwrap(try await backend.loadBookings(for: session.userID).first { $0.id == id })
+        // No await inside an assertion's argument: the compiler can't run it there.
+        let all = try await backend.loadBookings(for: session.userID)
+        return try XCTUnwrap(all.first { $0.id == id })
     }
 
     private func payments(for id: UUID) async throws -> [Payment] {
