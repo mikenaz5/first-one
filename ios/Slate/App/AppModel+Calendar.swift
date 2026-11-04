@@ -179,7 +179,7 @@ extension AppModel {
     }
 
     /// What an event says, for telling when it has changed.
-    static func fingerprint(of event: TeamEvent) -> String {
+    nonisolated static func fingerprint(of event: TeamEvent) -> String {
         [event.title, event.location, event.notes, event.organizationName, "\(event.startsAt.timeIntervalSince1970)",
          "\(event.endsAt.timeIntervalSince1970)", event.allDay ? "day" : "timed"].joined(separator: "\u{1F}")
     }
