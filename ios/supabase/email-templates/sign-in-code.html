@@ -1,0 +1,13 @@
+<!--
+  The email Slate Pro sends with a six-digit sign-in code. Paste the body below (everything under this comment) into BOTH
+  templates in the Supabase dashboard, because a new address uses one and a returning address uses the other:
+    Authentication > Emails > Confirm sign up
+    Authentication > Emails > Magic link
+  Give both the subject:  Your Slate Pro sign-in code
+  Supabase's default templates send a link and no code, and the app asks for the code, so without this nobody can sign in.
+  {{ .Token }} is the six digits; leave it exactly as it is.
+-->
+<h2>Your Slate Pro sign-in code</h2>
+<p>Type this code into the app to sign in:</p>
+<p style="font-size: 32px; font-weight: 600; letter-spacing: 6px; margin: 16px 0;">{{ .Token }}</p>
+<p>It works for 10 minutes. If you didn't ask for it, you can ignore this email.</p>
