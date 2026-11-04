@@ -504,7 +504,7 @@ check("a booking with a deposit is held, with an open contract", isinstance(pb, 
 pbid = pb["booking"]["id"]
 check("the countersigner is fixed at that moment", pb["contract"]["countersigner_id"] == dee)
 prep = svc("payment_prepare", client_a, pbid, "deposit", 0)
-check("the payment goes to the company's account", isinstance(prep, dict) and prep["destination"] == "acct_acme", prep)
+check("the payment goes to the company's account", isinstance(prep, dict) and prep["account"] == "acct_acme", prep)
 # The signer leaves the company before the deposit arrives.
 rpc(olivia, "member_remove", ORG, dee)
 check("removing the signer stops auto-countersign", one("select signer_user_id is null from organizations where id = %s", (ORG,)))
@@ -537,7 +537,7 @@ check("it is logged", one("select count(*) from activity_log where organization_
 check("a Manager can replace the link", isinstance(jb(mia, "share_delivery", dbid, "https://files.example.com/y", None), dict))
 check("the client confirms; with a balance to pay the booking isn't complete yet", jb(client_a, "confirm_receipt", dbid)["status"] == "confirmed")
 prepb = svc("payment_prepare", client_a, dbid, "balance", 0)
-check("the balance goes to the company's account too", isinstance(prepb, dict) and prepb["destination"] == "acct_acme", prepb)
+check("the balance goes to the company's account too", isinstance(prepb, dict) and prepb["account"] == "acct_acme", prepb)
 intent2 = "pi_" + uuid.uuid4().hex[:18]
 svc("payment_attach_intent", prepb["payment_id"], intent2)
 check("paying it completes the booking", svc("payment_record_success", intent2, prepb["amount_cents"], "ch_y", "apple_pay")["action"] == "completed")

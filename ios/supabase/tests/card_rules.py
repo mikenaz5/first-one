@@ -363,7 +363,7 @@ prep = svc("payment_prepare_saved", carol, b_carol, 0)
 check("the creator can start a charge", isinstance(prep, dict), prep)
 check("it is the balance, worked out by the database: total less deposit", prep["amount_cents"] == 90000 and prep["kind"] == "balance", prep)
 check("it carries the card and customer to charge, and where the money goes",
-      prep["customer"] == "cus_alice" and prep["payment_method"] == "pm_alice_visa" and prep["destination"] == "acct_" + carol[:8], prep)
+      prep["customer"] == "cus_alice" and prep["payment_method"] == "pm_alice_visa" and prep["account"] == "acct_" + carol[:8], prep)
 check("it is marked a card payment from the start", one("select method from payments where id = %s", (prep["payment_id"],)) == "card")
 check("it is a pending balance on that booking", one("select status::text || kind::text from payments where id = %s", (prep["payment_id"],)) == "pendingbalance")
 check("asking again reuses the same payment", svc("payment_prepare_saved", carol, b_carol, 0)["payment_id"] == prep["payment_id"])
@@ -381,7 +381,7 @@ for who, name, ok in [(olivia, "the Owner", True), (dee, "an Admin", True), (mia
                       (kim, "a Creator it isn't assigned to", False), (vee, "a Viewer", False)]:
     got = svc("payment_prepare_saved", who, b_acme, 0)
     check(f"at a company, {name} {'can' if ok else 'can not'}", isinstance(got, dict) if ok else err(got, "not_found"), got)
-check("the company's own account receives the money", svc("payment_prepare_saved", olivia, b_acme, 0)["destination"] == "acct_" + ORG[:8])
+check("the company's own account receives the money", svc("payment_prepare_saved", olivia, b_acme, 0)["account"] == "acct_" + ORG[:8])
 
 print("\n[when it is not yet time, or already done]")
 b_early = raw_booking(carol, alice, received=False)

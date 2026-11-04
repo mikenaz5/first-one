@@ -657,7 +657,7 @@ check("the held time shows as busy to other clients", len(sql_as(bob, "select * 
 
 prep = svc_call("payment_prepare", alice, held["id"], "deposit", 0)
 check("preparing a deposit gives the amount from the booking, the creator's account and no fee",
-      isinstance(prep, dict) and prep["amount_cents"] == 50000 and prep["currency"] == "usd" and prep["destination"] == "acct_payee"
+      isinstance(prep, dict) and prep["amount_cents"] == 50000 and prep["currency"] == "usd" and prep["account"] == "acct_payee"
       and prep["fee_cents"] == 0 and prep["existing_intent"] is None and prep["kind"] == "deposit", prep)
 again = svc_call("payment_prepare", alice, held["id"], "deposit", 0)
 check("preparing again reuses the same pending payment", again["payment_id"] == prep["payment_id"] and len(payments_of(held["id"])) == 1, again)
