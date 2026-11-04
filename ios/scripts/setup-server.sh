@@ -20,9 +20,23 @@ if ! command -v supabase >/dev/null 2>&1; then
     say "Installing Supabase's command-line tool with Homebrew"
     brew install supabase/tap/supabase
   else
-    die "This needs Supabase's command-line tool. Install Homebrew first (the one line on https://brew.sh), then run this again; it installs the tool for you."
+    # No Homebrew? Download the tool itself (one small program) into this folder, the way run-simulator.sh gets XcodeGen.
+    case "$(uname -m)" in
+      arm64|aarch64) chip=arm64 ;;
+      *) chip=amd64 ;;
+    esac
+    say "Downloading Supabase's command-line tool (about 50 MB)"
+    tools="$PWD/build/tools"
+    mkdir -p "$tools"
+    curl -fsSL -o "$tools/supabase.tar.gz" "https://github.com/supabase/cli/releases/latest/download/supabase_darwin_${chip}.tar.gz" \
+      || die "Couldn't download Supabase's tool. Check your internet connection and run this again."
+    tar -xzf "$tools/supabase.tar.gz" -C "$tools" supabase \
+      || die "Downloaded Supabase's tool but couldn't open it."
+    chmod +x "$tools/supabase"
+    export PATH="$tools:$PATH"
   fi
 fi
+command -v supabase >/dev/null 2>&1 || die "Supabase's command-line tool isn't available. Send me this whole window."
 
 ask() { local answer; read -r -p "$1" answer; printf '%s' "$answer"; }
 
