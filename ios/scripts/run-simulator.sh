@@ -7,6 +7,7 @@
 #   ./scripts/run-simulator.sh --device "iPhone 16" use a particular simulator
 #   ./scripts/run-simulator.sh --screenshot a.png   also save a screenshot a few seconds after launch
 #   ./scripts/run-simulator.sh --headless           don't open the Simulator window (for CI)
+#   ./scripts/run-simulator.sh --duo                run on the iPhone Duo simulator (needs Xcode 27.1 or newer)
 set -euo pipefail
 
 say() { printf '\n==> %s\n' "$*"; }
@@ -34,10 +35,12 @@ device=""
 shot=""
 open_xcode=0
 headless=0
+duo=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --xcode) open_xcode=1 ;;
     --headless) headless=1 ;;
+    --duo) duo=1 ;;
     --device) [[ $# -ge 2 ]] || die "--device needs a simulator name, for example --device \"iPhone 16\""; device="$2"; shift ;;
     --screenshot) [[ $# -ge 2 ]] || die "--screenshot needs a file name, for example --screenshot welcome.png"; shot="$2"; shift ;;
     -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
@@ -91,6 +94,11 @@ pick_udid() {
     xcrun simctl list devices available | grep -F "$device (" | grep -oE "$uuid_pattern" | tail -1 || true
     return
   fi
+  if [[ $duo -eq 1 ]]; then
+    # Any simulator with Duo in its name (Apple's exact wording may change), never an ordinary iPhone.
+    xcrun simctl list devices available | grep -i 'duo' | grep -oE "$uuid_pattern" | tail -1 || true
+    return
+  fi
   # Prefer the newest regular "iPhone N Pro", then a plain "iPhone N", then any iPhone that isn't a special shape.
   list=$(xcrun simctl list devices available | grep -E '^ +iPhone ' || true)
   found=$(printf '%s\n' "$list" | grep -E '^ +iPhone [0-9]+ Pro \(' | grep -oE "$uuid_pattern" | tail -1 || true)
@@ -101,6 +109,25 @@ pick_udid() {
 }
 
 udid=$(pick_udid)
+if [[ -z "$udid" && $duo -eq 1 && -z "$device" ]]; then
+  # The Duo software may be installed without a Duo phone having been set up in it yet, so make one.
+  runtime=$(xcrun simctl list runtimes available | grep -E '^iOS ' | tail -1 | sed -E 's/.* - (com\.apple\.CoreSimulator\.SimRuntime\.[^ ]+)$/\1/' || true)
+  duo_type=$(xcrun simctl list devicetypes | grep -i 'duo' | head -1 | sed -E 's/.*\((com\.apple\.CoreSimulator\.SimDeviceType\.[^)]+)\)$/\1/' || true)
+  if [[ "$runtime" == com.apple.* && "$duo_type" == com.apple.* ]]; then
+    say "Setting up an iPhone Duo in the simulator"
+    udid=$(xcrun simctl create "Slate iPhone Duo" "$duo_type" "$runtime" 2>/dev/null || true)
+  fi
+fi
+if [[ -z "$udid" && $duo -eq 1 && -z "$device" ]]; then
+  {
+    echo
+    echo "This Mac's Xcode doesn't have an iPhone Duo simulator."
+    echo "Duo needs Xcode 27.1 or newer. Update Xcode, open it once so it finishes installing, then run this again."
+    echo "Until then, run the same line without --duo to use an ordinary iPhone."
+  } >&2
+  diagnose
+  die "No iPhone Duo simulator found."
+fi
 if [[ -z "$udid" && -z "$device" ]]; then
   # Newer versions of Xcode don't come with the iPhone simulator. Ask Apple for it.
   say "No iPhone simulator found. Downloading it from Apple (several GB, so this can take a while)"
@@ -218,3 +245,6 @@ if [[ -n "$shot" ]]; then
 fi
 
 say "Slate Pro is running. A short animation plays first (touch the screen to skip it). On the welcome screen, tap \"Continue with a demo account\"."
+if [[ $duo -eq 1 ]]; then
+  say "This is the iPhone Duo simulator. If its window offers a fold or unfold control, try the app both ways, and look at the tab bar and the buttons at the top, which Duo moves to the side."
+fi
