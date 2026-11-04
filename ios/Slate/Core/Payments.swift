@@ -89,15 +89,14 @@ struct PaymentAccount: Equatable {
         case notConnected
         /// Stripe needs more information before the creator can be paid.
         case needsInformation
-        /// Payments work; the bank account isn't ready to receive payouts yet.
-        case payoutsPending
         case ready
     }
 
+    /// Being able to take cards is being ready. Payouts to the bank are the creator's own business, in their own Stripe
+    /// account, so they don't hold anything up here.
     var state: State {
         if !isConnected { return .notConnected }
         if !chargesEnabled { return .needsInformation }
-        if !payoutsEnabled { return .payoutsPending }
         return .ready
     }
 
@@ -106,22 +105,21 @@ struct PaymentAccount: Equatable {
 
     var title: String {
         switch state {
-        case .notConnected: "Get paid with Stripe"
-        case .needsInformation: "Finish setting up payments"
-        case .payoutsPending: "Add a bank account for payouts"
-        case .ready: isSimulated ? "Demo payments" : "Payments are set up"
+        case .notConnected: "Link your Stripe account"
+        case .needsInformation: "Finish linking your Stripe account"
+        case .ready: isSimulated ? "Demo payments" : "Stripe account linked"
         }
     }
 
     var detail: String {
         switch state {
-        case .notConnected: "Connect Stripe so clients can pay deposits and balances, and the money goes straight to you."
+        case .notConnected:
+            "Link your Stripe account so clients can pay your deposits and balances through Slate Pro. The money goes straight from them to your Stripe account. Sign in to one you already have or make a new one."
         case .needsInformation: "Stripe needs a few more details before clients can pay you."
-        case .payoutsPending: "Clients can pay you, but Stripe can't send the money to your bank until you add one."
         case .ready:
             isSimulated
                 ? "This version runs on your device only, so payments are pretend and no money moves."
-                : "Clients can pay deposits and balances, and Stripe sends the money to your bank."
+                : "Clients can pay your deposits and balances through Slate Pro, and the money goes straight to your Stripe account. Manage payouts in your Stripe Dashboard."
         }
     }
 }

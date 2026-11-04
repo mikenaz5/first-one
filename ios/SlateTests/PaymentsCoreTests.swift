@@ -399,8 +399,9 @@ final class PaymentAccountTests: XCTestCase {
         XCTAssertEqual(needsInfo.state, .needsInformation)
         XCTAssertFalse(needsInfo.canAcceptPayments)
 
+        // Payouts to the bank are the creator's own business in their own Stripe account, so they don't hold anything up.
         let noBank = PaymentAccount(isConnected: true, chargesEnabled: true, payoutsEnabled: false, detailsSubmitted: true)
-        XCTAssertEqual(noBank.state, .payoutsPending)
+        XCTAssertEqual(noBank.state, .ready)
         XCTAssertTrue(noBank.canAcceptPayments, "Clients can pay as soon as charges work")
 
         let ready = PaymentAccount(isConnected: true, chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true)

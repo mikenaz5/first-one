@@ -105,6 +105,28 @@ final class DirectChargeTests: XCTestCase {
         XCTAssertNil(info.stripeAccountID)
     }
 
+    func testOnlyACreatorIsAskedToLinkStripe() async throws {
+        // Signed in as the demo account with no profile, the person is only here to book.
+        XCTAssertFalse(model.canSetUpPayments)
+        await model.signOut()
+        XCTAssertFalse(model.canSetUpPayments, "nobody signed in is asked anything")
+    }
+
+    func testReadingThePaymentSetupFillsInTheLinkAndTheAccount() async throws {
+        let owner = try XCTUnwrap(model.ownerID)
+        try await backend.savePaymentLink(link, for: owner)
+        await model.loadPaymentSetup()
+        XCTAssertEqual(model.paymentLink, link)
+        XCTAssertEqual(model.paymentAccount, .simulated, "on-device the pretend account is always ready")
+    }
+
+    func testBeingAbleToTakeCardsIsBeingReadyWhateverPayoutsSay() {
+        XCTAssertEqual(PaymentAccount(isConnected: true, chargesEnabled: true, payoutsEnabled: false, detailsSubmitted: true).state, .ready)
+        XCTAssertEqual(PaymentAccount.notConnected.title, "Link your Stripe account")
+        XCTAssertEqual(PaymentAccount(isConnected: true, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false).title,
+                       "Finish linking your Stripe account")
+    }
+
     // MARK: The link
 
     func testALinkIsKeptAndComesBack() async throws {

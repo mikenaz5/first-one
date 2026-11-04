@@ -540,7 +540,7 @@ struct PaymentSetupSheet: View {
                             Task { await start() }
                         } label: {
                             HStack {
-                                Text(account.state == .notConnected ? "Set up with Stripe" : "Continue setup")
+                                Text(account.state == .notConnected ? "Link your Stripe account" : "Continue linking")
                                 if isWorking { Spacer(); ProgressView() }
                             }
                             .frame(minHeight: Metrics.minTapTarget)

@@ -108,6 +108,19 @@ extension AppModel {
         return false
     }
 
+    // MARK: - Linking Stripe
+
+    /// Whether the person on screen can link a Stripe account for what they sell: not a client, and at a company only
+    /// whoever may manage its payments (the Owner).
+    var canSetUpPayments: Bool { session != nil && !isClientOnly && can(.paymentsConnect) }
+
+    /// Reads where the owner's payment setup stands (their Stripe account and any payment link) without asking Stripe.
+    func loadPaymentSetup() async {
+        guard let owner = ownerID else { return }
+        paymentAccount = try? await backend.loadPaymentAccount(for: owner)
+        paymentLink = try? await backend.loadPaymentLink(for: owner)
+    }
+
     // MARK: - Paying another way
 
     /// How the booking's client can pay: with Apple Pay through Stripe, through the creator's own link, or both.

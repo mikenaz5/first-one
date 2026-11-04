@@ -7,6 +7,7 @@ struct SettingsView: View {
 
     @AppStorage(AppearancePreference.storageKey) private var appearance = AppearancePreference.dark.rawValue
     @State private var showNotifications = false
+    @State private var showPayments = false
     @State private var showUpgrade = false
     @State private var showNewCompany = false
     @State private var confirmLeave = false
@@ -15,6 +16,10 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            if model.canSetUpPayments {
+                getPaidSection
+            }
+
             if let organization = model.organization {
                 companySection(organization)
             } else {
@@ -82,8 +87,10 @@ struct SettingsView: View {
             NotificationSettingsSheet()
                 .presentationDetents([.large])
         }
+        .sheet(isPresented: $showPayments) { PaymentSetupSheet() }
         .sheet(isPresented: $showUpgrade) { UpgradeSheet() }
         .sheet(isPresented: $showNewCompany) { NewCompanySheet() }
+        .task { await model.loadPaymentSetup() }
         .confirmationDialog("Sign out of Slate Pro?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { Task { await model.signOut() } }
         }
@@ -103,6 +110,67 @@ struct SettingsView: View {
         } message: {
             Text("Your upcoming bookings there go back to the team. You keep your own profile and can be invited again.")
         }
+    }
+
+    // MARK: Get paid
+
+    /// Asks a creator who hasn't linked a Stripe account to link one, and shows where it stands once they have. It opens the
+    /// payments sheet, where Stripe's own pages do the linking (Slate Pro never sees their details) and where a payment link
+    /// can be added instead.
+    private var getPaidSection: some View {
+        let account = model.paymentAccount ?? .notConnected
+        let linked = account.state == .ready
+        return Section {
+            Button {
+                showPayments = true
+            } label: {
+                HStack(alignment: .top, spacing: Space.m) {
+                    Image(systemName: linked ? "checkmark.seal.fill" : "creditcard")
+                        .font(.title2)
+                        .foregroundStyle(linked ? Color.slateSuccess : Color.accentColor)
+                        .frame(minWidth: Metrics.iconColumn)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        Text(account.title).font(.headline)
+                        Text(account.detail).font(.subheadline).foregroundStyle(.secondary)
+                        if let link = model.paymentLink {
+                            Label("Clients can also pay through \(link.host)", systemImage: "link")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer(minLength: Space.s)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, Space.xs)
+                .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Opens payment setup")
+
+            if !linked {
+                Button {
+                    showPayments = true
+                } label: {
+                    Label(account.state == .needsInformation ? "Continue linking Stripe" : "Link your Stripe account", systemImage: "link")
+                        .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+                }
+                .buttonStyle(.slatePrimary)
+                .controlSize(.large)
+            }
+        } header: {
+            Text("Get paid")
+        } footer: {
+            if !linked {
+                Text("Until a Stripe account is linked, clients can't pay deposits through Slate Pro, so they can't book packages that ask for one. No Stripe account? Open this and add a payment link instead.")
+            }
+        }
+            .listRowBackground(Color.slateCard)
     }
 
     // MARK: Company

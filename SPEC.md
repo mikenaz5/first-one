@@ -693,7 +693,8 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 
 *What the creator sets up (Services ▸ Payments, or Settings ▸ Company settings ▸ Payments for a company's Owner)*
 
-1. **Set up with Stripe** opens Stripe's own pages. They sign in to a Stripe account they already have or make a new one; Slate Pro never sees their identity or bank details. **Check status** asks Stripe where they stand. They are ready when Stripe says the account can take **card payments**; payouts are their own business, in their own Stripe Dashboard.
+0. **A prompt in Settings.** A creator who hasn't linked a Stripe account sees a **Get paid** card at the top of Settings (Profile ▸ Settings; for a company, its Owner), with a **Link your Stripe account** button that opens the screen below, and a note that without it clients can't pay deposits. Once linked it shows **Stripe account linked**; if Stripe needs more it says **Finish linking your Stripe account** with a **Continue** button. Clients are never shown it.
+1. **Link your Stripe account** opens Stripe's own pages. They sign in to a Stripe account they already have or make a new one; Slate Pro never sees their identity or bank details. **Check status** asks Stripe where they stand. They are ready when Stripe says the account can take **card payments**; payouts are their own business, in their own Stripe Dashboard.
 2. **Or be paid another way:** a link to their own payment page (it must start with `https://`) and up to 300 characters of instruction ("Zelle to ..."). Leave the link empty and save to remove it. A creator with a link but no Stripe account can still have clients book packages with a deposit.
 3. A company's account and link belong to its **Owner** (the `payments.connect` permission), as before.
 
