@@ -11,6 +11,7 @@ struct WelcomeView: View {
     @State private var rawNonce = ""
     @State private var appeared = false
     @State private var showEmail = false
+    @State private var showTestPassword = false
 
     var body: some View {
         ZStack {
@@ -121,6 +122,11 @@ struct WelcomeView: View {
                         Task { await model.signInAsDemoClient() }
                     }
                     .buttonStyle(.slateOutline)
+                } else {
+                    // Debug builds against a real server: a person made by hand in Supabase, before email or Apple sign-in is ready.
+                    Button("Sign in with a test password") { showTestPassword = true }
+                        .buttonStyle(.slateOutline)
+                        .sheet(isPresented: $showTestPassword) { TestPasswordSignInView() }
                 }
                 #endif
 

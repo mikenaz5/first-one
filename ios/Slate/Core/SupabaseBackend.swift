@@ -228,6 +228,24 @@ final class SupabaseBackend: SlateBackend, @unchecked Sendable {
         }
     }
 
+    #if DEBUG
+    func signInWithPassword(email: String, password: String) async throws -> AuthSession {
+        guard let address = EmailCodeRules.cleanEmail(email) else { throw SlateError.invalidEmail }
+        do {
+            let session = try await client.auth.signIn(email: address, password: password)
+            return AuthSession(
+                userID: session.user.id,
+                appleUserID: nil,
+                email: session.user.email ?? address,
+                fullName: session.user.userMetadata["full_name"]?.stringValue
+            )
+        } catch let error as AuthError {
+            _ = error
+            throw SlateError.backend("Supabase didn't accept that email and password. In its dashboard check Authentication, Users: the user must exist and be confirmed.")
+        }
+    }
+    #endif
+
     func updateDisplayName(_ name: String) async throws -> AuthSession {
         guard let clean = EmailCodeRules.cleanName(name) else { throw SlateError.nameRequired }
         let user = try await client.auth.update(user: UserAttributes(data: ["full_name": .string(clean)]))

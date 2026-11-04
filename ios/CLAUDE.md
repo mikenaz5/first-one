@@ -69,4 +69,5 @@ SwiftUI app for creators (photographers, videographers) to get booked with a con
 - Run the SQL rule tests with a local Postgres: `PGPORT=5432 python3 supabase/tests/booking_rules.py` (needs `psycopg2`).
 - Tests that depend on "now" must not depend on the time of day. Use fixed dates (see `TestClock`) or pick days a few days ahead.
 - Storage paths use lowercase UUIDs, because Postgres compares `auth.uid()::text` case-sensitively.
+- The test password sign-in (`signInWithPassword`, `AppModel.signInWithTestPassword`, `TestPasswordSignInView`) is `#if DEBUG` all the way through, so no release build can contain it, and the product never has passwords. It exists so the real server can be tried with a user made by hand in the Supabase dashboard. Never remove the `#if DEBUG` guards or show it in a release.
 - Secrets live in `Config/Secrets.xcconfig` (git-ignored). Only the Supabase anon key belongs in the app, never the service-role key.

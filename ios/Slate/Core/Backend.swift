@@ -10,6 +10,11 @@ protocol SlateBackend {
     func requestEmailCode(_ email: String) async throws
     /// Signs in with the code, creating a free account for an address that has none. Throws `invalidEmail`, `invalidCode`.
     func signInWithEmailCode(email: String, code: String) async throws -> AuthSession
+    #if DEBUG
+    /// Debug builds only, and never in a release: signs in a person made by hand in the Supabase dashboard (Authentication,
+    /// Users, Add user), so the real server can be tried before email codes or Sign in with Apple are set up.
+    func signInWithPassword(email: String, password: String) async throws -> AuthSession
+    #endif
     /// Saves the name a person goes by on the contracts they sign. Throws `nameRequired`.
     func updateDisplayName(_ name: String) async throws -> AuthSession
     func signOut() async throws

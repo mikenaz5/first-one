@@ -27,6 +27,12 @@ extension LocalBackend {
         guard EmailCodeRules.cleanEmail(email) != nil else { throw SlateError.invalidEmail }
     }
 
+    #if DEBUG
+    func signInWithPassword(email: String, password: String) async throws -> AuthSession {
+        throw SlateError.backend("Password sign-in only exists when the app talks to a server.")
+    }
+    #endif
+
     func signInWithEmailCode(email: String, code: String) async throws -> AuthSession {
         guard let address = EmailCodeRules.cleanEmail(email) else { throw SlateError.invalidEmail }
         guard let digits = EmailCodeRules.cleanCode(code), digits == EmailCodeRules.demoCode else { throw SlateError.invalidCode }

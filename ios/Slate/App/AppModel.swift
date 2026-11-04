@@ -229,6 +229,16 @@ final class AppModel {
     }
 
     /// Signs in with the emailed code. Throws, so the screen can show what was wrong beside the field.
+    #if DEBUG
+    /// Debug builds only: see `SlateBackend.signInWithPassword`.
+    func signInWithTestPassword(email: String, password: String) async throws {
+        let newSession = try await backend.signInWithPassword(email: email, password: password)
+        UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
+        session = newSession
+        await loadAccount()
+    }
+    #endif
+
     func signInWithEmailCode(email: String, code: String) async throws {
         let newSession = try await backend.signInWithEmailCode(email: email, code: code)
         UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
