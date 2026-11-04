@@ -44,9 +44,12 @@ interface Calls {
   sessions: { params: Record<string, unknown>; key?: string }[];
   listed: Record<string, unknown>[];
   detached: string[];
-  intentsCreated: { params: Record<string, unknown>; key?: string }[];
-  intentsRetrieved: string[];
+  intentsCreated: { params: Record<string, unknown>; key?: string; account?: string }[];
+  intentsRetrieved: { id: string; account?: string }[];
   intentsCancelled: string[];
+  /** The platform card shared to a creator's account, and where. */
+  clones: { customer: string; paymentMethod: string; account: string; key?: string }[];
+  cancelAccounts: (string | undefined)[];
 }
 
 function makeStripe(overrides: Partial<{
@@ -54,13 +57,14 @@ function makeStripe(overrides: Partial<{
   detach: (id: string) => Promise<unknown>;
   deleteCustomer: (id: string) => Promise<unknown>;
   createIntent: (params: Record<string, unknown>) => Promise<StripeIntent>;
+  clone: (params: { customer: string; paymentMethod: string }) => Promise<{ id: string }>;
   retrieveIntent: (id: string) => Promise<StripeIntent>;
   cancelIntent: (id: string) => Promise<StripeIntent>;
   createSession: (params: Record<string, unknown>) => Promise<{ url: string | null }>;
 }> = {}): { stripe: CardStripe; calls: Calls } {
   const calls: Calls = {
     customersCreated: [], customersDeleted: [], sessions: [], listed: [], detached: [],
-    intentsCreated: [], intentsRetrieved: [], intentsCancelled: [],
+    intentsCreated: [], intentsRetrieved: [], intentsCancelled: [], clones: [], cancelAccounts: [],
   };
   const stripe: CardStripe = {
     customers: {
@@ -90,18 +94,23 @@ function makeStripe(overrides: Partial<{
         calls.detached.push(id);
         return overrides.detach ? overrides.detach(id) : { id };
       },
+      async clone(params, options) {
+        calls.clones.push({ ...params, account: options.stripeAccount, key: options.idempotencyKey });
+        return overrides.clone ? overrides.clone(params) : { id: "pm_shared" };
+      },
     },
     paymentIntents: {
       async create(params, options) {
-        calls.intentsCreated.push({ params, key: options?.idempotencyKey });
+        calls.intentsCreated.push({ params, key: options?.idempotencyKey, account: options?.stripeAccount });
         return overrides.createIntent ? overrides.createIntent(params) : { id: "pi_card", status: "succeeded", client_secret: "pi_card_secret" };
       },
-      async retrieve(id) {
-        calls.intentsRetrieved.push(id);
+      async retrieve(id, options) {
+        calls.intentsRetrieved.push({ id, account: options?.stripeAccount });
         return overrides.retrieveIntent ? overrides.retrieveIntent(id) : { id, status: "requires_payment_method", client_secret: `${id}_secret` };
       },
-      async cancel(id) {
+      async cancel(id, options) {
         calls.intentsCancelled.push(id);
+        calls.cancelAccounts.push(options?.stripeAccount);
         return overrides.cancelIntent ? overrides.cancelIntent(id) : { id, status: "canceled", client_secret: null };
       },
     },
@@ -137,7 +146,7 @@ const savedPrepared = (extra: Record<string, unknown> = {}) => ({
   amount_cents: 90000,
   currency: "usd",
   fee_cents: 0,
-  destination: "acct_creator",
+  account: "acct_creator",
   existing_intent: null,
   description: "Balance for Wedding with Maya Chen",
   customer: "cus_alice",
@@ -413,7 +422,9 @@ describe("forgetCards (deleting an account)", () => {
 // ---------------------------------------------------------------------------
 // Stripe's webhook, for cards
 // ---------------------------------------------------------------------------
-const eventOf = (type: string, object: Record<string, unknown>): StripeEvent => ({ id: `evt_${type}`, type, data: { object } });
+const eventOf = (type: string, object: Record<string, unknown>, account?: string): StripeEvent => ({
+  id: `evt_${type}`, type, ...(account ? { account } : {}), data: { object },
+});
 
 describe("handleCardEvent", () => {
   it("records a card saved on Stripe's page", async () => {
@@ -475,7 +486,10 @@ describe("Stripe's webhook, with cards", () => {
     return {
       db,
       stripe,
-      config: { platformFeeBps: 0, functionsBaseUrl: "https://ref.supabase.co/functions/v1", webhookSecret: "whsec", appScheme: "slate" },
+      config: {
+        platformFeeBps: 0, functionsBaseUrl: "https://ref.supabase.co/functions/v1", webhookSecret: "whsec", connectWebhookSecret: "whsec_c",
+        defaultCountry: "us", defaultCurrency: "usd", appScheme: "slate",
+      },
       log: () => {},
     };
   }
@@ -487,13 +501,13 @@ describe("Stripe's webhook, with cards", () => {
     const body = JSON.stringify(eventOf("payment_intent.succeeded", {
       id: "pi_card", amount: 90000, amount_received: 90000, latest_charge: "ch_1",
       metadata: { payment_id: PAYMENT, booking_id: BOOKING, kind: "balance", saved_card: "true" },
-    }));
+    }, "acct_creator"));
 
-    const result = await handleStripeWebhook(webhookDeps(db), body, "sig");
+    const result = await handleStripeWebhook(webhookDeps(db), body, "sig", "connect");
 
     assert.equal(result.status, 200);
     assert.deepEqual(db.called("payment_record_success")[0].args, {
-      p_intent_id: "pi_card", p_amount_cents: 90000, p_charge_id: "ch_1", p_method: "card",
+      p_intent_id: "pi_card", p_amount_cents: 90000, p_charge_id: "ch_1", p_method: "card", p_account_id: "acct_creator",
     });
   });
 
@@ -502,9 +516,9 @@ describe("Stripe's webhook, with cards", () => {
     const body = JSON.stringify(eventOf("payment_intent.succeeded", {
       id: "pi_wallet", amount: 90000, amount_received: 90000, latest_charge: "ch_2",
       metadata: { payment_id: PAYMENT, booking_id: BOOKING, kind: "balance" },
-    }));
+    }, "acct_creator"));
 
-    await handleStripeWebhook(webhookDeps(db), body, "sig");
+    await handleStripeWebhook(webhookDeps(db), body, "sig", "connect");
 
     assert.equal(db.called("payment_record_success")[0].args.p_method, "apple_pay");
   });
@@ -528,8 +542,8 @@ describe("Stripe's webhook, with cards", () => {
     const db = new FakeDb({ ...claim, payment_record_failure: () => null });
     const body = JSON.stringify(eventOf("payment_intent.payment_failed", {
       id: "pi_card", metadata: { payment_id: PAYMENT, saved_card: "true" }, last_payment_error: { message: "Your card was declined." },
-    }));
-    await handleStripeWebhook(webhookDeps(db), body, "sig");
+    }, "acct_creator"));
+    await handleStripeWebhook(webhookDeps(db), body, "sig", "connect");
     assert.deepEqual(db.called("payment_record_failure")[0].args, { p_intent_id: "pi_card", p_message: "Your card was declined." });
   });
 });
@@ -551,12 +565,15 @@ describe("chargeSavedCard", () => {
     const { params, key } = calls.intentsCreated[0];
     assert.equal(params.amount, 90000);
     assert.equal(params.currency, "usd");
-    assert.equal(params.customer, "cus_alice");
-    assert.equal(params.payment_method, "pm_alice_visa");
+    // The card is kept on the platform, so it is shared to the creator's own account, and charged there.
+    assert.deepEqual(calls.clones, [{ customer: "cus_alice", paymentMethod: "pm_alice_visa", account: "acct_creator", key: `clone-${PAYMENT}` }]);
+    assert.equal(params.payment_method, "pm_shared", "the creator's copy of the card, not the platform's");
+    assert.equal("customer" in params, false, "the platform's customer doesn't exist on the creator's account");
+    assert.equal(calls.intentsCreated[0].account, "acct_creator", "a direct charge");
     assert.equal(params.off_session, true);
     assert.equal(params.confirm, true);
-    assert.deepEqual(params.payment_method_types, ["card"]);
-    assert.deepEqual(params.transfer_data, { destination: "acct_creator" });
+    assert.equal("payment_method_types" in params, false);
+    assert.equal("transfer_data" in params, false, "no money passes through the platform");
     assert.deepEqual(params.metadata, { payment_id: PAYMENT, booking_id: BOOKING, kind: "balance", saved_card: "true" });
     assert.equal("application_fee_amount" in params, false);
     assert.equal(key, `payment-${PAYMENT}`, "a retry can't charge twice");
@@ -597,9 +614,8 @@ describe("chargeSavedCard", () => {
     });
 
     assert.equal(calls.intentsCreated[0].params.amount, 90000);
-    assert.equal(calls.intentsCreated[0].params.payment_method, "pm_alice_visa");
-    assert.equal(calls.intentsCreated[0].params.customer, "cus_alice");
-    assert.deepEqual(calls.intentsCreated[0].params.transfer_data, { destination: "acct_creator" });
+    assert.deepEqual(calls.clones.map((c) => [c.customer, c.paymentMethod, c.account]), [["cus_alice", "pm_alice_visa", "acct_creator"]]);
+    assert.equal(calls.intentsCreated[0].account, "acct_creator");
     assert.equal(db.called("payment_prepare_saved")[0].args.p_actor, USER);
     assert.equal(db.called("payment_prepare_saved")[0].args.p_fee_bps, 0);
   });
@@ -667,6 +683,7 @@ describe("chargeSavedCard", () => {
 
       assert.equal(result.status, 200);
       assert.deepEqual(calls.intentsCancelled, ["pi_old"]);
+      assert.deepEqual(calls.cancelAccounts, ["acct_creator"], "cancelled on the creator's account");
       assert.deepEqual(db.called("payment_record_failure")[0].args, { p_intent_id: "pi_old", p_message: "Replaced by a payment from the saved card." });
       assert.equal(calls.intentsCreated.length, 1);
       assert.equal(calls.intentsCreated[0].key, "payment-55555555-5555-4555-8555-555555555555", "the new payment has its own key");

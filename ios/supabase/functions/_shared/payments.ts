@@ -14,6 +14,7 @@
 
 import { handleBillingEvent } from "./billing.ts";
 import { handleCardEvent } from "./cards.ts";
+import type { ConnectApi, ConnectedAccount } from "./connect_v2.ts";
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -35,29 +36,25 @@ export interface StripeIntent {
   client_secret: string | null;
 }
 
+/** Options for a call made ON a creator's connected account (a direct charge): `stripeAccount` is the acct_… id. */
+export interface StripeCallOptions {
+  idempotencyKey?: string;
+  stripeAccount?: string;
+}
+
 export interface StripeLike {
   paymentIntents: {
-    create(params: Record<string, unknown>, options?: { idempotencyKey?: string }): Promise<StripeIntent>;
-    retrieve(id: string): Promise<StripeIntent>;
+    create(params: Record<string, unknown>, options?: StripeCallOptions): Promise<StripeIntent>;
+    retrieve(id: string, options?: StripeCallOptions): Promise<StripeIntent>;
   };
   refunds: {
     create(
       params: Record<string, unknown>,
-      options?: { idempotencyKey?: string },
+      options?: StripeCallOptions,
     ): Promise<{ id: string; status: string | null; failure_reason?: string | null }>;
   };
-  accounts: {
-    create(params: Record<string, unknown>, options?: { idempotencyKey?: string }): Promise<{ id: string }>;
-    retrieve(id: string): Promise<{
-      id: string;
-      charges_enabled?: boolean;
-      payouts_enabled?: boolean;
-      details_submitted?: boolean;
-    }>;
-  };
-  accountLinks: {
-    create(params: Record<string, unknown>): Promise<{ url: string }>;
-  };
+  /** Connected accounts (Accounts v2): see connect_v2.ts. */
+  connect: ConnectApi;
   webhooks: {
     /** Verifies the signature and parses the event, or throws. */
     constructEventAsync(payload: string, signature: string, secret: string): Promise<StripeEvent>;
@@ -67,6 +64,8 @@ export interface StripeLike {
 export interface StripeEvent {
   id: string;
   type: string;
+  /** The connected account an event happened on (acct_…). Set on events from Stripe's Connect webhook endpoint. */
+  account?: string;
   // deno-lint-ignore no-explicit-any
   data: { object: any };
 }
@@ -76,7 +75,13 @@ export interface Config {
   platformFeeBps: number;
   /** Where the Edge Functions are served, e.g. https://<ref>.supabase.co/functions/v1 */
   functionsBaseUrl: string;
+  /** Signing secret of the webhook endpoint for the platform's own events (seat billing, saved cards). */
   webhookSecret: string;
+  /** Signing secret of the webhook endpoint for events on creators' connected accounts (payments, refunds). */
+  connectWebhookSecret: string;
+  /** The country (two letters) and currency a new connected account starts with, until its owner says otherwise in onboarding. */
+  defaultCountry: string;
+  defaultCurrency: string;
   /** The app's URL scheme, for sending the browser back to the app after Stripe onboarding. */
   appScheme: string;
 }
@@ -175,14 +180,29 @@ interface Prepared {
   amount_cents: number;
   currency: string;
   fee_cents: number;
-  destination: string;
+  /** The creator's connected account the payment is made on (a direct charge). */
+  account: string;
   existing_intent: string | null;
   description: string;
 }
 
+/** Tells the database what Stripe says about a creator's connected account. Only "active" card payments can take money. */
+async function recordAccount(deps: Deps, account: ConnectedAccount): Promise<void> {
+  const charges = account.cardPayments === "active";
+  await deps.db.rpc("connect_account_update", {
+    p_account_id: account.id,
+    p_charges: charges,
+    p_payouts: account.payouts === "active",
+    // Accounts made through Accounts v2 have no separate "details submitted" flag: an account that can take cards is done.
+    p_details: charges,
+  });
+}
+
 /**
- * Opens (or reuses) a PaymentIntent for a booking's deposit or balance and returns its client secret,
- * which the app's Apple Pay sheet uses to pay. The amount and destination come from the database.
+ * Opens (or reuses) a PaymentIntent for a booking's deposit or balance and returns its client secret, which the app's Apple
+ * Pay sheet uses to pay. It is a DIRECT CHARGE: the intent is made on the creator's own Stripe account, so the money goes
+ * from the client to the creator and never through the platform's account. The app is told which account (`stripe_account`)
+ * so its Stripe SDK talks to that one. The amount and the account come from the database, never from a caller.
  */
 export async function createPaymentIntent(deps: Deps, userId: string, input: unknown): Promise<HttpResult> {
   const body = asObject(input);
@@ -204,19 +224,33 @@ export async function createPaymentIntent(deps: Deps, userId: string, input: unk
     return dbFailure(deps, error);
   }
 
+  // Ask Stripe whether the account can take cards right now rather than trusting what was stored when the creator last
+  // opened onboarding: a creator can lose that at any time.
+  try {
+    const account = await deps.stripe.connect.getAccount(prepared.account);
+    if (account.cardPayments !== "active") {
+      await recordAccount(deps, account);
+      return fail(409, "payments_not_ready");
+    }
+  } catch (error) {
+    return asObject(error)?.type ? stripeFailure(deps, error) : dbFailure(deps, error);
+  }
+
+  const onAccount = { stripeAccount: prepared.account };
   const respond = (clientSecret: string): HttpResult =>
     ok({
       payment_id: prepared.payment_id,
       client_secret: clientSecret,
       amount_cents: prepared.amount_cents,
       currency: prepared.currency,
+      stripe_account: prepared.account,
     });
 
   // A second tap, or a retry after the app lost the first answer: use the intent already made.
   if (prepared.existing_intent) {
     let existing: StripeIntent;
     try {
-      existing = await deps.stripe.paymentIntents.retrieve(prepared.existing_intent);
+      existing = await deps.stripe.paymentIntents.retrieve(prepared.existing_intent, onAccount);
     } catch (error) {
       return stripeFailure(deps, error);
     }
@@ -237,18 +271,16 @@ export async function createPaymentIntent(deps: Deps, userId: string, input: unk
 
   let intent: StripeIntent;
   try {
+    // No payment_method_types: the creator's own Stripe settings decide which methods are offered, and Apple Pay is a card.
     const params: Record<string, unknown> = {
       amount: prepared.amount_cents,
       currency: prepared.currency,
-      // Apple Pay is a card payment method as far as Stripe is concerned.
-      payment_method_types: ["card"],
-      // The creator is paid directly; the platform keeps only its fee (none by default).
-      transfer_data: { destination: prepared.destination },
       description: prepared.description,
       metadata: { payment_id: prepared.payment_id, booking_id: prepared.booking_id, kind: prepared.kind },
     };
+    // There is no application fee for now. If there ever is one, it is taken here, from the creator's charge.
     if (prepared.fee_cents > 0) params.application_fee_amount = prepared.fee_cents;
-    intent = await deps.stripe.paymentIntents.create(params, { idempotencyKey: `payment-${prepared.payment_id}` });
+    intent = await deps.stripe.paymentIntents.create(params, { idempotencyKey: `payment-${prepared.payment_id}`, ...onAccount });
   } catch (error) {
     return stripeFailure(deps, error);
   }
@@ -270,6 +302,8 @@ interface RefundRow {
   amount_cents: number;
   payment_intent_id: string | null;
   stripe_refund_id: string | null;
+  /** The connected account the payment was made on, and so the one the refund is made on. */
+  stripe_account_id: string | null;
 }
 
 export interface RefundOutcome {
@@ -294,7 +328,7 @@ export async function issueRefunds(deps: Deps, bookingId: string): Promise<Refun
   const outcomes: RefundOutcome[] = [];
 
   for (const row of rows ?? []) {
-    if (!row.payment_intent_id) {
+    if (!row.payment_intent_id || !row.stripe_account_id) {
       await deps.db.rpc("refund_record_result", {
         p_refund_id: row.refund_id,
         p_status: "failed",
@@ -310,12 +344,12 @@ export async function issueRefunds(deps: Deps, bookingId: string): Promise<Refun
         {
           payment_intent: row.payment_intent_id,
           amount: row.amount_cents,
-          // The payment went to the creator: take it back from them, and give back any platform fee pro rata.
-          reverse_transfer: true,
+          // A direct charge is refunded from the creator's own Stripe balance, on their account. If a platform fee was
+          // taken (none is, for now), give it back pro rata.
           refund_application_fee: true,
           metadata: { refund_id: row.refund_id },
         },
-        { idempotencyKey: `refund-${row.refund_id}` },
+        { idempotencyKey: `refund-${row.refund_id}`, stripeAccount: row.stripe_account_id },
       );
       const status = refundStatus(refund.status);
       await deps.db.rpc("refund_record_result", {
@@ -360,16 +394,34 @@ export async function processRefundsRequest(deps: Deps, userId: string, input: u
 // ---------------------------------------------------------------------------
 // Stripe's webhook
 // ---------------------------------------------------------------------------
+/** Which of Stripe's two webhook endpoints a request came to; each has its own signing secret. */
+export type WebhookSource = "platform" | "connect";
+
 /**
  * Stripe tells us what really happened to a payment. Everything that changes a booking because of money
  * starts here, never from the app, so a client can't claim to have paid.
+ *
+ * Payments are direct charges, so their events happen on the CREATOR's account and arrive at the "connect" endpoint
+ * ("Listen to events on connected accounts"), carrying that account's id. The "platform" endpoint hears about the
+ * platform's own things: seat billing and saved cards. Each is verified with its own secret, so an event can only be
+ * what the endpoint it came to is for.
  */
-export async function handleStripeWebhook(deps: Deps, rawBody: string, signature: string | null): Promise<HttpResult> {
+export async function handleStripeWebhook(
+  deps: Deps,
+  rawBody: string,
+  signature: string | null,
+  source: WebhookSource = "platform",
+): Promise<HttpResult> {
   if (!signature) return fail(400, "bad_signature");
+  const secret = source === "connect" ? deps.config.connectWebhookSecret : deps.config.webhookSecret;
+  if (!secret) {
+    deps.log("webhook secret is not set", source);
+    return fail(503, "not_configured");
+  }
 
   let event: StripeEvent;
   try {
-    event = await deps.stripe.webhooks.constructEventAsync(rawBody, signature, deps.config.webhookSecret);
+    event = await deps.stripe.webhooks.constructEventAsync(rawBody, signature, secret);
   } catch (error) {
     deps.log("webhook signature rejected", messageOf(error));
     return fail(400, "bad_signature");
@@ -379,7 +431,8 @@ export async function handleStripeWebhook(deps: Deps, rawBody: string, signature
     const claimed = await deps.db.rpc<boolean>("webhook_claim_event", { p_event_id: event.id, p_type: event.type });
     if (!claimed) return ok({ received: true, duplicate: true });
 
-    await dispatch(deps, event);
+    if (source === "connect") await dispatchConnect(deps, event);
+    else await dispatchPlatform(deps, event);
     await deps.db.rpc("webhook_event_done", { p_event_id: event.id });
     return ok({ received: true });
   } catch (error) {
@@ -389,8 +442,14 @@ export async function handleStripeWebhook(deps: Deps, rawBody: string, signature
   }
 }
 
-async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
+/** Events on a creator's connected account: the money. */
+async function dispatchConnect(deps: Deps, event: StripeEvent): Promise<void> {
   const object = event.data.object;
+  // An event on a connected account always says which. One that doesn't is not one of ours to act on.
+  if (!event.account) {
+    deps.log("connect event without an account was ignored", { event: event.id, type: event.type });
+    return;
+  }
 
   switch (event.type) {
     case "payment_intent.succeeded": {
@@ -402,10 +461,14 @@ async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
         p_charge_id: typeof object.latest_charge === "string" ? object.latest_charge : null,
         // Apple Pay, unless the creator charged a card the client allowed them to (cards.ts marks those in the metadata).
         p_method: object.metadata?.saved_card === "true" ? "card" : "apple_pay",
+        // The database checks this is the account the payment was made on.
+        p_account_id: event.account,
       });
       if (result.action === "refund_required") {
-        // The money arrived too late (or for a cancelled booking). Send it back.
+        // The money arrived too late (or for a cancelled booking, or twice). Send it back.
         await issueRefunds(deps, result.booking_id);
+      } else if (result.action === "ignored") {
+        deps.log("payment event from a different account was ignored", { event: event.id, account: event.account });
       }
       return;
     }
@@ -429,23 +492,17 @@ async function dispatch(deps: Deps, event: StripeEvent): Promise<void> {
       });
       return;
     }
-    case "account.updated": {
-      if (!object?.id) return;
-      await deps.db.rpc("connect_account_update", {
-        p_account_id: object.id,
-        p_charges: !!object.charges_enabled,
-        p_payouts: !!object.payouts_enabled,
-        p_details: !!object.details_submitted,
-      });
-      return;
-    }
     default:
-      // Cards kept for later, then subscription events for seat billing; anything else we don't care about is
-      // acknowledged and ignored.
-      if (await handleCardEvent(deps, event)) return;
-      await handleBillingEvent(deps, event);
+      // Anything else a creator's account does is theirs to see in their own Dashboard.
       return;
   }
+}
+
+/** Events on the platform's own account: subscriptions for seat billing, and cards kept for later. */
+async function dispatchPlatform(deps: Deps, event: StripeEvent): Promise<void> {
+  // Cards kept for later, then subscription events for seat billing; anything else we don't care about is acknowledged and ignored.
+  if (await handleCardEvent(deps, event)) return;
+  await handleBillingEvent(deps, event);
 }
 
 // ---------------------------------------------------------------------------
@@ -461,8 +518,9 @@ export interface ConnectStatus {
 }
 
 /**
- * Creates the creator's Stripe Express account the first time, refreshes what Stripe says about it, and
- * (unless `action` is "status") returns a link to finish onboarding when there is more to do.
+ * Creates the creator's own Stripe account the first time (a Standard-style account: they own it and its Dashboard, see
+ * connect_v2.ts), refreshes what Stripe says about it, and (unless `action` is "status") returns a link to finish
+ * onboarding when there is more to do. The creator can open it to sign in to an existing Stripe login or make a new one.
  */
 export async function connectOnboarding(deps: Deps, userId: string, input: unknown): Promise<HttpResult> {
   const asked = asObject(input);
@@ -485,15 +543,13 @@ export async function connectOnboarding(deps: Deps, userId: string, input: unkno
         const none: ConnectStatus = { connected: false, charges_enabled: false, payouts_enabled: false, details_submitted: false };
         return ok(none);
       }
-      const created = await deps.stripe.accounts.create(
-        {
-          type: "express",
-          capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-          metadata: owner === userId ? { user_id: userId } : { user_id: userId, organization_id: owner },
-        },
+      const created = await deps.stripe.connect.createAccount({
+        country: deps.config.defaultCountry,
+        currency: deps.config.defaultCurrency,
+        metadata: owner === userId ? { user_id: userId } : { user_id: userId, organization_id: owner },
         // One account per person or company even if two taps race.
-        { idempotencyKey: `connect-account-${owner}` },
-      );
+        idempotencyKey: `connect-account-${owner}`,
+      });
       try {
         await deps.db.rpc("connect_account_save", { p_creator_id: owner, p_account_id: created.id });
       } catch (error) {
@@ -504,27 +560,23 @@ export async function connectOnboarding(deps: Deps, userId: string, input: unkno
       accountId = (await deps.db.rpc<string | null>("connect_account_for", { p_creator_id: owner })) ?? created.id;
     }
 
-    const account = await deps.stripe.accounts.retrieve(accountId);
-    await deps.db.rpc("connect_account_update", {
-      p_account_id: accountId,
-      p_charges: !!account.charges_enabled,
-      p_payouts: !!account.payouts_enabled,
-      p_details: !!account.details_submitted,
-    });
+    const account = await deps.stripe.connect.getAccount(accountId);
+    await recordAccount(deps, account);
 
+    // Ready means the account can take cards. (Payouts are the creator's own business, in their own Dashboard.)
+    const ready = account.cardPayments === "active";
     const status: ConnectStatus = {
       connected: true,
-      charges_enabled: !!account.charges_enabled,
-      payouts_enabled: !!account.payouts_enabled,
-      details_submitted: !!account.details_submitted,
+      charges_enabled: ready,
+      payouts_enabled: account.payouts === "active",
+      details_submitted: ready,
     };
-    if (!wantsLink || (status.charges_enabled && status.payouts_enabled)) return ok(status);
+    if (!wantsLink || ready) return ok(status);
 
-    const link = await deps.stripe.accountLinks.create({
+    const link = await deps.stripe.connect.createOnboardingLink({
       account: accountId,
-      type: "account_onboarding",
-      refresh_url: `${deps.config.functionsBaseUrl}/connect-redirect?to=refresh`,
-      return_url: `${deps.config.functionsBaseUrl}/connect-redirect?to=return`,
+      refreshUrl: `${deps.config.functionsBaseUrl}/connect-redirect?to=refresh`,
+      returnUrl: `${deps.config.functionsBaseUrl}/connect-redirect?to=return`,
     });
     return ok({ ...status, url: link.url });
   } catch (error) {

@@ -10,6 +10,7 @@ import {
   processRefundsRequest,
 } from "../functions/_shared/payments.ts";
 import type { Deps, StripeEvent, StripeIntent, StripeLike } from "../functions/_shared/payments.ts";
+import type { ConnectedAccount } from "../functions/_shared/connect_v2.ts";
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -36,50 +37,53 @@ class FakeDb {
 }
 
 interface StripeCalls {
-  intentsCreated: { params: Record<string, unknown>; key?: string }[];
-  intentsRetrieved: string[];
-  refunds: { params: Record<string, unknown>; key?: string }[];
-  accountsCreated: { params: Record<string, unknown>; key?: string }[];
-  links: Record<string, unknown>[];
+  intentsCreated: { params: Record<string, unknown>; key?: string; account?: string }[];
+  intentsRetrieved: { id: string; account?: string }[];
+  refunds: { params: Record<string, unknown>; key?: string; account?: string }[];
+  accountsCreated: { country: string; currency: string; metadata: Record<string, string>; key?: string }[];
+  accountsFetched: string[];
+  links: { account: string; refreshUrl: string; returnUrl: string }[];
 }
+
+const READY: Omit<ConnectedAccount, "id"> = { cardPayments: "active", payouts: null };
+const NOT_READY: Omit<ConnectedAccount, "id"> = { cardPayments: "pending", payouts: null };
 
 function makeStripe(overrides: Partial<{
   createIntent: (params: Record<string, unknown>) => Promise<StripeIntent>;
   retrieveIntent: (id: string) => Promise<StripeIntent>;
   createRefund: (params: Record<string, unknown>) => Promise<{ id: string; status: string | null; failure_reason?: string | null }>;
-  retrieveAccount: (id: string) => Promise<{ id: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }>;
+  getAccount: (id: string) => Promise<ConnectedAccount>;
   constructEvent: (payload: string, signature: string, secret: string) => Promise<StripeEvent>;
 }> = {}): { stripe: StripeLike; calls: StripeCalls } {
-  const calls: StripeCalls = { intentsCreated: [], intentsRetrieved: [], refunds: [], accountsCreated: [], links: [] };
+  const calls: StripeCalls = { intentsCreated: [], intentsRetrieved: [], refunds: [], accountsCreated: [], accountsFetched: [], links: [] };
   const stripe: StripeLike = {
     paymentIntents: {
       async create(params, options) {
-        calls.intentsCreated.push({ params, key: options?.idempotencyKey });
+        calls.intentsCreated.push({ params, key: options?.idempotencyKey, account: options?.stripeAccount });
         return overrides.createIntent ? overrides.createIntent(params) : { id: "pi_new", status: "requires_payment_method", client_secret: "pi_new_secret_x" };
       },
-      async retrieve(id) {
-        calls.intentsRetrieved.push(id);
+      async retrieve(id, options) {
+        calls.intentsRetrieved.push({ id, account: options?.stripeAccount });
         return overrides.retrieveIntent ? overrides.retrieveIntent(id) : { id, status: "requires_payment_method", client_secret: `${id}_secret` };
       },
     },
     refunds: {
       async create(params, options) {
-        calls.refunds.push({ params, key: options?.idempotencyKey });
+        calls.refunds.push({ params, key: options?.idempotencyKey, account: options?.stripeAccount });
         return overrides.createRefund ? overrides.createRefund(params) : { id: "re_1", status: "succeeded" };
       },
     },
-    accounts: {
-      async create(params, options) {
-        calls.accountsCreated.push({ params, key: options?.idempotencyKey });
+    connect: {
+      async createAccount(input) {
+        calls.accountsCreated.push({ country: input.country, currency: input.currency, metadata: input.metadata, key: input.idempotencyKey });
         return { id: "acct_new" };
       },
-      async retrieve(id) {
-        return overrides.retrieveAccount ? overrides.retrieveAccount(id) : { id, charges_enabled: false, payouts_enabled: false, details_submitted: false };
+      async getAccount(id) {
+        calls.accountsFetched.push(id);
+        return overrides.getAccount ? overrides.getAccount(id) : { id, ...READY };
       },
-    },
-    accountLinks: {
-      async create(params) {
-        calls.links.push(params);
+      async createOnboardingLink(input) {
+        calls.links.push(input);
         return { url: "https://connect.stripe.test/onboard/abc" };
       },
     },
@@ -102,7 +106,10 @@ function makeDeps(db: FakeDb, stripe: StripeLike, config: Partial<Deps["config"]
       config: {
         platformFeeBps: 0,
         functionsBaseUrl: "https://ref.supabase.co/functions/v1",
-        webhookSecret: "whsec_test",
+        webhookSecret: "whsec_platform",
+        connectWebhookSecret: "whsec_connect",
+        defaultCountry: "us",
+        defaultCurrency: "usd",
         appScheme: "slate",
         ...config,
       },
@@ -123,7 +130,7 @@ const prepared = (extra: Record<string, unknown> = {}) => ({
   amount_cents: 50000,
   currency: "usd",
   fee_cents: 0,
-  destination: "acct_creator",
+  account: "acct_creator",
   existing_intent: null,
   description: "Deposit for Portrait session with Maya Chen",
   ...extra,
@@ -133,7 +140,7 @@ const prepared = (extra: Record<string, unknown> = {}) => ({
 // Paying
 // ---------------------------------------------------------------------------
 describe("createPaymentIntent", () => {
-  it("opens a payment for the amount the database says, paid out to the creator", async () => {
+  it("opens a payment for the amount the database says, as a direct charge on the creator's own account", async () => {
     const db = new FakeDb({ payment_prepare: () => prepared(), payment_attach_intent: () => null });
     const { stripe, calls } = makeStripe();
     const { deps } = makeDeps(db, stripe);
@@ -141,18 +148,43 @@ describe("createPaymentIntent", () => {
     const result = await createPaymentIntent(deps, USER, { booking_id: BOOKING, kind: "deposit" });
 
     assert.equal(result.status, 200);
-    assert.deepEqual(result.body, { payment_id: PAYMENT, client_secret: "pi_new_secret_x", amount_cents: 50000, currency: "usd" });
+    assert.deepEqual(result.body, {
+      payment_id: PAYMENT, client_secret: "pi_new_secret_x", amount_cents: 50000, currency: "usd", stripe_account: "acct_creator",
+    });
     assert.deepEqual(db.called("payment_prepare")[0].args, { p_user_id: USER, p_booking_id: BOOKING, p_kind: "deposit", p_fee_bps: 0 });
     assert.equal(calls.intentsCreated.length, 1);
-    const { params, key } = calls.intentsCreated[0];
+    const { params, key, account } = calls.intentsCreated[0];
     assert.equal(params.amount, 50000);
     assert.equal(params.currency, "usd");
-    assert.deepEqual(params.transfer_data, { destination: "acct_creator" });
-    assert.deepEqual(params.payment_method_types, ["card"]);
+    assert.equal(account, "acct_creator", "the intent is made ON the creator's account");
+    assert.equal("transfer_data" in params, false, "no money passes through the platform");
+    assert.equal("on_behalf_of" in params, false);
+    assert.equal("payment_method_types" in params, false, "the creator's own Stripe settings decide the methods");
     assert.deepEqual(params.metadata, { payment_id: PAYMENT, booking_id: BOOKING, kind: "deposit" });
     assert.equal("application_fee_amount" in params, false, "no fee unless the database asks for one");
     assert.equal(key, `payment-${PAYMENT}`, "a retry can't create a second charge");
     assert.deepEqual(db.called("payment_attach_intent")[0].args, { p_payment_id: PAYMENT, p_intent_id: "pi_new" });
+  });
+
+  it("checks with Stripe that the creator's account can take cards before charging", async () => {
+    const db = new FakeDb({ payment_prepare: () => prepared(), payment_attach_intent: () => null });
+    const { stripe, calls } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    await createPaymentIntent(deps, USER, { booking_id: BOOKING, kind: "deposit" });
+    assert.deepEqual(calls.accountsFetched, ["acct_creator"]);
+  });
+
+  it("charges nothing, and records the account as not ready, when Stripe says it can't take cards", async () => {
+    for (const cardPayments of ["pending", "restricted", "inactive", null]) {
+      const db = new FakeDb({ payment_prepare: () => prepared(), connect_account_update: () => null });
+      const { stripe, calls } = makeStripe({ getAccount: async (id) => ({ id, cardPayments, payouts: null }) });
+      const { deps } = makeDeps(db, stripe);
+      const result = await createPaymentIntent(deps, USER, { booking_id: BOOKING, kind: "deposit" });
+      assert.equal(result.status, 409, String(cardPayments));
+      assert.deepEqual(result.body, { error: "payments_not_ready" });
+      assert.equal(calls.intentsCreated.length, 0);
+      assert.deepEqual(db.called("connect_account_update")[0].args, { p_account_id: "acct_creator", p_charges: false, p_payouts: false, p_details: false });
+    }
   });
 
   it("charges the platform fee the database worked out", async () => {
@@ -164,6 +196,7 @@ describe("createPaymentIntent", () => {
 
     assert.equal(db.called("payment_prepare")[0].args.p_fee_bps, 250);
     assert.equal(calls.intentsCreated[0].params.application_fee_amount, 1250);
+    assert.equal(calls.intentsCreated[0].account, "acct_creator");
   });
 
   it("ignores any amount, user or destination the caller tries to send", async () => {
@@ -176,7 +209,7 @@ describe("createPaymentIntent", () => {
     });
 
     assert.equal(calls.intentsCreated[0].params.amount, 50000);
-    assert.deepEqual(calls.intentsCreated[0].params.transfer_data, { destination: "acct_creator" });
+    assert.equal(calls.intentsCreated[0].account, "acct_creator", "never the account a caller names");
     assert.equal(db.called("payment_prepare")[0].args.p_user_id, USER);
     assert.equal(db.called("payment_prepare")[0].args.p_fee_bps, 0);
   });
@@ -228,6 +261,7 @@ describe("createPaymentIntent", () => {
 
     assert.equal(result.status, 200);
     assert.equal((result.body as { client_secret: string }).client_secret, "pi_old_secret");
+    assert.deepEqual(calls.intentsRetrieved, [{ id: "pi_old", account: "acct_creator" }], "looked up on the creator's account");
     assert.equal(calls.intentsCreated.length, 0);
     assert.equal(db.called("payment_attach_intent").length, 0);
   });
@@ -280,12 +314,12 @@ describe("createPaymentIntent", () => {
 // ---------------------------------------------------------------------------
 // Refunds
 // ---------------------------------------------------------------------------
-const refundRow = (id: string, amount: number, intent: string | null = "pi_paid") => ({
-  refund_id: id, amount_cents: amount, payment_intent_id: intent, stripe_refund_id: null,
+const refundRow = (id: string, amount: number, intent: string | null = "pi_paid", account: string | null = "acct_creator") => ({
+  refund_id: id, amount_cents: amount, payment_intent_id: intent, stripe_refund_id: null, stripe_account_id: intent ? account : null,
 });
 
 describe("issueRefunds", () => {
-  it("sends each owed refund to Stripe, taking it back from the creator", async () => {
+  it("sends each owed refund to Stripe, made on the creator's own account", async () => {
     const db = new FakeDb({ refunds_to_process: () => [refundRow("r1", 25000)], refund_record_result: () => null });
     const { stripe, calls } = makeStripe({ createRefund: async () => ({ id: "re_9", status: "succeeded" }) });
     const { deps } = makeDeps(db, stripe);
@@ -294,8 +328,10 @@ describe("issueRefunds", () => {
 
     assert.deepEqual(outcomes, [{ refund_id: "r1", status: "succeeded" }]);
     assert.deepEqual(calls.refunds[0].params, {
-      payment_intent: "pi_paid", amount: 25000, reverse_transfer: true, refund_application_fee: true, metadata: { refund_id: "r1" },
+      payment_intent: "pi_paid", amount: 25000, refund_application_fee: true, metadata: { refund_id: "r1" },
     });
+    assert.equal("reverse_transfer" in calls.refunds[0].params, false, "a direct charge has no transfer to reverse");
+    assert.equal(calls.refunds[0].account, "acct_creator", "refunded from the creator's balance, on their account");
     assert.equal(calls.refunds[0].key, "refund-r1", "asking twice can't refund twice");
     assert.deepEqual(db.called("refund_record_result")[0].args, { p_refund_id: "r1", p_status: "succeeded", p_stripe_refund_id: "re_9", p_message: null });
   });
@@ -358,6 +394,14 @@ describe("issueRefunds", () => {
     assert.equal(calls.refunds.length, 2, "a refund with no Stripe payment behind it is never sent");
   });
 
+  it("won't send a refund that has no connected account behind it", async () => {
+    const db = new FakeDb({ refunds_to_process: () => [{ ...refundRow("r1", 100), stripe_account_id: null }], refund_record_result: () => null });
+    const { stripe, calls } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    assert.deepEqual(await issueRefunds(deps, BOOKING), [{ refund_id: "r1", status: "failed" }]);
+    assert.equal(calls.refunds.length, 0);
+  });
+
   it("does nothing when nothing is owed", async () => {
     const db = new FakeDb({ refunds_to_process: () => [] });
     const { stripe, calls } = makeStripe();
@@ -400,8 +444,8 @@ describe("processRefundsRequest", () => {
 // ---------------------------------------------------------------------------
 // Webhook
 // ---------------------------------------------------------------------------
-const event = (type: string, object: Record<string, unknown>, id = "evt_1"): string =>
-  JSON.stringify({ id, type, data: { object } });
+const event = (type: string, object: Record<string, unknown>, id = "evt_1", account: string | null = "acct_creator"): string =>
+  JSON.stringify({ id, type, ...(account ? { account } : {}), data: { object } });
 
 const ourIntent = (extra: Record<string, unknown> = {}) => ({
   id: "pi_new", amount: 50000, amount_received: 50000, latest_charge: "ch_1", metadata: { payment_id: PAYMENT, booking_id: BOOKING, kind: "deposit" }, ...extra,
@@ -434,7 +478,25 @@ describe("handleStripeWebhook", () => {
     const { deps } = makeDeps(webhookDb(), stripe);
     const body = event("ping", {});
     await handleStripeWebhook(deps, body, "t=1,v1=abc");
-    assert.deepEqual(seen, [body, "t=1,v1=abc", "whsec_test"]);
+    assert.deepEqual(seen, [body, "t=1,v1=abc", "whsec_platform"]);
+  });
+
+  it("verifies the Connect endpoint with its own secret, never the platform's", async () => {
+    const seen: string[] = [];
+    const { stripe } = makeStripe({ constructEvent: async (payload, _signature, secret) => { seen.push(secret); return JSON.parse(payload); } });
+    const { deps } = makeDeps(webhookDb(), stripe);
+    await handleStripeWebhook(deps, event("ping", {}), "sig", "connect");
+    await handleStripeWebhook(deps, event("ping", {}, "evt_2"), "sig", "platform");
+    assert.deepEqual(seen, ["whsec_connect", "whsec_platform"]);
+  });
+
+  it("answers 503 and touches nothing when the endpoint's secret isn't set", async () => {
+    const db = webhookDb();
+    const { stripe } = makeStripe();
+    const { deps } = makeDeps(db, stripe, { connectWebhookSecret: "" });
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect");
+    assert.equal(result.status, 503);
+    assert.equal(db.calls.length, 0);
   });
 
   it("records a successful payment and marks the event done", async () => {
@@ -442,11 +504,11 @@ describe("handleStripeWebhook", () => {
     const { stripe, calls } = makeStripe();
     const { deps } = makeDeps(db, stripe);
 
-    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig");
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect");
 
     assert.equal(result.status, 200);
     assert.deepEqual(db.called("payment_record_success")[0].args, {
-      p_intent_id: "pi_new", p_amount_cents: 50000, p_charge_id: "ch_1", p_method: "apple_pay",
+      p_intent_id: "pi_new", p_amount_cents: 50000, p_charge_id: "ch_1", p_method: "apple_pay", p_account_id: "acct_creator",
     });
     assert.deepEqual(db.calls.map((call) => call.fn), ["webhook_claim_event", "payment_record_success", "webhook_event_done"]);
     assert.equal(calls.refunds.length, 0);
@@ -456,7 +518,7 @@ describe("handleStripeWebhook", () => {
     const db = webhookDb();
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent({ amount: 50000, amount_received: 49000 })), "sig");
+    await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent({ amount: 50000, amount_received: 49000 })), "sig", "connect");
     assert.equal(db.called("payment_record_success")[0].args.p_amount_cents, 49000);
   });
 
@@ -464,7 +526,7 @@ describe("handleStripeWebhook", () => {
     const db = webhookDb();
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", { id: "pi_other", amount: 1, metadata: {} }), "sig");
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", { id: "pi_other", amount: 1, metadata: {} }), "sig", "connect");
     assert.equal(result.status, 200);
     assert.equal(db.called("payment_record_success").length, 0);
     assert.equal(db.called("webhook_event_done").length, 1);
@@ -479,7 +541,7 @@ describe("handleStripeWebhook", () => {
     const { stripe, calls } = makeStripe();
     const { deps } = makeDeps(db, stripe);
 
-    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig");
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect");
 
     assert.equal(result.status, 200);
     assert.equal(calls.refunds.length, 1);
@@ -492,7 +554,7 @@ describe("handleStripeWebhook", () => {
     const db = webhookDb({ payment_record_success: () => new DbError("deadlock detected") });
     const { stripe } = makeStripe();
     const { deps, logs } = makeDeps(db, stripe);
-    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig");
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect");
     assert.equal(result.status, 500);
     assert.equal(db.called("webhook_event_done").length, 0);
     assert.ok(logs.length > 0);
@@ -502,14 +564,14 @@ describe("handleStripeWebhook", () => {
     const db = webhookDb({ payment_record_success: () => new DbError("amount_mismatch") });
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    assert.equal((await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig")).status, 500);
+    assert.equal((await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect")).status, 500);
   });
 
   it("skips an event it has already finished", async () => {
     const db = webhookDb({ webhook_claim_event: () => false });
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig");
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent()), "sig", "connect");
     assert.equal(result.status, 200);
     assert.deepEqual(result.body, { received: true, duplicate: true });
     assert.equal(db.called("payment_record_success").length, 0);
@@ -519,7 +581,7 @@ describe("handleStripeWebhook", () => {
     const db = webhookDb();
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    await handleStripeWebhook(deps, event("payment_intent.payment_failed", ourIntent({ last_payment_error: { message: "Your card was declined." } })), "sig");
+    await handleStripeWebhook(deps, event("payment_intent.payment_failed", ourIntent({ last_payment_error: { message: "Your card was declined." } })), "sig", "connect");
     assert.deepEqual(db.called("payment_record_failure")[0].args, { p_intent_id: "pi_new", p_message: "Your card was declined." });
   });
 
@@ -536,18 +598,60 @@ describe("handleStripeWebhook", () => {
       const db = webhookDb();
       const { stripe } = makeStripe();
       const { deps } = makeDeps(db, stripe);
-      await handleStripeWebhook(deps, event(type, object), "sig");
+      await handleStripeWebhook(deps, event(type, object), "sig", "connect");
       assert.equal(db.called("refund_record_by_stripe_id")[0].args.p_status, expected, `${type} ${object.status}`);
       assert.equal(db.called("refund_record_by_stripe_id")[0].args.p_stripe_refund_id, "re_1");
     }
   });
 
-  it("updates what a creator can do when Stripe changes their account", async () => {
+  it("tells the database which account an event came from, so a payment can only be reported by the account it was made on", async () => {
     const db = webhookDb();
     const { stripe } = makeStripe();
     const { deps } = makeDeps(db, stripe);
-    await handleStripeWebhook(deps, event("account.updated", { id: "acct_1", charges_enabled: true, payouts_enabled: false, details_submitted: true }), "sig");
-    assert.deepEqual(db.called("connect_account_update")[0].args, { p_account_id: "acct_1", p_charges: true, p_payouts: false, p_details: true });
+    await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent(), "evt_a", "acct_somebody_else"), "sig", "connect");
+    assert.equal(db.called("payment_record_success")[0].args.p_account_id, "acct_somebody_else");
+  });
+
+  it("logs, and sends nothing back, when the database says the payment belongs to another account", async () => {
+    const db = webhookDb({ payment_record_success: () => ({ action: "ignored", booking_id: BOOKING }) });
+    const { stripe, calls } = makeStripe();
+    const { deps, logs } = makeDeps(db, stripe);
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent(), "evt_a", "acct_somebody_else"), "sig", "connect");
+    assert.equal(result.status, 200);
+    assert.equal(calls.refunds.length, 0);
+    assert.ok(logs.some((line) => /different account/.test(line)));
+  });
+
+  it("ignores a Connect event that doesn't say which account it is from", async () => {
+    const db = webhookDb();
+    const { stripe } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    const result = await handleStripeWebhook(deps, event("payment_intent.succeeded", ourIntent(), "evt_a", null), "sig", "connect");
+    assert.equal(result.status, 200);
+    assert.equal(db.called("payment_record_success").length, 0);
+  });
+
+  it("never marks anything paid from the platform's own endpoint", async () => {
+    const db = webhookDb();
+    const { stripe } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    for (const type of ["payment_intent.succeeded", "payment_intent.payment_failed", "refund.updated"]) {
+      const result = await handleStripeWebhook(deps, event(type, ourIntent({ status: "succeeded" })), "sig", "platform");
+      assert.equal(result.status, 200, type);
+    }
+    assert.equal(db.called("payment_record_success").length, 0);
+    assert.equal(db.called("payment_record_failure").length, 0);
+    assert.equal(db.called("refund_record_by_stripe_id").length, 0);
+  });
+
+  it("doesn't use account.updated: whether a creator can take cards is asked of Stripe when it matters", async () => {
+    const db = webhookDb();
+    const { stripe } = makeStripe();
+    const { deps } = makeDeps(db, stripe);
+    for (const source of ["platform", "connect"] as const) {
+      await handleStripeWebhook(deps, event("account.updated", { id: "acct_1", charges_enabled: true }, `evt_${source}`), "sig", source);
+    }
+    assert.equal(db.called("connect_account_update").length, 0);
   });
 
   it("acknowledges events it doesn't use", async () => {
@@ -564,14 +668,16 @@ describe("handleStripeWebhook", () => {
 // Connect
 // ---------------------------------------------------------------------------
 describe("connectOnboarding", () => {
-  it("creates an account the first time and returns a link to finish setting up", async () => {
+  const notReady = async (id: string): Promise<ConnectedAccount> => ({ id, ...NOT_READY });
+
+  it("creates the creator's own account the first time and returns a link to finish setting up", async () => {
     let stored: string | null = null;
     const db = new FakeDb({
       connect_account_for: () => stored,
       connect_account_save: (args) => { stored = args.p_account_id as string; return null; },
       connect_account_update: () => null,
     });
-    const { stripe, calls } = makeStripe();
+    const { stripe, calls } = makeStripe({ getAccount: notReady });
     const { deps } = makeDeps(db, stripe);
 
     const result = await connectOnboarding(deps, USER, {});
@@ -581,28 +687,30 @@ describe("connectOnboarding", () => {
       connected: true, charges_enabled: false, payouts_enabled: false, details_submitted: false, url: "https://connect.stripe.test/onboard/abc",
     });
     assert.equal(calls.accountsCreated.length, 1);
-    assert.equal(calls.accountsCreated[0].params.type, "express");
-    assert.deepEqual(calls.accountsCreated[0].params.capabilities, { card_payments: { requested: true }, transfers: { requested: true } });
+    assert.deepEqual(calls.accountsCreated[0].metadata, { user_id: USER });
+    assert.equal(calls.accountsCreated[0].country, "us");
+    assert.equal(calls.accountsCreated[0].currency, "usd");
     assert.equal(calls.accountsCreated[0].key, `connect-account-${USER}`, "two taps can't make two accounts");
     assert.deepEqual(db.called("connect_account_save")[0].args, { p_creator_id: USER, p_account_id: "acct_new" });
-    assert.equal(calls.links[0].account, "acct_new");
-    assert.equal(calls.links[0].type, "account_onboarding");
-    assert.equal(calls.links[0].return_url, "https://ref.supabase.co/functions/v1/connect-redirect?to=return");
-    assert.equal(calls.links[0].refresh_url, "https://ref.supabase.co/functions/v1/connect-redirect?to=refresh");
+    assert.deepEqual(calls.links, [{
+      account: "acct_new",
+      returnUrl: "https://ref.supabase.co/functions/v1/connect-redirect?to=return",
+      refreshUrl: "https://ref.supabase.co/functions/v1/connect-redirect?to=refresh",
+    }]);
   });
 
   it("reuses the account it already has", async () => {
     const db = new FakeDb({ connect_account_for: () => "acct_existing", connect_account_update: () => null });
-    const { stripe, calls } = makeStripe();
+    const { stripe, calls } = makeStripe({ getAccount: notReady });
     const { deps } = makeDeps(db, stripe);
     await connectOnboarding(deps, USER, {});
     assert.equal(calls.accountsCreated.length, 0);
     assert.equal(calls.links[0].account, "acct_existing");
   });
 
-  it("records what Stripe says and sends no link once the creator can be paid", async () => {
+  it("records what Stripe says and sends no link once the account can take cards", async () => {
     const db = new FakeDb({ connect_account_for: () => "acct_ready", connect_account_update: () => null });
-    const { stripe, calls } = makeStripe({ retrieveAccount: async (id) => ({ id, charges_enabled: true, payouts_enabled: true, details_submitted: true }) });
+    const { stripe, calls } = makeStripe({ getAccount: async (id) => ({ id, cardPayments: "active", payouts: "active" }) });
     const { deps } = makeDeps(db, stripe);
     const result = await connectOnboarding(deps, USER, {});
     assert.deepEqual(result.body, { connected: true, charges_enabled: true, payouts_enabled: true, details_submitted: true });
@@ -610,13 +718,24 @@ describe("connectOnboarding", () => {
     assert.equal(calls.links.length, 0);
   });
 
-  it("still offers a link when payments work but payouts aren't set up", async () => {
-    const db = new FakeDb({ connect_account_for: () => "acct_half", connect_account_update: () => null });
-    const { stripe, calls } = makeStripe({ retrieveAccount: async (id) => ({ id, charges_enabled: true, payouts_enabled: false, details_submitted: true }) });
+  it("calls an account ready when it can take cards, whatever its payouts say (payouts are the creator's own business)", async () => {
+    const db = new FakeDb({ connect_account_for: () => "acct_ready", connect_account_update: () => null });
+    const { stripe, calls } = makeStripe({ getAccount: async (id) => ({ id, cardPayments: "active", payouts: null }) });
     const { deps } = makeDeps(db, stripe);
     const result = await connectOnboarding(deps, USER, {});
-    assert.equal((result.body as { url?: string }).url, "https://connect.stripe.test/onboard/abc");
-    assert.equal(calls.links.length, 1);
+    assert.deepEqual(result.body, { connected: true, charges_enabled: true, payouts_enabled: false, details_submitted: true });
+    assert.equal(calls.links.length, 0);
+  });
+
+  it("keeps offering a link while card payments aren't active", async () => {
+    for (const cardPayments of ["pending", "restricted", null]) {
+      const db = new FakeDb({ connect_account_for: () => "acct_half", connect_account_update: () => null });
+      const { stripe, calls } = makeStripe({ getAccount: async (id) => ({ id, cardPayments, payouts: null }) });
+      const { deps } = makeDeps(db, stripe);
+      const result = await connectOnboarding(deps, USER, {});
+      assert.equal((result.body as { url?: string }).url, "https://connect.stripe.test/onboard/abc", String(cardPayments));
+      assert.equal(calls.links.length, 1);
+    }
   });
 
   it("can just report status, creating nothing", async () => {
@@ -628,7 +747,7 @@ describe("connectOnboarding", () => {
     assert.equal(calls.accountsCreated.length, 0);
 
     const db2 = new FakeDb({ connect_account_for: () => "acct_1", connect_account_update: () => null });
-    const second = makeDeps(db2, makeStripe().stripe);
+    const second = makeDeps(db2, makeStripe({ getAccount: notReady }).stripe);
     const status = await connectOnboarding(second.deps, USER, { action: "status" });
     assert.equal("url" in (status.body as object), false);
   });
@@ -642,7 +761,7 @@ describe("connectOnboarding", () => {
       connect_account_save: (args) => { stored = args.p_account_id as string; return null; },
       connect_account_update: () => null,
     });
-    const { stripe, calls } = makeStripe();
+    const { stripe, calls } = makeStripe({ getAccount: notReady });
     const { deps } = makeDeps(db, stripe);
 
     const result = await connectOnboarding(deps, USER, { organization_id: COMPANY });
@@ -651,7 +770,7 @@ describe("connectOnboarding", () => {
     assert.deepEqual(db.called("connect_authorize")[0].args, { p_user: USER, p_owner: COMPANY });
     assert.deepEqual(db.called("connect_account_save")[0].args, { p_creator_id: COMPANY, p_account_id: "acct_new" });
     assert.equal(calls.accountsCreated[0].key, `connect-account-${COMPANY}`, "one account per company");
-    assert.deepEqual(calls.accountsCreated[0].params.metadata, { user_id: USER, organization_id: COMPANY });
+    assert.deepEqual(calls.accountsCreated[0].metadata, { user_id: USER, organization_id: COMPANY });
   });
 
   it("refuses to touch a company's account for anyone who isn't allowed to", async () => {
@@ -694,7 +813,7 @@ describe("connectOnboarding", () => {
 
   it("reports Stripe trouble without its details", async () => {
     const db = new FakeDb({ connect_account_for: () => "acct_1", connect_account_update: () => null });
-    const { stripe } = makeStripe({ retrieveAccount: async () => { throw Object.assign(new Error("rk_live_oops"), { type: "StripeAPIError" }); } });
+    const { stripe } = makeStripe({ getAccount: async () => { throw Object.assign(new Error("rk_live_oops"), { type: "StripeAPIError" }); } });
     const { deps } = makeDeps(db, stripe);
     const result = await connectOnboarding(deps, USER, {});
     assert.equal(result.status, 502);

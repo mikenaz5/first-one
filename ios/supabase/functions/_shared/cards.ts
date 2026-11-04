@@ -12,7 +12,7 @@
 //   - _shared/runtime.ts wires this to the real Stripe SDK. That wiring has never been run against live Stripe.
 //
 // Only erasable TypeScript syntax is used (no enums or parameter properties) so Node can run it directly.
-import type { Db, HttpResult, StripeEvent, StripeIntent } from "./payments.ts";
+import type { Db, HttpResult, StripeCallOptions, StripeEvent, StripeIntent } from "./payments.ts";
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -39,11 +39,20 @@ export interface CardStripe {
   paymentMethods: {
     list(params: Record<string, unknown>): Promise<{ data: StripeCardMethod[] }>;
     detach(id: string): Promise<unknown>;
+    /**
+     * Shares a card kept on the platform with a creator's connected account, so the creator can charge it there (a direct
+     * charge). The copy lives on their account; the platform's card and customer are untouched.
+     */
+    clone(
+      params: { customer: string; paymentMethod: string },
+      options: { stripeAccount: string; idempotencyKey?: string },
+    ): Promise<{ id: string }>;
   };
+  /** Payments are made on the creator's connected account (`stripeAccount`), never on the platform's. */
   paymentIntents: {
-    create(params: Record<string, unknown>, options?: { idempotencyKey?: string }): Promise<StripeIntent>;
-    retrieve(id: string): Promise<StripeIntent>;
-    cancel(id: string): Promise<StripeIntent>;
+    create(params: Record<string, unknown>, options?: StripeCallOptions): Promise<StripeIntent>;
+    retrieve(id: string, options?: StripeCallOptions): Promise<StripeIntent>;
+    cancel(id: string, options?: StripeCallOptions): Promise<StripeIntent>;
   };
 }
 
@@ -290,7 +299,8 @@ interface SavedPrepared {
   amount_cents: number;
   currency: string;
   fee_cents: number;
-  destination: string;
+  /** The creator's connected account the charge is made on. */
+  account: string;
   existing_intent: string | null;
   description: string;
   customer: string;
@@ -324,15 +334,15 @@ export async function chargeSavedCard(deps: CardDeps, userId: string, input: unk
     // A payment is already waiting on this booking: say the client started paying another way and didn't finish, or an
     // earlier try failed. If it is done or under way, leave it be; if not, close it so this one starts clean.
     if (prepared.existing_intent) {
-      const existing = await deps.stripe.paymentIntents.retrieve(prepared.existing_intent);
+      const existing = await deps.stripe.paymentIntents.retrieve(prepared.existing_intent, { stripeAccount: prepared.account });
       if (existing.status === "succeeded") return fail(409, "already_paid");
       if (existing.status === "processing") return fail(409, "payment_processing");
       if (existing.status !== "canceled") {
         try {
-          await deps.stripe.paymentIntents.cancel(existing.id);
+          await deps.stripe.paymentIntents.cancel(existing.id, { stripeAccount: prepared.account });
         } catch (error) {
           // It may have gone through a moment ago.
-          const again = await deps.stripe.paymentIntents.retrieve(existing.id);
+          const again = await deps.stripe.paymentIntents.retrieve(existing.id, { stripeAccount: prepared.account });
           if (again.status === "succeeded") return fail(409, "already_paid");
           if (again.status === "processing") return fail(409, "payment_processing");
           if (again.status !== "canceled") throw error;
@@ -346,16 +356,25 @@ export async function chargeSavedCard(deps: CardDeps, userId: string, input: unk
     return failure(deps, error);
   }
 
+  // The card is kept on the platform; the charge is made on the creator's own account, so the card is shared to it first.
+  const onAccount = { stripeAccount: prepared.account };
+  let shared: { id: string };
+  try {
+    shared = await deps.stripe.paymentMethods.clone(
+      { customer: prepared.customer, paymentMethod: prepared.payment_method },
+      { stripeAccount: prepared.account, idempotencyKey: `clone-${prepared.payment_id}` },
+    );
+  } catch (error) {
+    return failure(deps, error);
+  }
+
   const params: Record<string, unknown> = {
     amount: prepared.amount_cents,
     currency: prepared.currency,
-    customer: prepared.customer,
-    payment_method: prepared.payment_method,
-    payment_method_types: ["card"],
+    payment_method: shared.id,
     // The client isn't there: the bank may refuse it, and then the client pays in the app.
     off_session: true,
     confirm: true,
-    transfer_data: { destination: prepared.destination },
     description: prepared.description,
     metadata: { payment_id: prepared.payment_id, booking_id: prepared.booking_id, kind: prepared.kind, saved_card: "true" },
   };
@@ -363,7 +382,7 @@ export async function chargeSavedCard(deps: CardDeps, userId: string, input: unk
 
   let intent: StripeIntent;
   try {
-    intent = await deps.stripe.paymentIntents.create(params, { idempotencyKey: `payment-${prepared.payment_id}` });
+    intent = await deps.stripe.paymentIntents.create(params, { idempotencyKey: `payment-${prepared.payment_id}`, ...onAccount });
   } catch (error) {
     const stripeError = asObject(error);
     if (stripeError?.type !== "StripeCardError") return failure(deps, error);
@@ -394,7 +413,7 @@ export async function chargeSavedCard(deps: CardDeps, userId: string, input: unk
   // Anything else (the bank wants the client to approve it) can't be finished without them. Close it so it can't be
   // completed later by surprise.
   try {
-    await deps.stripe.paymentIntents.cancel(intent.id);
+    await deps.stripe.paymentIntents.cancel(intent.id, onAccount);
   } catch (error) {
     deps.log("could not cancel an unfinished card payment", messageOf(error));
   }

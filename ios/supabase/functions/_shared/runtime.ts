@@ -4,9 +4,14 @@
 // adapters, and everything with logic in it is in payments.ts, where it is tested.
 //
 // Secrets this needs (set with `supabase secrets set`):
-//   STRIPE_SECRET_KEY       sk_test_… or sk_live_…
-//   STRIPE_WEBHOOK_SECRET   whsec_… from the webhook endpoint you add in the Stripe dashboard
+//   STRIPE_SECRET_KEY       sk_test_… or sk_live_… (or a restricted key, rk_…, with the permissions these functions use)
+//   STRIPE_WEBHOOK_SECRET   whsec_… of the webhook endpoint for the platform's OWN events (stripe-webhook): seat billing, saved cards
+//   STRIPE_CONNECT_WEBHOOK_SECRET   whsec_… of the endpoint with "Listen to events on Connected accounts" turned on
+//                           (stripe-connect-webhook): payments and refunds, which happen on each creator's own account
 //   PLATFORM_FEE_BPS        optional, defaults to 0 (the platform takes nothing)
+//   STRIPE_DEFAULT_COUNTRY  optional, two letters, defaults to "us": the country a new connected account starts with
+//   STRIPE_DEFAULT_CURRENCY optional, defaults to "usd"
+//   STRIPE_API_VERSION      optional: the Stripe API version for the Accounts v2 calls (see connect_v2.ts)
 //   APP_URL_SCHEME          optional, defaults to "slate"
 // For seat billing (billing-session, billing-sync):
 //   STRIPE_SEAT_PRICE_ID    the id of the Stripe Price for one seat for one month (price_…); billing is off without it
@@ -25,6 +30,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { DbError } from "./payments.ts";
 import type { Db, Deps, HttpResult } from "./payments.ts";
 import { createApnsSender } from "./apns.ts";
+import { makeConnectApi } from "./connect_v2.ts";
 import type { BillingDeps } from "./billing.ts";
 import type { CalendarDeps } from "./calendar.ts";
 import type { CardDeps } from "./cards.ts";
@@ -51,16 +57,18 @@ export function makeDeps(): Deps {
       },
     },
     stripe: {
+      // `options.stripeAccount` makes a call ON a creator's connected account (a direct charge).
       paymentIntents: {
-        create: (params, options) => stripe.paymentIntents.create(params as never, options),
-        retrieve: (id) => stripe.paymentIntents.retrieve(id),
+        create: (params, options) => stripe.paymentIntents.create(params as never, options as never),
+        retrieve: (id, options) => stripe.paymentIntents.retrieve(id, {}, options as never),
       },
-      refunds: { create: (params, options) => stripe.refunds.create(params as never, options) },
-      accounts: {
-        create: (params, options) => stripe.accounts.create(params as never, options),
-        retrieve: (id) => stripe.accounts.retrieve(id),
-      },
-      accountLinks: { create: (params) => stripe.accountLinks.create(params as never) },
+      refunds: { create: (params, options) => stripe.refunds.create(params as never, options as never) },
+      // Connected accounts use Accounts v2, called with plain fetch (see connect_v2.ts).
+      connect: makeConnectApi({
+        secretKey: Deno.env.get("STRIPE_SECRET_KEY")!,
+        apiVersion: Deno.env.get("STRIPE_API_VERSION") || undefined,
+        fetchFn: fetch as never,
+      }),
       webhooks: {
         constructEventAsync: (payload, signature, secret) =>
           stripe.webhooks.constructEventAsync(payload, signature, secret, undefined, cryptoProvider) as never,
@@ -70,6 +78,9 @@ export function makeDeps(): Deps {
       platformFeeBps: Number(Deno.env.get("PLATFORM_FEE_BPS") ?? "0") || 0,
       functionsBaseUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1`,
       webhookSecret: Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "",
+      connectWebhookSecret: Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET") ?? "",
+      defaultCountry: (Deno.env.get("STRIPE_DEFAULT_COUNTRY") ?? "us").toLowerCase(),
+      defaultCurrency: (Deno.env.get("STRIPE_DEFAULT_CURRENCY") ?? "usd").toLowerCase(),
       appScheme: Deno.env.get("APP_URL_SCHEME") ?? "slate",
     },
     log: (message, detail) => console.error(message, detail ?? ""),
@@ -120,11 +131,17 @@ export function makeCardDeps(): CardDeps {
       paymentMethods: {
         list: (params) => stripe.paymentMethods.list(params as never) as never,
         detach: (id) => stripe.paymentMethods.detach(id),
+        // Shares a platform card with a creator's connected account, for one direct charge there.
+        clone: (params, options) =>
+          stripe.paymentMethods.create(
+            { customer: params.customer, payment_method: params.paymentMethod } as never,
+            options as never,
+          ) as never,
       },
       paymentIntents: {
-        create: (params, options) => stripe.paymentIntents.create(params as never, options),
-        retrieve: (id) => stripe.paymentIntents.retrieve(id),
-        cancel: (id) => stripe.paymentIntents.cancel(id),
+        create: (params, options) => stripe.paymentIntents.create(params as never, options as never),
+        retrieve: (id, options) => stripe.paymentIntents.retrieve(id, {}, options as never),
+        cancel: (id, options) => stripe.paymentIntents.cancel(id, {}, options as never),
       },
     },
     config: { platformFeeBps: base.config.platformFeeBps, functionsBaseUrl: base.config.functionsBaseUrl },
