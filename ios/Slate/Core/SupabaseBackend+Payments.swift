@@ -73,19 +73,76 @@ extension SupabaseBackend {
         var action: String
     }
 
-    /// What `create-payment-intent` answers.
+    /// What `create-payment-intent` answers. `stripe_account` is the creator's own account the payment is made on.
     private struct PaymentIntentResponse: Decodable {
         var paymentId: String
         var clientSecret: String
         var amountCents: Int
         var currency: String
+        var stripeAccount: String?
 
         enum CodingKeys: String, CodingKey {
             case currency
             case paymentId = "payment_id"
             case clientSecret = "client_secret"
             case amountCents = "amount_cents"
+            case stripeAccount = "stripe_account"
         }
+    }
+
+    /// What `payment_options` returns, and what `creator_payment_links` holds.
+    private struct PaymentOptionsRow: Decodable {
+        var stripeReady: Bool
+        var linkUrl: String?
+        var instructions: String?
+
+        enum CodingKeys: String, CodingKey {
+            case instructions
+            case stripeReady = "stripe_ready"
+            case linkUrl = "link_url"
+        }
+    }
+
+    private struct PaymentLinkRow: Decodable {
+        var url: String
+        var instructions: String
+    }
+
+    private struct OptionsParams: Encodable {
+        var pBookingId: String
+
+        enum CodingKeys: String, CodingKey { case pBookingId = "p_booking_id" }
+    }
+
+    /// `p_instructions` and `p_note` have defaults in SQL, so they may be left out; `p_url` is sent empty to take a link away.
+    private struct SaveLinkParams: Encodable {
+        var pOwner: String
+        var pUrl: String
+        var pInstructions: String
+
+        enum CodingKeys: String, CodingKey {
+            case pOwner = "p_owner"
+            case pUrl = "p_url"
+            case pInstructions = "p_instructions"
+        }
+    }
+
+    private struct MarkReceivedParams: Encodable {
+        var pBookingId: String
+        var pKind: String
+        var pNote: String?
+
+        enum CodingKeys: String, CodingKey {
+            case pBookingId = "p_booking_id"
+            case pKind = "p_kind"
+            case pNote = "p_note"
+        }
+    }
+
+    private struct RefundSentParams: Encodable {
+        var pRefundId: String
+
+        enum CodingKeys: String, CodingKey { case pRefundId = "p_refund_id" }
     }
 
     private struct PaymentIntentRequest: Encodable {
@@ -206,7 +263,8 @@ extension SupabaseBackend {
             clientSecret: response.clientSecret,
             amountCents: response.amountCents,
             currencyCode: response.currency.uppercased(),
-            kind: kind
+            kind: kind,
+            stripeAccountID: response.stripeAccount
         )
     }
 
@@ -239,6 +297,78 @@ extension SupabaseBackend {
 
     func settleRefunds(bookingID: UUID) async throws {
         try await callVoid("process-refunds", body: RefundRequest(bookingId: Self.key(bookingID)))
+    }
+
+    // MARK: - Paying another way
+
+    func paymentOptions(bookingID: UUID, for userID: UUID) async throws -> PaymentOptions? {
+        do {
+            let row: PaymentOptionsRow? = try await client
+                .rpc("payment_options", params: OptionsParams(pBookingId: Self.key(bookingID)))
+                .execute()
+                .value
+            guard let row else { return nil }
+            return PaymentOptions(stripeReady: row.stripeReady, link: Self.makeLink(url: row.linkUrl, instructions: row.instructions))
+        } catch {
+            throw Self.mapPaymentRpcError(error)
+        }
+    }
+
+    func loadPaymentLink(for ownerID: UUID) async throws -> PaymentLink? {
+        let rows: [PaymentLinkRow] = try await client
+            .from("creator_payment_links")
+            .select("url, instructions")
+            .eq("creator_id", value: Self.key(ownerID))
+            .limit(1)
+            .execute()
+            .value
+        guard let row = rows.first else { return nil }
+        return Self.makeLink(url: row.url, instructions: row.instructions)
+    }
+
+    func savePaymentLink(_ link: PaymentLink?, for ownerID: UUID) async throws {
+        do {
+            try await client.rpc("payment_link_save", params: SaveLinkParams(
+                pOwner: Self.key(ownerID), pUrl: link?.url.absoluteString ?? "", pInstructions: link?.instructions ?? ""
+            )).execute()
+        } catch {
+            throw Self.mapPaymentRpcError(error)
+        }
+    }
+
+    func markPaymentReceived(bookingID: UUID, kind: PaymentKind, note: String?, by userID: UUID) async throws {
+        do {
+            try await client.rpc("payment_mark_received", params: MarkReceivedParams(
+                pBookingId: Self.key(bookingID), pKind: kind.rawValue, pNote: note
+            )).execute()
+        } catch {
+            throw Self.mapPaymentRpcError(error)
+        }
+    }
+
+    func markRefundSent(paymentID: UUID, by userID: UUID) async throws {
+        do {
+            try await client.rpc("refund_mark_sent", params: RefundSentParams(pRefundId: Self.key(paymentID))).execute()
+        } catch {
+            throw Self.mapPaymentRpcError(error)
+        }
+    }
+
+    private static func makeLink(url: String?, instructions: String?) -> PaymentLink? {
+        guard let url, let address = URL(string: url) else { return nil }
+        return PaymentLink(url: address, instructions: instructions ?? "")
+    }
+
+    /// The database's refusals for the pay-another-way functions, in words. Anything it doesn't know goes to the booking errors.
+    static func mapPaymentRpcError(_ error: Error) -> Error {
+        let text = "\(error)"
+        if text.contains("invalid_link") { return SlateError.invalidPaymentLink }
+        if text.contains("profile_required") { return SlateError.backend("Finish setting up your profile before adding a payment link.") }
+        // A deposit marked after its hold ran out, once someone else has the time.
+        if text.contains("time_taken") { return SlateError.slotTaken }
+        if text.contains("invalid_kind") { return SlateError.paymentNotDue }
+        if text.contains("not_found") { return SlateError.notAllowed }
+        return mapBookingError(error)
     }
 
     // MARK: - Calling Edge Functions

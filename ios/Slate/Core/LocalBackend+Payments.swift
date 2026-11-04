@@ -19,6 +19,13 @@ extension LocalBackend {
         try write(payments, to: paymentsURL)
     }
 
+    /// Creators' own payment links, by owner id (lower case).
+    var paymentLinksURL: URL { root.appendingPathComponent("payment-links.json") }
+
+    func readPaymentLinks() -> [String: PaymentLink] {
+        read([String: PaymentLink].self, from: paymentLinksURL) ?? [:]
+    }
+
     // MARK: - Holds
 
     /// Gives up holds whose deposit wasn't paid in time: the time is freed, the contract voided.
@@ -117,6 +124,12 @@ extension LocalBackend {
 
     /// What Stripe's webhook does in the real system: the payment went through, so the booking moves on.
     func completeSimulatedPayment(_ paymentID: UUID) async throws {
+        try applyPaymentSuccess(paymentID, method: .simulated)
+    }
+
+    /// The state change a successful payment causes, whether it was a pretend Stripe payment or one the creator marked
+    /// received (`payment_apply_success` in SQL).
+    func applyPaymentSuccess(_ paymentID: UUID, method: PaymentMethod) throws {
         var payments = readPayments()
         guard let paymentIndex = payments.firstIndex(where: { $0.id == paymentID }), payments[paymentIndex].kind != .refund else {
             throw SlateError.paymentNotDue
@@ -132,7 +145,7 @@ extension LocalBackend {
 
         payments[paymentIndex].status = .succeeded
         payments[paymentIndex].paidAt = now
-        payments[paymentIndex].method = .simulated
+        payments[paymentIndex].method = method
         payments[paymentIndex].failureMessage = nil
 
         var confirm = false
@@ -169,7 +182,7 @@ extension LocalBackend {
         if refundNeeded {
             payments.append(Payment(
                 id: UUID(), bookingID: payment.bookingID, kind: .refund, refundOf: payment.id, amountCents: payment.amountCents,
-                currencyCode: payment.currencyCode, status: .pending, method: .simulated, failureMessage: nil, createdAt: now, paidAt: nil
+                currencyCode: payment.currencyCode, status: .pending, method: method, failureMessage: nil, createdAt: now, paidAt: nil
             ))
         }
         try write(bookings, to: bookingsURL)
@@ -280,16 +293,110 @@ extension LocalBackend {
         return CancellationResult(booking: bookings[index], refundCents: figures.refundCents, percent: figures.percent)
     }
 
-    /// On-device there is no card to send money back to, so every owed refund is simply marked as returned.
+    /// On-device there is no card to send money back to, so every owed refund is simply marked as returned. (A refund of a
+    /// payment marked received by hand is the creator's to send, so it waits for `markRefundSent`, as in SQL.)
     func settleRefunds(bookingID: UUID) async throws {
         let now = self.now
         var payments = readPayments()
         var changed = false
-        for index in payments.indices where payments[index].bookingID == bookingID && payments[index].kind == .refund && payments[index].status == .pending {
+        for index in payments.indices where payments[index].bookingID == bookingID && payments[index].kind == .refund
+            && payments[index].status == .pending && payments[index].method != .manual {
             payments[index].status = .succeeded
             payments[index].paidAt = now
             changed = true
         }
         if changed { try writePayments(payments) }
+    }
+
+    // MARK: - Paying another way
+
+    func paymentOptions(bookingID: UUID, for userID: UUID) async throws -> PaymentOptions? {
+        guard let booking = readBookings().first(where: { $0.id == bookingID }), booking.clientID == userID else { return nil }
+        // Pretend Stripe payments always work on-device; the creator's link is whatever they saved.
+        return PaymentOptions(stripeReady: true, link: readPaymentLinks()[booking.creatorID.uuidString.lowercased()])
+    }
+
+    func loadPaymentLink(for ownerID: UUID) async throws -> PaymentLink? {
+        try authorizeOwner(ownerID, .paymentsConnect)
+        return readPaymentLinks()[ownerID.uuidString.lowercased()]
+    }
+
+    func savePaymentLink(_ link: PaymentLink?, for ownerID: UUID) async throws {
+        try authorizeOwner(ownerID, .paymentsConnect)
+        var links = readPaymentLinks()
+        let key = ownerID.uuidString.lowercased()
+        if let link {
+            guard PaymentLinkRules.clean(url: link.url.absoluteString) == link.url.absoluteString else { throw SlateError.invalidPaymentLink }
+            links[key] = PaymentLink(url: link.url, instructions: PaymentLinkRules.cleanInstructions(link.instructions))
+        } else {
+            links[key] = nil
+        }
+        try write(links, to: paymentLinksURL)
+    }
+
+    /// `payment_mark_received` in SQL: whoever manages the booking records that the money arrived another way, and the booking
+    /// moves on as it would for a payment through Stripe.
+    func markPaymentReceived(bookingID: UUID, kind: PaymentKind, note: String?, by userID: UUID) async throws {
+        try expireLapsedHolds()
+        guard kind == .deposit || kind == .balance else { throw SlateError.paymentNotDue }
+        guard let booking = readBookings().first(where: { $0.id == bookingID }), providerAccess(userID, booking, .manage) else {
+            throw SlateError.notAllowed
+        }
+        var payments = readPayments()
+        let mine = payments.filter { $0.bookingID == bookingID }
+
+        let amount: Int
+        switch kind {
+        case .deposit:
+            guard booking.status == .held || booking.status == .expired else { throw SlateError.paymentNotDue }
+            amount = booking.depositCents
+            // After the hold ran out a deposit still counts, but only while nobody else has the time.
+            if booking.status == .expired {
+                let now = self.now
+                let taken = readBookings().contains {
+                    $0.id != booking.id && $0.occupant == booking.occupant
+                        && $0.effectiveStatus(at: now).blocksTime && IntervalMath.overlaps($0.blockedRange, booking.blockedRange)
+                }
+                if taken { throw SlateError.slotTaken }
+            }
+        case .balance:
+            guard booking.status == .confirmed, booking.receiptConfirmedAt != nil else { throw SlateError.paymentNotDue }
+            if booking.depositCents > 0, !mine.contains(where: { $0.kind == .deposit && $0.status == .succeeded }) {
+                throw SlateError.paymentNotDue
+            }
+            amount = booking.totalCents - booking.depositCents
+        case .refund:
+            throw SlateError.paymentNotDue
+        }
+        guard amount > 0 else { throw SlateError.paymentNotDue }
+        if mine.contains(where: { $0.kind == kind && $0.status == .succeeded }) { throw SlateError.alreadyPaid }
+
+        // Anything still waiting for this payment is moot now.
+        for index in payments.indices where payments[index].bookingID == bookingID && payments[index].kind == kind && payments[index].status == .pending {
+            payments[index].status = .canceled
+        }
+        let payment = Payment(
+            id: UUID(), bookingID: bookingID, kind: kind, refundOf: nil, amountCents: amount,
+            currencyCode: booking.currencyCode, status: .pending, method: .manual, failureMessage: nil,
+            createdAt: now, paidAt: nil
+        )
+        payments.append(payment)
+        try writePayments(payments)
+        try applyPaymentSuccess(payment.id, method: .manual)
+    }
+
+    /// `refund_mark_sent` in SQL: only a refund of a payment made by hand, and only by whoever manages the booking.
+    func markRefundSent(paymentID: UUID, by userID: UUID) async throws {
+        var payments = readPayments()
+        guard let index = payments.firstIndex(where: { $0.id == paymentID && $0.kind == .refund }),
+              let booking = readBookings().first(where: { $0.id == payments[index].bookingID }),
+              providerAccess(userID, booking, .manage)
+        else { throw SlateError.notAllowed }
+        guard payments[index].method == .manual else { throw SlateError.paymentNotDue }
+        if payments[index].status == .pending {
+            payments[index].status = .succeeded
+            payments[index].paidAt = now
+            try writePayments(payments)
+        }
     }
 }

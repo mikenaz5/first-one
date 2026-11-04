@@ -108,6 +108,20 @@ protocol SlateBackend {
     /// Sends any refunds owed on a booking to the card that paid.
     func settleRefunds(bookingID: UUID) async throws
 
+    // Paying another way
+    /// How this booking's client can pay: through Stripe, the creator's own link, or both. Nil if the person isn't the
+    /// booking's client.
+    func paymentOptions(bookingID: UUID, for userID: UUID) async throws -> PaymentOptions?
+    /// The owner's payment link (a person's, or their company's), if they have set one.
+    func loadPaymentLink(for ownerID: UUID) async throws -> PaymentLink?
+    /// Sets the owner's payment link, or with nil takes it away.
+    func savePaymentLink(_ link: PaymentLink?, for ownerID: UUID) async throws
+    /// The creator (or whoever manages the booking) says the money for a deposit or balance reached them some other way.
+    /// The booking moves on exactly as it would for a payment through Stripe.
+    func markPaymentReceived(bookingID: UUID, kind: PaymentKind, note: String?, by userID: UUID) async throws
+    /// The creator says they sent a refund that Slate Pro couldn't send for them, because the payment was made directly.
+    func markRefundSent(paymentID: UUID, by userID: UUID) async throws
+
     // Cards on file
     /// The person's own cards. Stripe holds the numbers; these are what is shown.
     func loadCards(for userID: UUID) async throws -> [SavedCard]

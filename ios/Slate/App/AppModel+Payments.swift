@@ -36,8 +36,9 @@ extension AppModel {
         }
     }
 
-    /// A creator needs Stripe set up before deposits can be taken. Always true on-device.
-    var canTakePayments: Bool { paymentAccount?.canAcceptPayments ?? false }
+    /// A creator can take a deposit once Stripe can take cards, or once there is a payment link clients can use instead.
+    /// Always true for Stripe on-device.
+    var canTakePayments: Bool { (paymentAccount?.canAcceptPayments ?? false) || paymentLink != nil }
 
     /// Whether any of the creator's packages asks for a deposit.
     var hasPackagesWithDeposit: Bool { packages.contains { $0.isPublished && $0.depositCents > 0 } }
@@ -105,6 +106,82 @@ extension AppModel {
             if attempt < attempts - 1 { try? await Task.sleep(for: .seconds(1)) }
         }
         return false
+    }
+
+    // MARK: - Paying another way
+
+    /// How the booking's client can pay: with Apple Pay through Stripe, through the creator's own link, or both.
+    func paymentOptions(for booking: Booking) async -> PaymentOptions? {
+        guard let session else { return nil }
+        return try? await backend.paymentOptions(bookingID: booking.id, for: session.userID)
+    }
+
+    /// What the person on the provider side of a booking may mark as received by hand right now, if anything.
+    func kindToMarkReceived(_ booking: Booking, now: Date = Date()) -> PaymentKind? {
+        guard let me = session?.userID, booking.clientID != me, isProviderSide(booking), canManage(booking) else { return nil }
+        switch paymentSummary(for: booking, now: now).phase {
+        case .depositDue, .depositFailed, .holdExpired: return .deposit
+        case .balanceDue: return .balance
+        default: return nil
+        }
+    }
+
+    /// Records that money for a deposit or balance reached the creator some other way. True when it was recorded.
+    @discardableResult
+    func markReceived(_ kind: PaymentKind, for booking: Booking) async -> Bool {
+        guard let session else { return false }
+        do {
+            try await backend.markPaymentReceived(bookingID: booking.id, kind: kind, note: nil, by: session.userID)
+            await reloadMoney()
+            return true
+        } catch {
+            show(error, title: "Couldn't record the payment")
+            await reloadMoney()
+            return false
+        }
+    }
+
+    /// Whether this is a refund the creator has to send by hand, and the person may say they did.
+    func canMarkRefundSent(_ payment: Payment, in booking: Booking) -> Bool {
+        payment.kind == .refund && payment.status == .pending && payment.method == .manual
+            && booking.clientID != session?.userID && isProviderSide(booking) && canManage(booking)
+    }
+
+    func markRefundSent(_ payment: Payment) async {
+        guard let session else { return }
+        do {
+            try await backend.markRefundSent(paymentID: payment.id, by: session.userID)
+        } catch {
+            show(error, title: "Couldn't record the refund")
+        }
+        await reloadMoney()
+    }
+
+    func refreshPaymentLink() async {
+        guard let owner = ownerID else { return }
+        paymentLink = try? await backend.loadPaymentLink(for: owner)
+    }
+
+    /// Saves the link (an empty address takes it away). True when it was saved.
+    func savePaymentLink(url: String, instructions: String) async -> Bool {
+        guard let owner = ownerID else { return false }
+        do {
+            if url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try await backend.savePaymentLink(nil, for: owner)
+                paymentLink = nil
+                return true
+            }
+            guard let clean = PaymentLinkRules.clean(url: url), let address = URL(string: clean) else {
+                throw SlateError.invalidPaymentLink
+            }
+            let link = PaymentLink(url: address, instructions: PaymentLinkRules.cleanInstructions(instructions))
+            try await backend.savePaymentLink(link, for: owner)
+            paymentLink = link
+            return true
+        } catch {
+            show(error, title: "Couldn't save the link")
+            return false
+        }
     }
 
     // MARK: - Refunds

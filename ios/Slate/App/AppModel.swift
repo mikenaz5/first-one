@@ -81,6 +81,8 @@ final class AppModel {
     var payments: [Payment] = []
     /// A creator's Stripe account, if they have one. Only meaningful for creators.
     var paymentAccount: PaymentAccount?
+    /// The creator's own payment link, for clients who pay some way other than through Stripe.
+    var paymentLink: PaymentLink?
     var isPaying = false
     /// The person's own cards (kept by Stripe; the app only shows what identifies them), and the creators they have allowed
     /// to charge one for the balance of a booking.
@@ -328,6 +330,7 @@ final class AppModel {
         reviewSummaryByCreator = [:]
         payments = []
         paymentAccount = nil
+        paymentLink = nil
         cards = []
         cardPermissions = []
         cardAccessByBooking = [:]

@@ -139,6 +139,7 @@ extension AppModel {
         availability = nil
         contractTemplates = []
         paymentAccount = nil
+        paymentLink = nil
         organization = nil
         teamMembers = []
         teamInvites = []

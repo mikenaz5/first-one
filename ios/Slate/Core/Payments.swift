@@ -23,12 +23,16 @@ enum PaymentMethod: String, Codable, Hashable {
     case card
     /// A pretend payment from on-device mode. No money moved.
     case simulated
+    /// The money reached the creator some other way (through their own payment link, cash, a transfer) and they
+    /// marked it received. Slate Pro never saw it.
+    case manual
 
     var title: String {
         switch self {
         case .applePay: "Apple Pay"
         case .card: "Card"
         case .simulated: "Demo payment"
+        case .manual: "Paid directly"
         }
     }
 }
@@ -53,6 +57,9 @@ struct Payment: Identifiable, Codable, Equatable, Hashable {
     /// Plain words for the history list.
     var statusTitle: String {
         switch (kind, status) {
+        // Slate Pro can't send a refund of money it never held: the creator does, and says so.
+        case (.refund, .pending) where method == .manual: "Waiting for the creator to send it"
+        case (.refund, .succeeded) where method == .manual: "Refunded by the creator"
         case (.refund, .succeeded): "Refunded"
         case (.refund, .pending): "Refund on the way"
         case (.refund, .failed): "Refund needs attention"
@@ -137,6 +144,46 @@ struct PaymentIntentInfo: Equatable {
     var amountCents: Int
     var currencyCode: String
     var kind: PaymentKind
+    /// The creator's own Stripe account the payment is made on (a direct charge): the Stripe SDK must talk to this
+    /// account, not the platform's, or it won't find the payment. Nil for a pretend payment on-device.
+    var stripeAccountID: String? = nil
+}
+
+// MARK: - Paying another way
+
+/// How a creator would rather be paid when it isn't by card through Stripe: a link to their own payment page
+/// (PayPal.me, Venmo, Cash App, an invoice) and a few words about it. Slate Pro sends the client there and never
+/// sees the payment, so the creator marks it received on the booking.
+struct PaymentLink: Equatable, Hashable, Codable {
+    var url: URL
+    var instructions: String
+
+    /// The site's name, shown to the client before they leave the app.
+    var host: String { url.host ?? url.absoluteString }
+}
+
+/// What a booking's client can do to pay: through Stripe when the creator's account takes cards, through the creator's
+/// link, or both.
+struct PaymentOptions: Equatable {
+    var stripeReady: Bool
+    var link: PaymentLink?
+
+    var offersAnything: Bool { stripeReady || link != nil }
+}
+
+/// Mirrors `payment_link_save()` in SQL: a link is `https` only and a real-looking address (the same check a delivery
+/// link gets), and the instructions are cut at 300 characters.
+enum PaymentLinkRules {
+    static let instructionsMaxLength = 300
+
+    /// The link as it will be stored, or nil when it can't be used.
+    static func clean(url text: String) -> String? { DeliveryRules.cleanLink(text) }
+
+    /// The instructions trimmed and cut to fit, the way the database keeps them.
+    static func cleanInstructions(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(String.UnicodeScalarView(trimmed.unicodeScalars.prefix(instructionsMaxLength)))
+    }
 }
 
 // MARK: - Refunds

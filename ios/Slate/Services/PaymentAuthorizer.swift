@@ -3,6 +3,9 @@ import PassKit
 #if canImport(StripeApplePay)
 import StripeApplePay
 #endif
+#if canImport(StripeCore)
+import StripeCore
+#endif
 
 /// What the payment sheet needs to show and charge.
 struct PaymentRequestDetails: Equatable {
@@ -71,6 +74,14 @@ final class ApplePayAuthorizer: NSObject, PaymentAuthorizer, ApplePayContextDele
 
     func authorize(_ request: PaymentRequestDetails) async throws -> PaymentAuthorization {
         guard let secret = request.info.clientSecret else { throw SlateError.paymentUnavailable }
+        // The payment is a direct charge on the creator's own Stripe account, so Stripe's SDK must talk to that account.
+        // Without it the payment would be looked for on the platform's account and not found.
+        guard let account = request.info.stripeAccountID, !account.isEmpty else { throw SlateError.paymentUnavailable }
+        #if canImport(StripeCore)
+        STPAPIClient.shared.stripeAccount = account
+        #else
+        throw SlateError.paymentsNotConfigured
+        #endif
         guard StripeAPI.deviceSupportsApplePay() else { throw SlateError.applePayUnavailable }
 
         let paymentRequest = StripeAPI.paymentRequest(

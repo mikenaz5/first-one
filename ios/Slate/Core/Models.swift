@@ -270,6 +270,7 @@ enum SlateError: LocalizedError, Equatable {
     case applePayUnavailable
     case notDeliverable
     case invalidDeliveryLink
+    case invalidPaymentLink
     case deliveryNoteTooLong
     case notDelivered
     case notReviewable
@@ -396,6 +397,8 @@ enum SlateError: LocalizedError, Equatable {
             "Final files can be shared once the shoot has started, and until the client confirms they have them."
         case .invalidDeliveryLink:
             "Paste a link that starts with https:// (for example a Dropbox, Google Drive or WeTransfer share link)."
+        case .invalidPaymentLink:
+            "Paste a link that starts with https:// (for example a PayPal.me, Venmo, Cash App or invoice link)."
         case .deliveryNoteTooLong:
             "Notes can be up to \(DeliveryRules.noteMaxLength) characters."
         case .notDelivered:

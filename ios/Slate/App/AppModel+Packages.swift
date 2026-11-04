@@ -12,6 +12,7 @@ extension AppModel {
         creatorSignature = try await backend.loadCreatorSignature(for: userID)
         payments = try await backend.loadPayments(for: userID)
         paymentAccount = try? await backend.loadPaymentAccount(for: owner)
+        paymentLink = try? await backend.loadPaymentLink(for: owner)
     }
 
     /// Runs once the account has loaded and the person is in the app.

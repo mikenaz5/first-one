@@ -76,6 +76,113 @@ struct PayButton: View {
     }
 }
 
+// MARK: - Choosing how to pay
+
+/// How to pay what is due: with Apple Pay when the creator's Stripe account takes cards, and/or through the creator's own
+/// payment link. The link pays the creator directly, outside Slate Pro, and they mark it received on the booking.
+struct PaymentChoices: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
+
+    let booking: Booking
+    let kind: PaymentKind
+    let amountCents: Int
+    let applePay: () -> Void
+
+    @State private var options: PaymentOptions?
+    @State private var asking: PaymentLink?
+
+    var body: some View {
+        VStack(spacing: Space.m) {
+            // Until we know otherwise, offer the usual way.
+            if options?.stripeReady ?? true {
+                PayButton(kind: kind, amountCents: amountCents, currencyCode: booking.currencyCode, action: applePay)
+            }
+            if let link = options?.link {
+                linkOption(link)
+            }
+            if let options, !options.offersAnything {
+                Label("\(booking.creatorName) hasn't set up a way to pay yet. Send them a message to arrange it.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.slateWarning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .task(id: booking.id) { options = await model.paymentOptions(for: booking) }
+        .confirmationDialog(
+            "Leave Slate Pro to pay?",
+            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
+            titleVisibility: .visible,
+            presenting: asking
+        ) { link in
+            Button("Open \(link.host)") { openURL(link.url) }
+            Button("Cancel", role: .cancel) {}
+        } message: { link in
+            Text("This opens \(link.host). Slate Pro doesn't see or protect a payment made there.")
+        }
+    }
+
+    private func linkOption(_ link: PaymentLink) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Button { asking = link } label: {
+                Label("Pay through \(link.host)", systemImage: "link")
+                    .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+            }
+            .buttonStyle(.slateOutline)
+            .controlSize(.large)
+            if !link.instructions.isEmpty {
+                Text(link.instructions).font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text("This pays \(booking.creatorName) directly, outside Slate Pro. They mark it received here, and then your booking moves on.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// For the creator: the money for a deposit or balance reached them some other way (their own payment link, cash, a
+/// transfer). Confirming records it, and the booking moves on as it would for a payment through Stripe.
+struct MarkReceivedButton: View {
+    @Environment(AppModel.self) private var model
+
+    let booking: Booking
+    let kind: PaymentKind
+
+    @State private var confirming = false
+    @State private var working = false
+
+    private var noun: String { kind == .deposit ? "deposit" : "balance" }
+    private var amountCents: Int { kind == .deposit ? booking.depositCents : booking.balanceCents }
+
+    var body: some View {
+        Button { confirming = true } label: {
+            HStack {
+                Label("Mark \(noun) received", systemImage: "checkmark.circle")
+                if working { ProgressView() }
+            }
+            .frame(maxWidth: .infinity, minHeight: Metrics.buttonLabelHeight)
+        }
+        .buttonStyle(.slateOutline)
+        .controlSize(.large)
+        .disabled(working)
+        .confirmationDialog(
+            "Mark \(Money.format(amountCents, code: booking.currencyCode)) as received?", isPresented: $confirming, titleVisibility: .visible
+        ) {
+            Button("Yes, I've been paid") {
+                Task {
+                    working = true
+                    await model.markReceived(kind, for: booking)
+                    working = false
+                }
+            }
+            Button("Not yet", role: .cancel) {}
+        } message: {
+            Text("Only do this once the money has reached you. \(kind == .deposit ? "The booking will be confirmed." : "The booking will be completed.") It can't be undone here.")
+        }
+    }
+}
+
 // MARK: - Payment card (booking detail)
 
 /// What has been paid, what is owed now, and the button to pay it.
@@ -120,9 +227,11 @@ struct PaymentStatusCard: View {
             }
 
             if let kind {
-                PayButton(kind: kind, amountCents: summary.dueNowCents, currencyCode: booking.currencyCode) {
+                PaymentChoices(booking: booking, kind: kind, amountCents: summary.dueNowCents) {
                     Task { await pay(kind) }
                 }
+            } else if let receivable = model.kindToMarkReceived(booking, now: now) {
+                MarkReceivedButton(booking: booking, kind: receivable)
             }
         }
         .sensoryFeedback(.success, trigger: summary.phase == .paidInFull)
@@ -151,17 +260,22 @@ struct PaymentHistorySection: View {
         if !history.isEmpty {
             Section {
                 ForEach(history) { payment in
-                    AdaptiveStack(spacing: Space.s) {
-                        VStack(alignment: .leading, spacing: Space.xxs) {
-                            Text(payment.kind.title)
-                            Text(subtitle(for: payment)).font(.footnote).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        AdaptiveStack(spacing: Space.s) {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(payment.kind.title)
+                                Text(subtitle(for: payment)).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: Space.m)
+                            Text("\(payment.kind == .refund ? "−" : "")\(Money.format(payment.amountCents, code: payment.currencyCode))")
+                                .monospacedDigit()
+                                .foregroundStyle(payment.status == .failed ? Color.slateDanger : Color.primary)
                         }
-                        Spacer(minLength: Space.m)
-                        Text("\(payment.kind == .refund ? "−" : "")\(Money.format(payment.amountCents, code: payment.currencyCode))")
-                            .monospacedDigit()
-                            .foregroundStyle(payment.status == .failed ? Color.slateDanger : Color.primary)
+                        .accessibilityElement(children: .combine)
+                        if model.canMarkRefundSent(payment, in: booking) {
+                            RefundSentButton(payment: payment)
+                        }
                     }
-                    .accessibilityElement(children: .combine)
                 }
             } header: {
                 Text("Payment history")
@@ -181,6 +295,28 @@ struct PaymentHistorySection: View {
             parts.append(when.formatted(date: .abbreviated, time: .shortened))
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// A refund of money the creator was paid directly isn't Slate Pro's to send. The creator sends it and says so here.
+private struct RefundSentButton: View {
+    @Environment(AppModel.self) private var model
+
+    let payment: Payment
+    @State private var confirming = false
+
+    var body: some View {
+        Button("Mark refund as sent") { confirming = true }
+            .buttonStyle(.borderless)
+            .frame(minHeight: Metrics.minTapTarget, alignment: .leading)
+            .confirmationDialog(
+                "Have you sent \(Money.format(payment.amountCents, code: payment.currencyCode)) back?", isPresented: $confirming, titleVisibility: .visible
+            ) {
+                Button("Yes, it's sent") { Task { await model.markRefundSent(payment) } }
+                Button("Not yet", role: .cancel) {}
+            } message: {
+                Text("The client paid you directly, so you send the refund yourself, outside Slate Pro.")
+            }
     }
 }
 
@@ -304,7 +440,7 @@ struct HeldBookingView: View {
 
                 VStack(spacing: Space.m) {
                     if remaining != nil {
-                        PayButton(kind: .deposit, amountCents: held.depositCents, currencyCode: held.currencyCode) {
+                        PaymentChoices(booking: held, kind: .deposit, amountCents: held.depositCents) {
                             Task { await booking.payDeposit(using: model) }
                         }
                         Button("Release this time", role: .destructive) {
@@ -338,14 +474,19 @@ struct PaymentsCard: View {
         HStack(alignment: .top, spacing: Space.m) {
             Image(systemName: "creditcard")
                 .font(.title2)
-                .foregroundStyle(account.canAcceptPayments ? Color.accentColor : Color.slateWarning)
+                .foregroundStyle(model.canTakePayments ? Color.accentColor : Color.slateWarning)
                 .frame(minWidth: Metrics.iconColumn)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text("Payments").font(.headline)
                 Text(account.title).font(.subheadline).foregroundStyle(.secondary)
-                if !account.canAcceptPayments, model.hasPackagesWithDeposit {
+                if let link = model.paymentLink {
+                    Label("Clients can also pay through \(link.host)", systemImage: "link")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                if !model.canTakePayments, model.hasPackagesWithDeposit {
                     Text("Clients can't book packages with a deposit until this is done.")
                         .font(.footnote)
                         .foregroundStyle(Color.slateWarning)
@@ -369,6 +510,13 @@ struct PaymentSetupSheet: View {
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
 
     @State private var isWorking = false
+    @State private var linkText = ""
+    @State private var instructions = ""
+    @State private var savingLink = false
+
+    private var linkChanged: Bool {
+        linkText != (model.paymentLink?.url.absoluteString ?? "") || instructions != (model.paymentLink?.instructions ?? "")
+    }
 
     var body: some View {
         let account = model.paymentAccount ?? .notConnected
@@ -403,10 +551,37 @@ struct PaymentSetupSheet: View {
                             .frame(minHeight: Metrics.minTapTarget)
                             .disabled(isWorking)
                     } footer: {
-                        Text("Stripe collects your identity and bank details on its own pages. Slate Pro never sees them. Stripe charges its normal processing fee on each payment; Slate Pro adds no fee.")
+                        Text("Stripe collects your identity and bank details on its own pages, and you can sign in to a Stripe account you already have or make a new one. Slate Pro never sees your details. Clients pay you directly: the money goes from their card to your Stripe account and never through Slate Pro. Stripe charges you its normal processing fee on each payment; Slate Pro adds no fee.")
                     }
                         .listRowBackground(Color.slateCard)
                 }
+
+                Section {
+                    TextField("https://paypal.me/yourname", text: $linkText)
+                        .textContentType(.URL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .frame(minHeight: Metrics.minTapTarget)
+                    TextField("What clients should do (optional)", text: $instructions, axis: .vertical)
+                        .lineLimit(1...4)
+                        .frame(minHeight: Metrics.minTapTarget)
+                    Button {
+                        Task { await saveLink() }
+                    } label: {
+                        HStack {
+                            Text(model.paymentLink == nil ? "Save link" : "Update link")
+                            if savingLink { Spacer(); ProgressView() }
+                        }
+                        .frame(minHeight: Metrics.minTapTarget)
+                    }
+                    .disabled(savingLink || !linkChanged)
+                } header: {
+                    Text("Or be paid another way")
+                } footer: {
+                    Text("A link to your own payment page (PayPal.me, Venmo, Cash App, an invoice). Clients are sent there, and Slate Pro never sees the payment, so mark it received on the booking once it arrives. Leave the link empty and save to remove it.")
+                }
+                    .listRowBackground(Color.slateCard)
 
                 Section("How you get paid") {
                     Label("The deposit is paid when a client books, the balance after the client confirms they have your final files.", systemImage: "arrow.left.arrow.right")
@@ -423,9 +598,23 @@ struct PaymentSetupSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .task { await model.refreshPaymentAccount() }
+            .task {
+                await model.refreshPaymentAccount()
+                await model.refreshPaymentLink()
+                linkText = model.paymentLink?.url.absoluteString ?? ""
+                instructions = model.paymentLink?.instructions ?? ""
+            }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private func saveLink() async {
+        savingLink = true
+        defer { savingLink = false }
+        if await model.savePaymentLink(url: linkText, instructions: instructions) {
+            linkText = model.paymentLink?.url.absoluteString ?? ""
+            instructions = model.paymentLink?.instructions ?? ""
+        }
     }
 
     private func start() async {

@@ -53,6 +53,7 @@ Decisions made with the product owner:
 | D26 | **A client can message a creator before booking.** A **Message** button on every creator's page (and on a company's page) opens a conversation with them, called an inquiry: one per client and creator, with typed text only (no booking lines, because nothing has happened to a booking). At a person it goes to the person; at a company it goes to the Owner, Admins and Managers (Viewers can read it; a Creator-role member sees only the jobs assigned to them, and an inquiry has nobody assigned). It appears in both people's Messages lists as soon as the first message is sent, marked *Before booking*. Booking later starts a separate conversation for the booking; the question stays where it was. | Section 8.15. Unlimited free messaging between strangers invites spam, so there are limits (R27). |
 | D27 | **A company can put events on its team calendar that aren't bookings** (a meeting, an editing day, time off). Owners, Admins, Managers and Creators add them; the person who made one changes or removes it, and Owners, Admins and Managers change or remove anyone's; Viewers look. Everyone on the team sees every event. An event is for the whole team or for people named, and **by default it takes their time**: a client can't book them while it lasts, and the usual buffer after it applies. An event can be set to not block bookings, and then it is only a note. An event added over a booking that already exists leaves the booking alone. A lapsed plan makes events read only. | Section 8.16. Uses the same busy-time rule as a person's own calendar, so a person is still never in two places. |
 | D28 | **Calendar links, and the phone's calendar.** Each person gets one private web address that other calendar apps subscribe to (Apple Calendar, Google Calendar, Outlook, anything that reads a calendar link). It shows their bookings (as the person doing the job, or as the client) and the team events that are for them: names and times, never money, contracts, a booking's notes or contact details. It can be replaced at any time, which stops the old address at once. The app also adds those same bookings and team events to a calendar on the phone itself, including a Google or Outlook account added in the iPhone's Settings, which is instant and works offline. We do not log in to someone's Google account ourselves. | Section 8.16 and R28. Google Calendar refreshes a subscribed link only about once a day, so the screen says that plainly and points to the phone option for instant changes. |
+| D29 | **Clients pay creators directly, through the creator's own Stripe account.** Each creator (or company) connects their own Stripe account, either one they already have or a new one made in Stripe's onboarding; in Stripe's terms a **Standard** connected account (Accounts v2: full Dashboard, Stripe collects its own fees and covers negative balances, card payments requested). A deposit or balance is a **direct charge**: the payment is made on the creator's account, so the money goes from the client's card to the creator and **never passes through the Slate Pro platform account**. There is **no application fee for now** (the code still understands one, set to zero). A booking is marked deposit paid **only from the `payment_intent.succeeded` event of the creator's connected account** (a separate Connect webhook), and the event must name the account the payment was made on. Refunds are made on the same account, from the creator's own balance. **Fallback:** a creator can instead (or as well) add an **external payment link** (PayPal.me, Venmo, an invoice) with a few words of instruction, and **mark a deposit or balance received by hand**; a booking moves on exactly as it does for a Stripe payment. A refund of money paid that way is the creator's to send and to mark sent. | Section 8.17. Money never passes through the platform, so the platform holds no client funds and has no money-transmission exposure of its own; disputes and Stripe's fees are the creator's, as they would be on their own Stripe account. The fallback keeps a creator with no Stripe account (or one client who prefers to pay another way) in business. Slate Pro can't verify a payment made outside Stripe, so only the people who manage the booking can record one. |
 
 Assumptions, open to change (section 13):
 
@@ -222,7 +223,7 @@ Legend: **MVP** = in the first release. **Later** = post-MVP.
 
 | Feature | Detail | Phase |
 |---|---|---|
-| Onboarding | Sign in with Apple, then business name, handle, legal name and address (needed in contracts), categories, then Stripe Connect Express onboarding. Target: link live in under 10 minutes. | MVP |
+| Onboarding | Sign in with Apple, then business name, handle, legal name and address (needed in contracts), categories, then Stripe Connect onboarding (their own Stripe account). Target: link live in under 10 minutes. | MVP |
 | Profile and portfolio | Bio, location and travel radius, up to 12 images, external video links (YouTube/Vimeo). | MVP |
 | Packages | Name, description, duration, fixed price, deposit (percent or fixed), deliverables list, delivery turnaround, location type (on-location, studio, remote), travel fee, add-ons, cancellation policy, attached contract template. | MVP |
 | Contract templates | Starter templates plus a clause editor with merge fields. Versioned. Creator authorises auto-countersign at publish. See section 6. | MVP |
@@ -427,7 +428,7 @@ erDiagram
 | **Signature** | contract id, signer role and user, signed name, method (typed, drawn, stored), consent-text version, signed at, IP, device, locale, email at signing, verification method | |
 | **Amendment** | contract id, reason, change summary, proposed by, status (proposed, accepted, declined), accepted by both at | Used for reschedules and scope changes. |
 | **Booking** | creator id (**the owner**), **assigned to (user id; equals the owner for an Individual)**, **requested member (true when the client chose that person)**, **assignee share (basis points, snapshot)**, client id, package id, **package snapshot**, add-ons snapshot, start and end, timezone, location, client brief, status, total, deposit, balance, balance due at, cancellation policy snapshot, contract id, created via (app, web), hold expires at, cancelled by and reason | Double booking is prevented per **assigned person**, not per owner, so a company's members work in parallel and each person is still never in two places. A company booking in manual-assignment mode has no assignee until a Manager assigns one (8.10). |
-| **Payment** | booking id, kind (deposit, balance, refund, adjustment), amount, currency, platform fee, Stripe payment intent id, status, method (Apple Pay, card), paid at | Money is stored in minor units. |
+| **Payment** | booking id, kind (deposit, balance, refund, adjustment), amount, currency, platform fee, Stripe payment intent id, status, method (Apple Pay, card, **paid directly**, marked received by hand), the connected account it was charged on, who marked it and a note, paid at | Money is stored in minor units. |
 | **Payout** (read-only mirror) | creator id (**the owner**), Stripe payout id, amount, status, arrival date | For the earnings screen. Stripe is the source of truth. A company's payouts are those of its own Connect account. |
 | **Payment account** | creator id (**the owner**), Stripe account id, charges enabled, payouts enabled, details submitted | One per owner. A company's is separate from the personal one of any member. |
 | **ClientCard** | user id, Stripe payment method id (never shown to the app), brand, last four digits, expiry month and year, added at | A reference, not a card: Stripe holds the number. Up to five per person. Readable only by its owner, and only these display columns. |
@@ -469,7 +470,7 @@ stateDiagram-v2
 2. Basics: business name, handle, categories, legal name and address (explained: "used in your contracts").
 3. First package from a starter, with a starter contract template preselected. The creator can accept defaults and edit later.
 4. Availability, prefilled Monday to Friday, 9:00 to 17:00, editable.
-5. Stripe Connect Express onboarding in a system web authentication sheet. Stripe handles identity checks.
+5. Stripe Connect onboarding in a system web authentication sheet: they sign in to a Stripe account they already have or make a new one, and Stripe handles identity checks. (Or they skip it and add a payment link instead, section 8.17.)
 6. Authorise auto-countersign and store a signature.
 7. Publish, then share the link and QR code through the system share sheet.
 
@@ -521,7 +522,7 @@ stateDiagram-v2
 3. Plan: the seat floor, the per-seat price from Stripe, and a button that opens the Stripe checkout in a system web authentication sheet. Until the plan is active, the company can be set up but can't be published or invite anyone.
 4. First shared service from a starter, with a starter template.
 5. Designated signer: you, with your stored signature, and the auto-countersign authorisation.
-6. Stripe Connect Express onboarding for the **company** account.
+6. Stripe Connect onboarding for the **company's own** Stripe account (or a payment link, section 8.17).
 7. Publish and share the link and QR code.
 
 **Upgrade an existing Individual** (Profile, "Upgrade to a company"):
@@ -688,6 +689,34 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 10. What the app writes into the phone's calendar carries a `slate://` link, so the busy-time reader never counts it twice.
 
 
+### 8.17 Paying a creator directly
+
+*What the creator sets up (Services ▸ Payments, or Settings ▸ Company settings ▸ Payments for a company's Owner)*
+
+1. **Set up with Stripe** opens Stripe's own pages. They sign in to a Stripe account they already have or make a new one; Slate Pro never sees their identity or bank details. **Check status** asks Stripe where they stand. They are ready when Stripe says the account can take **card payments**; payouts are their own business, in their own Stripe Dashboard.
+2. **Or be paid another way:** a link to their own payment page (it must start with `https://`) and up to 300 characters of instruction ("Zelle to ..."). Leave the link empty and save to remove it. A creator with a link but no Stripe account can still have clients book packages with a deposit.
+3. A company's account and link belong to its **Owner** (the `payments.connect` permission), as before.
+
+*What the client sees on a deposit or balance that is due*
+
+1. **Apple Pay** (the usual button) when the creator's Stripe account takes cards, and/or **Pay through <site>** when the creator has a link. The link button first says the client is leaving Slate Pro and shows the site's name; the creator's instruction and a note that the payment is direct and outside Slate Pro sit under it.
+2. If the creator has neither, the screen says so and suggests a message.
+3. The 15-minute hold still applies. A deposit paid through a link usually takes longer to be marked than that, so the creator can mark a deposit received after the hold ran out; it counts only while nobody else has taken the time.
+
+*What the creator does when money arrives another way*
+
+1. **Mark deposit received** (or **balance**) on the booking, with a confirmation that says the booking will be confirmed or completed. It records a payment labelled **Paid directly**, for the amount the booking says (never one the creator types), and the booking moves on exactly as for an Apple Pay payment, including the contract being finished.
+2. Allowed for whoever can manage the booking (a person selling alone; at a company the Owner, an Admin or Manager, or the Creator the booking is assigned to). Not a Viewer, and never the client.
+3. The **balance** can be marked only once the client has confirmed they have their files, the same rule as for Apple Pay. A payment can be marked once.
+4. If the client had opened Apple Pay for the same payment and finishes it later, the creator's mark stands and the extra payment is refunded to the client.
+5. A refund of a payment made this way is shown to the client as **Waiting for the creator to send it**. The creator sends it themselves and taps **Mark refund as sent**. Stripe sends no money for it.
+
+*How a Stripe payment is recorded*
+
+1. The app asks the server to open the payment; the server makes the PaymentIntent **on the creator's connected account** and the Apple Pay sheet confirms it there.
+2. Stripe tells the Connect webhook `payment_intent.succeeded` for that account. The server passes the account on, the database checks it is the account the payment was made on, and only then marks the deposit paid. An event for another account, or with no account, is ignored.
+3. Refunds are made on the same account. Saved cards (section 8.14) stay with the platform; to charge one, the card is first shared to the creator's account and charged there.
+
 ## 9. Screens and navigation
 
 One `TabView` with five tabs, **role-aware**. Each tab owns a `NavigationStack`. Tab labels are the same for both roles.
@@ -817,6 +846,7 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R26 | **The card at Stripe and the row here can disagree** after a dropped connection: a card removed at one and not the other. | Removal deletes at Stripe first, then here. A refresh compares the two lists and fixes the difference. A charge to a card that no longer exists fails before any money moves. |
 | R27 | **Messages between strangers invite spam, harassment and scams,** and App Review guideline 1.2 expects an app with user-generated content to offer a way to report and block. | The limits in 8.15 slow a flood but do not stop a determined person. Before opening to the public: add *Report* and *Block* to every conversation, a way for the creator to turn off messages from people they have not worked with, and a place to review reports. Until then, keep testing to people you know. |
 | R28 | **A calendar link is a secret anyone holding it can read,** and it may end up in a chat or on a shared computer. It shows names and times of bookings and team events. | The address holds 128 random bits, reading is the only thing it can do, it is shown only to its owner, and **Make a new link** replaces it at once. It leaves out money, contracts, notes and contact details. A person who leaves a company stops seeing that company's events in the link straight away. |
+| R29 | **Payments made outside Stripe are the creator's word.** Slate Pro can't see that money arrived, so a creator could mark a deposit received that wasn't, or never send a refund they marked owed. Separately, **the Stripe calls for creator-owned accounts (Accounts v2) and for sharing a saved card to a creator's account have not been run against Stripe.** | A manual payment is labelled "Paid directly" everywhere and only the people who manage the booking can record one; a manual refund stays pending until the creator says they sent it. The client sees both. Try creating an account, a payment, a refund and a shared card in a Stripe test-mode sandbox before real money moves. |
 
 ## 13. Open questions
 
