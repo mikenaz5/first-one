@@ -75,11 +75,16 @@ if [[ ! -f supabase/config.toml ]]; then
   [[ -f supabase/config.toml ]] || die "Couldn't set up the Supabase folder. Run  supabase init  in the ios folder and send me what it prints."
 fi
 
-say "Linking to your project. Supabase asks for the database password you chose when you made it."
+say "Linking to your project"
 supabase link --project-ref "$ref"
 
-say "Putting the database online. Supabase lists what it will add and asks you to confirm."
-supabase db push
+# Newer versions of the tool push to a copy on this Mac unless told to use the linked project (--remote); older ones
+# always use the linked project and don't know the word.
+push_target=()
+if supabase db push --help 2>&1 | grep -q -- '--remote'; then push_target=(--remote); fi
+
+say "Putting the database online. Supabase may ask for the database password you chose when you made the project (typing shows nothing; that is normal), then lists what it will add and asks you to confirm."
+supabase db push ${push_target[@]+"${push_target[@]}"}
 
 # 3. The server functions that need no outside account. The payment, push and billing ones come later, with their own
 #    setup in README.md ("Turning on real payments" and the sections after it).
