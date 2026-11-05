@@ -73,7 +73,7 @@ You do this once. It means getting a build to your phone is one button, with no 
 **C1. Make an App Store Connect key.** In App Store Connect ▸ **Users and Access** ▸ **Integrations** ▸ **App Store Connect API** ▸ **Team Keys** ▸ **Generate API Key** (or the **+**).
 
 - Name: `GitHub upload`
-- Access: **App Manager** (Admin also works)
+- Access: **Admin** (the build signs the app for you through this key, and signing sometimes needs more than App Manager can do)
 - Generate, then **Download API Key** (once; the file is called `AuthKey_XXXXXXXXXX.p8`).
 - Write down the **Key ID** (in the table, next to the key) and the **Issuer ID** (at the top of the page, a long string with dashes).
 
