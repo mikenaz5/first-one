@@ -110,8 +110,23 @@ jobs:
       - name: Save the App Store Connect key
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
-          chmod 600 "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          KEY="$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          # Rebuild the key file from whatever was pasted. A paste can lose its line breaks or its first and last lines;
+          # the key itself is the one block of letters and numbers between them, so put the frame back around it.
+          BODY=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----BEGIN [A-Z ]*-----//g' -e 's/-----END [A-Z ]*-----//g' | tr -d ' \n\t"')
+          {
+            echo '-----BEGIN PRIVATE KEY-----'
+            printf '%s' "$BODY" | fold -w 64
+            echo
+            echo '-----END PRIVATE KEY-----'
+          } > "$KEY"
+          chmod 600 "$KEY"
+          if ! openssl pkey -in "$KEY" -noout 2>/dev/null; then
+            echo "::error::The ASC_KEY_P8 secret is not a usable Apple key. Open the AuthKey_....p8 file in TextEdit, select all (Cmd A), copy (Cmd C), then on GitHub (Settings > Secrets and variables > Actions) click the pencil next to ASC_KEY_P8 and paste it over what is there."
+            echo "What was saved: ${#ASC_KEY_P8} characters in all, ${#BODY} once the BEGIN and END lines and spaces are removed (a real Apple key has 184). It is not shown here."
+            exit 1
+          fi
+          echo "The key is in the right shape."
 
       - name: Build the app
         run: |

@@ -100,6 +100,11 @@ These secrets can't be read back by anyone, including me; GitHub only hands them
 
 If it turns red, open the run, click the red step and send me the first lines of red text. The first run is where small signing messages show up, and they are quick to fix.
 
+Two messages you may see, and what to do:
+
+- *"The ASC_KEY_P8 secret is not a usable Apple key"* (step **Save the App Store Connect key**): the key was not pasted whole. The button already puts back a missing first or last line and lost line breaks, so this means something else was pasted. Open the `AuthKey_….p8` file in TextEdit (right-click it, **Open With**, **TextEdit**), press Cmd A then Cmd C, and on GitHub (Settings, Secrets and variables, Actions) click the pencil next to `ASC_KEY_P8` and paste it over what is there. The message says how many characters it found; a real key has 184 once the first and last lines are taken away.
+- *"These secrets are not set: …"* (step **Check the secrets are all there**): it names the secrets that are missing; add them as in C2.
+
 **D2. Wait for Apple.** In App Store Connect ▸ your app ▸ **TestFlight**, the build appears under *iOS builds* after 10 to 30 minutes of "Processing". Apple may email you that it finished. (The app declares that it uses only ordinary encryption, so the export questions are already answered.)
 
 **D3. Put yourself on the team of testers.** Still in TestFlight: **Internal Testing** ▸ **+** ▸ name the group `Me` ▸ tick *Enable automatic distribution* ▸ add yourself (your Apple ID must be a user under *Users and Access*; you are one already) ▸ add the build.
