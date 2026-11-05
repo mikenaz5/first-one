@@ -41,6 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check this is the branch with the app
+        working-directory: .
+        run: |
+          if [ ! -d ios ]; then
+            echo "::error::This branch has no app in it. When you press Run workflow, set 'Use workflow from' to claude/ecstatic-curie-4456ah first."
+            exit 1
+          fi
+
       - name: Check the secrets are all there
         run: |
           missing=""
