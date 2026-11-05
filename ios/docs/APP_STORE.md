@@ -1,0 +1,227 @@
+# Getting Slate Pro into TestFlight and the App Store
+
+Plain steps, in order. Nothing here needs you to write code. Where a step says "tell me", paste what you see (never a secret key) and I will fix the project.
+
+**The order**
+
+1. **Apple's developer website:** register the app's names and switch on its features (Part A).
+2. **App Store Connect:** create the app's page (Part B).
+3. **GitHub:** hand it a key so it can upload builds for you, with one button (Part C).
+4. **TestFlight:** press the button, install the app on your own iPhone (Part D).
+5. **The store page:** words, pictures and privacy answers (Part E).
+6. **Submit for review**, after the checklist in Part F.
+
+Apple usually takes a day or two to approve an enrollment, and one to three days to review a first submission. Parts A to D can be done as soon as your account is active; E and F can be prepared now.
+
+---
+
+## Part A. Apple's developer website
+
+Go to <https://developer.apple.com/account> and sign in with the Apple ID you enrolled with. Everything below is under **Certificates, Identifiers & Profiles** (click it on the account page).
+
+**A1. Write down your Team ID.** On the account page, click **Membership details**. Copy the 10-character **Team ID** (letters and numbers). You will need it in Part C.
+
+**A2. Make the App Group** (the shared box the app and its widget both use).
+Identifiers ▸ the blue **+** ▸ **App Groups** ▸ Continue. Description: `Slate Pro`. Identifier: `group.com.slateproapp.app`. Continue ▸ Register.
+
+**A3. Make the app's identifier.**
+Identifiers ▸ **+** ▸ **App IDs** ▸ Continue ▸ **App** ▸ Continue.
+
+- Description: `Slate Pro`
+- Bundle ID: choose **Explicit** and type `com.slateproapp.app` (exactly, lower case)
+- Under **Capabilities**, tick: **App Groups**, **Push Notifications**, **Sign in with Apple**. (Apple Pay is added later, see A6.)
+- Next to **App Groups** click **Configure** and tick `group.com.slateproapp.app`. Next to **Sign in with Apple** leave it on *Enable as a primary App ID*.
+- Continue ▸ Register.
+
+**A4. Make the widget's identifier.** Same screen again: **+** ▸ App IDs ▸ App ▸ Continue.
+
+- Description: `Slate Pro Widgets`
+- Bundle ID, **Explicit**: `com.slateproapp.app.widgets`
+- Capability: **App Groups**, and **Configure** it with the same `group.com.slateproapp.app`.
+- Continue ▸ Register.
+
+**A5. Make a push key** (so the server can send notifications; skip it for the very first TestFlight build if you like, notifications just stay off).
+Keys ▸ **+** ▸ name `Slate Pro push` ▸ tick **Apple Push Notifications service (APNs)** ▸ Continue ▸ Register ▸ **Download**. You can download it only once. Keep the `.p8` file somewhere safe and write down the **Key ID**. Part "Turning on notifications" in [`../README.md`](../README.md) says where the server uses it. Never paste the file's contents into a chat.
+
+**A6. Apple Pay (optional for the first build; payment links work without it).**
+Identifiers ▸ **+** ▸ **Merchant IDs** ▸ Continue. Description `Slate Pro`, Identifier `merchant.com.slateproapp.app`. Then Stripe needs Apple's certificate for it: in the Stripe dashboard open *Settings ▸ Payment methods ▸ Apple Pay ▸ Add new application*, follow its steps (it gives you a file to upload to Apple and a file to bring back). When the merchant ID exists, go back to the app's identifier (A3), tick **Apple Pay Payment Processing**, click **Configure**, tick the merchant ID, Save. "Turning on real payments" in the README has the rest.
+
+**A7. A second key, for Sign in with Apple (not needed yet).** When I add the "revoke Apple's sign-in when someone deletes their account" step (Part F), it needs one more key: Keys ▸ **+** ▸ name `Slate Pro sign in` ▸ tick **Sign in with Apple** ▸ Configure ▸ pick the `Slate Pro` app ID ▸ Save ▸ Register ▸ Download (once). Hold on to it, and I will tell you where it goes.
+
+---
+
+## Part B. App Store Connect: the app's page
+
+Go to <https://appstoreconnect.apple.com> ▸ **Apps** ▸ the blue **+** ▸ **New App**.
+
+- Platforms: **iOS**
+- Name: `Slate Pro` (it must be unique across the whole App Store; if it is taken, try `Slate Pro: Bookings`)
+- Primary language: English (U.S.)
+- Bundle ID: pick `Slate Pro - com.slateproapp.app` from the list (it appears once A3 is done)
+- SKU: `slatepro-ios` (only you ever see it)
+- User access: Full Access
+- Create.
+
+The app now has a page. Leave it empty for the moment.
+
+---
+
+## Part C. Let GitHub upload builds for you
+
+You do this once. It means getting a build to your phone is one button, with no Xcode signing screens.
+
+**C1. Make an App Store Connect key.** In App Store Connect ▸ **Users and Access** ▸ **Integrations** ▸ **App Store Connect API** ▸ **Team Keys** ▸ **Generate API Key** (or the **+**).
+
+- Name: `GitHub upload`
+- Access: **App Manager** (Admin also works)
+- Generate, then **Download API Key** (once; the file is called `AuthKey_XXXXXXXXXX.p8`).
+- Write down the **Key ID** (in the table, next to the key) and the **Issuer ID** (at the top of the page, a long string with dashes).
+
+**C2. Give GitHub the secrets.** On GitHub open the `first-one` repository ▸ **Settings** ▸ **Secrets and variables** ▸ **Actions** ▸ **New repository secret**. Add these one at a time (name exactly as written):
+
+| Secret name | What to paste |
+|---|---|
+| `ASC_KEY_ID` | The Key ID from C1 |
+| `ASC_ISSUER_ID` | The Issuer ID from C1 |
+| `ASC_KEY_P8` | Open the `AuthKey_….p8` file in TextEdit, select all, copy, paste. Include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
+| `APPLE_TEAM_ID` | The Team ID from A1 |
+| `SUPABASE_URL` | Your Supabase project address, like `https://abcdefgh.supabase.co` (Supabase ▸ Project Settings ▸ Data API) |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase's **publishable** key, starting `sb_publishable_`. **Never** the secret key; the button refuses it |
+| `STRIPE_PUBLISHABLE_KEY` | *Optional, for Apple Pay.* Stripe's publishable key, starting `pk_`. Never `sk_` |
+| `APPLE_PAY_MERCHANT_ID` | *Optional, with the one above.* `merchant.com.slateproapp.app` |
+
+These secrets can't be read back by anyone, including me; GitHub only hands them to the upload button's run.
+
+---
+
+## Part D. Your first build on your own iPhone
+
+**D1. Press the button.** On GitHub open the **Actions** tab ▸ **TestFlight** in the left list ▸ **Run workflow** ▸ pick the branch ▸ (leave *version* empty for now) ▸ the green **Run workflow**. It takes 15 to 25 minutes. A green tick means Apple has the build.
+
+If it turns red, open the run, click the red step and send me the first lines of red text. The first run is where small signing messages show up, and they are quick to fix.
+
+**D2. Wait for Apple.** In App Store Connect ▸ your app ▸ **TestFlight**, the build appears under *iOS builds* after 10 to 30 minutes of "Processing". Apple may email you that it finished. (The app declares that it uses only ordinary encryption, so the export questions are already answered.)
+
+**D3. Put yourself on the team of testers.** Still in TestFlight: **Internal Testing** ▸ **+** ▸ name the group `Me` ▸ tick *Enable automatic distribution* ▸ add yourself (your Apple ID must be a user under *Users and Access*; you are one already) ▸ add the build.
+
+**D4. Install it.** On your iPhone, install **TestFlight** from the App Store and sign in with the same Apple ID. Slate Pro appears; tap **Install**. This is the real app on a real phone, talking to your real Supabase project. Builds expire after 90 days, and each new press of the button makes a newer one.
+
+**D5. Friends and creators.** Internal testing is for up to 100 people who are on your App Store Connect team. For anyone else (a photographer friend, say), make an **External Testing** group and add their email; Apple does a short review of the first external build (about a day), then they get an invite by email.
+
+---
+
+## Part E. The store page
+
+Open the app's page in App Store Connect ▸ **iOS App ▸ 1.0 Prepare for Submission**. Suggested text (change anything you like; it is yours):
+
+**Name:** Slate Pro
+**Subtitle (30 characters at most):** Bookings, contracts, payments
+**Category:** Business (primary), Photo & Video (secondary)
+**Promotional text (170 characters at most; you can change it any time without a new review):**
+Get booked, sign the contract, take the deposit and deliver the files, all in one app made for photographers, videographers and freelancers.
+
+**Description:**
+
+> Slate Pro is the booking app for people who get hired to make things: photographers, videographers and other freelance creators.
+>
+> Share your link, let clients pick a package and a time that is really free, and have the contract signed inside the booking. A booking is confirmed only when the contract is signed and the deposit is settled, so nobody gets double-booked and nobody is left with a handshake and no paperwork.
+>
+> FOR CREATORS
+> • A public page with your portfolio, packages, add-ons and prices
+> • Set your hours; your calendar's busy times keep clients off the times you're taken (only the start and end times are shared, never the titles)
+> • A contract written into every booking, filled in for you and signed on the phone, with a signed PDF for both of you
+> • Get paid directly to your own Stripe account, with Apple Pay, or add your own payment link and mark payments received yourself
+> • Message clients, deliver photos and videos in the app or by link, and collect reviews
+> • A home screen widget for your next bookings
+>
+> FOR COMPANIES AND STUDIOS
+> • Add your team with roles, shared services, a team calendar and events
+> • Bookings are assigned to the right person, with a record of who did what
+>
+> FOR CLIENTS
+> • Free to use: find creators near you, ask a question before you book, sign, pay and receive your files
+> • Keep a card on file for next time
+>
+> Your data is encrypted in transit and who can see what is enforced on the server. No ads and no tracking. Questions: support@slateproapp.com.
+
+(Every line describes something the app does today. If a feature is switched off at launch, such as Apple Pay, delete its mention before submitting.)
+
+**Keywords (100 characters at most, commas, no spaces):**
+`booking,photographer,videographer,freelance,contract,invoice,deposit,client,schedule,esign,studio`
+
+**URLs**
+
+- Support URL: `https://slateproapp.com/support/`
+- Privacy Policy URL: `https://slateproapp.com/privacy/`
+- Marketing URL (optional): `https://slateproapp.com/`
+
+**Copyright:** `2026 ` followed by the legal name of whoever runs Slate Pro.
+
+**Age rating.** Answer the questionnaire honestly. The points that matter for this app: people can message each other and share photos and videos (user-generated content: yes), there is no web browsing, no gambling, no violence and no mature material. Real-world payments for services are not "in-app purchases".
+
+**Screenshots.** App Store Connect lists the exact sizes when you click the screenshot box (an iPhone set is required; an iPad set too if the app runs on iPad, see Part F). The simulator can produce them: tell me when you want a set and I will add a script that takes them from the demo account.
+
+### App Privacy answers
+
+In App Store Connect ▸ your app ▸ **App Privacy** ▸ **Get Started**. These match the privacy manifest in the app ([`Config/PrivacyInfo.xcprivacy`](../Config/PrivacyInfo.xcprivacy)) and the privacy policy on the website. Do they match what you actually do? Read them once; Apple holds you to what you answer here.
+
+- **Do you or your third-party partners collect data from this app?** Yes.
+- **Used to track you** (tied to ads or shared with data brokers): **none**. Slate Pro has no advertising and no tracking.
+- **Linked to the person's identity, used only for App Functionality** (running the app), for each of these:
+
+| Apple's heading | What it is in Slate Pro |
+|---|---|
+| Contact Info ▸ Name | Name from Sign in with Apple or the profile |
+| Contact Info ▸ Email Address | Sign-in address (may be Apple's private relay) |
+| Identifiers ▸ User ID | The account's internal ID |
+| Identifiers ▸ Device ID | The notification token Apple gives the phone |
+| User Content ▸ Photos or Videos | Portfolio and delivered photos and videos |
+| User Content ▸ Emails or Text Messages | Messages between a client and a creator |
+| User Content ▸ Other User Content | Contracts and signatures, notes, reviews, calendar busy times, reports |
+| Purchases ▸ Purchase History | Deposits, balances and refunds on bookings |
+| Financial Info ▸ Payment Info | Saved card's brand, last four digits and expiry (Stripe keeps the number) |
+
+- **Not collected:** location (the approximate position stays on the phone), contacts, health, browsing or search history, diagnostics. If the free TestFlight or App Store crash reports are all you use, you do not collect them yourself.
+
+### Notes for the App Review team
+
+Paste this into **App Review Information ▸ Notes** and edit it:
+
+> Slate Pro lets freelance creators (photographers, videographers) take bookings with a contract signed inside the booking, and lets clients find, book and pay them.
+>
+> To sign in, use "Continue with Apple". No other account is needed. (An email-code sign-in also exists for clients.)
+>
+> Payments are for real-world services (a photo shoot), paid to the creator's own Stripe account, so In-App Purchase does not apply. Company accounts pay a per-seat subscription for team features; this is an organisation plan sold to businesses and handled on the web (guideline 3.1.3(c)).
+>
+> Account deletion: Settings ▸ Delete account.
+> Reporting content: [say where, once report and block are built].
+> Contact: support@slateproapp.com
+
+---
+
+## Part F. Before pressing "Submit for Review"
+
+| | What | Who | Where it stands |
+|---|---|---|---|
+| ☐ | **The website is live at slateproapp.com** with the privacy policy and terms, and `python3 ios/scripts/check_site.py --release` passes (no *Draft* box, no `[[brackets]]`). Apple opens the privacy URL. | You (and a lawyer for the legal text) | Pages are written as drafts; see [`../../site/README.md`](../../site/README.md) |
+| ☐ | **`support@slateproapp.com` exists** and you read it | You | Not yet |
+| ☐ | **Sign-in emails work** (your own email sender, the code template pasted into Supabase) | You, with me | Parked; needs the domain's email records |
+| ☐ | **Sign in with Apple works** against the real project (Supabase ▸ Authentication ▸ Providers ▸ Apple, with `com.slateproapp.app` as the client ID) | You | Needs A3 |
+| ☐ | **Report and block** for messages and reviews (guideline 1.2: apps with user-written content). Files can be reported today | **Me** | Not built. Next |
+| ☐ | **Revoke Sign in with Apple when an account is deleted** (guideline 5.1.1(v)) | **Me**, with the key from A7 | Not built |
+| ☐ | **Something for the reviewer to try.** A sample creator with a profile, a package and a payment link on the real server, so the reviewer can book without paying real money (guideline 2.1: the app must be fully usable in review) | **Me** and you | Not built |
+| ☐ | **Seat billing and Apple's rules.** Selling a company plan on the web instead of through In-App Purchase is allowed for organisations (3.1.3(c)) but is a grey area for one-person companies. Re-read the current guideline text before submitting. The fallback is In-App Purchase seat bands | **You** decide | Risk R9 in [`../../SPEC.md`](../../SPEC.md) |
+| ☐ | **Stripe tested in a sandbox**: connect a creator, pay a deposit, refund (see "Known gaps" in the README: none of it has run against Stripe yet) | You, with me | Not yet |
+| ☐ | **iPad or iPhone only?** The app is set to run on both, but no one has tried it on an iPad. Choosing iPhone only for 1.0 means no iPad screenshots and no iPad layout to be rejected for | **You** decide | Say the word and I flip the setting |
+| ☐ | **Privacy answers (Part E) match** the policy and the manifest | You | Written |
+| ☐ | **A real iPhone has run it** from TestFlight, start to finish: sign in, make a profile, book, sign, pay | You | After D4 |
+
+What is already done in the project for you: the privacy manifest (checked on every build), the app icon (1024 px, no transparency, which Apple insists on), the permission wording iOS shows (calendar, photos, location), "Delete account" inside the app, Sign in with Apple offered next to email codes, the export-encryption answer, the product name, and the upload button.
+
+---
+
+## After the first release
+
+- **New version:** press the TestFlight button again with a new *version* (for example `1.0.1`). The build number goes up on its own.
+- **Choose phased release** on the version page so the update reaches people over a week, not all at once.
+- Apple will require builds made with a newer Xcode from time to time; the button uses the newest Xcode on GitHub's machines.

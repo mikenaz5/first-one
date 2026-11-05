@@ -36,6 +36,9 @@ jobs:
       - name: Check the website against the app
         run: python3 scripts/check_site.py
 
+      - name: Check the privacy manifest
+        run: python3 scripts/check_privacy_manifest.py
+
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -83,6 +86,14 @@ jobs:
             exit 1
           fi
           grep -E "Executed [0-9]+ tests" build/xcodebuild.log | tail -n 3
+
+      - name: Check the privacy manifest made it into the built app
+        run: |
+          APP=$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path "*/Build/Products/Debug-iphonesimulator/Slate.app" | head -n 1)
+          echo "Built app: $APP"
+          test -n "$APP"
+          test -f "$APP/PrivacyInfo.xcprivacy"
+          python3 scripts/check_privacy_manifest.py "$APP/PrivacyInfo.xcprivacy"
 
       - name: Upload build log
         if: always()

@@ -31,6 +31,9 @@ targets:
     sources:
       - path: Slate
       - path: Shared
+      # Apple's privacy manifest: what the app uses and collects. App Store Connect rejects an upload without it.
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - target: SlateWidgets
       - package: Supabase

@@ -97,6 +97,10 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
 
 Set `DEVELOPMENT_TEAM` in `Config/Secrets.xcconfig`. The default build uses one capability, Sign in with Apple (`Config/Slate.entitlements`); Apple Pay and push notifications are switched on through `Config/Secrets.xcconfig` (see "Turning on real payments" and "Turning on notifications"). Apple's free "Personal Team" doesn't support any of them; use a paid developer account. The bundle ID is `com.slateproapp.app` (in `project.yml`), with `com.slateproapp.app.widgets` for the widget; register exactly these in your Apple developer account.
 
+### TestFlight and the App Store
+
+[`docs/APP_STORE.md`](docs/APP_STORE.md) is the step-by-step for the day the Apple Developer account is active: which identifiers, keys and capabilities to make in Apple's portals, how to create the app's page in App Store Connect, the six GitHub secrets, the store text, the App Privacy answers, notes for the App Review team and the checklist to clear before submitting. Getting a build onto a phone is one button: **Actions ▸ TestFlight ▸ Run workflow** (`.github/workflows/testflight.yml`) writes `Config/Secrets.xcconfig` from the secrets, archives the app with automatic signing through an App Store Connect API key and uploads it; the build number is the run number, so it always goes up. It has never been run (it needs the account), so expect a signing message or two the first time. The app carries Apple's privacy manifest (`Config/PrivacyInfo.xcprivacy`, added to the app target in `project.yml`); `scripts/check_privacy_manifest.py` checks it on every build, fails if the code starts using a system feature the manifest doesn't explain, and CI confirms the file lands inside the built app.
+
 ## Packages, availability and booking
 
 **Packages** are plain values (`ServicePackage`, `AddOn`) validated by `PackageRules`, which is the one list of limits the form, both backends and the SQL agree on. Prices are whole cents. The deposit is a fixed amount set per package; add-ons are settled in the balance. An "extra time" add-on lengthens the booking (so it blocks more of the calendar) and a "rush" add-on shortens delivery (never below one day).
@@ -372,7 +376,8 @@ privacy and support addresses on the store page, and `scripts/check_site.py` (ru
 ```
 ios/
   project.yml                 XcodeGen project definition (source of truth)
-  Config/                     xcconfig, entitlements (Info.plist is generated)
+  Config/                     xcconfig, entitlements, PrivacyInfo.xcprivacy (Info.plist is generated)
+  docs/APP_STORE.md           Getting into TestFlight and the App Store, step by step
   Shared/                     Code compiled into both the app and the widget (the widget's snapshot, its storage and wording)
   SlateWidgets/               The home screen and lock screen widget (WidgetKit)
   Slate/
