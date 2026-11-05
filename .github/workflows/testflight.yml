@@ -1,0 +1,178 @@
+name: TestFlight
+
+# Builds Slate Pro for real iPhones and uploads it to App Store Connect, where TestFlight picks it up.
+# It never runs by itself: open the Actions tab, choose "TestFlight", press "Run workflow".
+# It needs an Apple Developer account and six secrets first. ios/docs/APP_STORE.md, step by step, says how to get each one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version people see, such as 1.0.0. Leave empty to keep the one in ios/project.yml."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ios
+    env:
+      # Required. Each one is a repository secret (Settings ▸ Secrets and variables ▸ Actions).
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      # Optional. Without these the build has no Apple Pay (everything else works).
+      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+      APPLE_PAY_MERCHANT_ID: ${{ secrets.APPLE_PAY_MERCHANT_ID }}
+      APP_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check this is the branch with the app
+        working-directory: .
+        run: |
+          if [ ! -d ios ]; then
+            echo "::error::This branch has no app in it. When you press Run workflow, set 'Use workflow from' to claude/ecstatic-curie-4456ah first."
+            exit 1
+          fi
+
+      - name: Check the secrets are all there
+        run: |
+          missing=""
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID SUPABASE_URL SUPABASE_PUBLISHABLE_KEY; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::These secrets are not set:$missing. See ios/docs/APP_STORE.md, step 'Let GitHub upload builds for you'."
+            exit 1
+          fi
+          case "$SUPABASE_PUBLISHABLE_KEY" in
+            sb_secret_*) echo "::error::SUPABASE_PUBLISHABLE_KEY holds a SECRET key. Use the publishable key (sb_publishable_...), never the secret one."; exit 1 ;;
+          esac
+          case "$STRIPE_PUBLISHABLE_KEY" in
+            ""|pk_*) ;;
+            *) echo "::error::STRIPE_PUBLISHABLE_KEY must start with pk_ (the publishable key). Never put a secret key (sk_...) in the app."; exit 1 ;;
+          esac
+          if [ -n "$STRIPE_PUBLISHABLE_KEY" ] && [ -z "$APPLE_PAY_MERCHANT_ID" ]; then
+            echo "::error::STRIPE_PUBLISHABLE_KEY is set but APPLE_PAY_MERCHANT_ID is not. Set both for Apple Pay, or neither."
+            exit 1
+          fi
+
+      - name: Check the product name and the privacy manifest
+        run: |
+          python3 scripts/check_product_name.py
+          python3 scripts/check_privacy_manifest.py
+
+      - name: Use the newest Xcode on this machine
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Write the settings file (Secrets.xcconfig)
+        run: |
+          # "//" starts a comment in these files, so the address is written with the $() trick the example file explains.
+          URL=$(printf '%s' "$SUPABASE_URL" | sed 's#^https://#https:/$()/#')
+          {
+            printf 'SUPABASE_URL = %s\n' "$URL"
+            printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_PUBLISHABLE_KEY"
+            printf 'DEVELOPMENT_TEAM = %s\n' "$APPLE_TEAM_ID"
+            if [ -n "$STRIPE_PUBLISHABLE_KEY" ]; then
+              printf 'STRIPE_PUBLISHABLE_KEY = %s\n' "$STRIPE_PUBLISHABLE_KEY"
+              printf 'APPLE_PAY_MERCHANT_ID = %s\n' "$APPLE_PAY_MERCHANT_ID"
+              echo 'CODE_SIGN_ENTITLEMENTS = Config/Slate.ApplePay.Push.entitlements'
+            else
+              echo 'CODE_SIGN_ENTITLEMENTS = Config/Slate.Push.entitlements'
+            fi
+          } > Config/Secrets.xcconfig
+          # Show the names only, never the values.
+          sed -E 's/=.*/= (set)/' Config/Secrets.xcconfig
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Save the App Store Connect key
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Build the app
+        run: |
+          mkdir -p build
+          EXTRA=""
+          if [ -n "$APP_VERSION" ]; then EXTRA="MARKETING_VERSION=$APP_VERSION"; fi
+          # The build number must go up every time App Store Connect gets a build; this run's number always does.
+          xcodebuild archive \
+            -project Slate.xcodeproj \
+            -scheme Slate \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Slate.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            $EXTRA \
+            > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -60; tail -n 60 build/archive.log; exit 1; }
+          tail -n 5 build/archive.log
+
+      - name: Upload to App Store Connect
+        run: |
+          cat > build/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/Slate.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            > build/export.log 2>&1 || { grep -E "error:|Error" build/export.log | sort -u | head -40; tail -n 60 build/export.log; exit 1; }
+          tail -n 8 build/export.log
+          echo "Uploaded build $GITHUB_RUN_NUMBER. It shows up in App Store Connect ▸ TestFlight in a few minutes, after Apple has processed it."
+
+      - name: Remove the key from this machine
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys" Config/Secrets.xcconfig
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: |
+            ios/build/archive.log
+            ios/build/export.log
+          if-no-files-found: ignore
