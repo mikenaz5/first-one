@@ -71,6 +71,39 @@ jobs:
             exit 1
           fi
 
+      - name: Check the Apple numbers look right
+        run: |
+          # A pasted value can carry a space or a line break at its end, and Apple then says "not authorized". Take those off,
+          # and use the tidied copies (KEY_ID, ISSUER_ID, TEAM_ID) from here on.
+          KEY_ID=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
+          ISSUER_ID=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          TEAM_ID=$(printf '%s' "$APPLE_TEAM_ID" | tr -d '[:space:]')
+          {
+            echo "KEY_ID=$KEY_ID"
+            echo "ISSUER_ID=$ISSUER_ID"
+            echo "TEAM_ID=$TEAM_ID"
+          } >> "$GITHUB_ENV"
+          UUID='^[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}$'
+          TEN='^[A-Za-z0-9]{10}$'
+          bad=0
+          if ! printf '%s' "$KEY_ID" | grep -Eq "$TEN"; then
+            echo "::error::ASC_KEY_ID should be 10 letters and numbers, the Key ID shown next to your key on App Store Connect (it is also in the file name: AuthKey_XXXXXXXXXX.p8). What is saved is ${#KEY_ID} characters long."
+            bad=1
+          fi
+          if ! printf '%s' "$ISSUER_ID" | grep -Eq "$UUID"; then
+            echo "::error::ASC_ISSUER_ID should be the long Issuer ID at the top of App Store Connect > Users and Access > Integrations > App Store Connect API, with dashes, like 69a6de7e-1234-47e3-e053-5b8c7c11a4d1. What is saved is ${#ISSUER_ID} characters long."
+            bad=1
+          fi
+          if ! printf '%s' "$TEAM_ID" | grep -Eq "$TEN"; then
+            echo "::error::APPLE_TEAM_ID should be 10 letters and numbers, the Team ID under Membership details on developer.apple.com/account. What is saved is ${#TEAM_ID} characters long."
+            bad=1
+          fi
+          if printf '%s' "$KEY_ID" | grep -Eq "$UUID" && printf '%s' "$ISSUER_ID" | grep -Eq "$TEN"; then
+            echo "::error::ASC_KEY_ID and ASC_ISSUER_ID look swapped: the long one with dashes is the Issuer ID."
+          fi
+          if [ "$bad" -ne 0 ]; then exit 1; fi
+          echo "The three Apple numbers have the right shape."
+
       - name: Check the product name and the privacy manifest
         run: |
           python3 scripts/check_product_name.py
@@ -92,7 +125,7 @@ jobs:
           {
             printf 'SUPABASE_URL = %s\n' "$URL"
             printf 'SUPABASE_ANON_KEY = %s\n' "$SUPABASE_PUBLISHABLE_KEY"
-            printf 'DEVELOPMENT_TEAM = %s\n' "$APPLE_TEAM_ID"
+            printf 'DEVELOPMENT_TEAM = %s\n' "$TEAM_ID"
             if [ -n "$STRIPE_PUBLISHABLE_KEY" ]; then
               printf 'STRIPE_PUBLISHABLE_KEY = %s\n' "$STRIPE_PUBLISHABLE_KEY"
               printf 'APPLE_PAY_MERCHANT_ID = %s\n' "$APPLE_PAY_MERCHANT_ID"
@@ -110,7 +143,7 @@ jobs:
       - name: Save the App Store Connect key
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          KEY="$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          KEY="$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
           # Rebuild the key file from whatever was pasted. A paste can lose its line breaks or its first and last lines;
           # the key itself is the one block of letters and numbers between them, so put the frame back around it.
           BODY=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----BEGIN [A-Z ]*-----//g' -e 's/-----END [A-Z ]*-----//g' | tr -d ' \n\t"')
@@ -128,6 +161,43 @@ jobs:
           fi
           echo "The key is in the right shape."
 
+      - name: Ask Apple whether the key works
+        run: |
+          KEY="$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+          NOW=$(date +%s)
+          HEADER=$(printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$KEY_ID" | b64url)
+          PAYLOAD=$(printf '{"iss":"%s","iat":%s,"exp":%s,"aud":"appstoreconnect-v1"}' "$ISSUER_ID" "$NOW" "$((NOW + 600))" | b64url)
+          # openssl signs in DER form; Apple wants the two 32-byte halves (r and s) side by side.
+          SIGNATURE=$(printf '%s.%s' "$HEADER" "$PAYLOAD" | openssl dgst -sha256 -sign "$KEY" | python3 -c '
+          import sys, base64
+          d = sys.stdin.buffer.read()
+          i = 2 + (d[1] & 0x7F if d[1] & 0x80 else 0)
+          rl = d[i + 1]; r = d[i + 2:i + 2 + rl]; i += 2 + rl
+          sl = d[i + 1]; s = d[i + 2:i + 2 + sl]
+          r = r.lstrip(b"\0").rjust(32, b"\0"); s = s.lstrip(b"\0").rjust(32, b"\0")
+          sys.stdout.write(base64.urlsafe_b64encode(r + s).rstrip(b"=").decode())
+          ')
+          STATUS=$(curl -sS -m 30 -o "$RUNNER_TEMP/asc-apps.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $HEADER.$PAYLOAD.$SIGNATURE" \
+            "https://api.appstoreconnect.apple.com/v1/apps?filter%5BbundleId%5D=com.slateproapp.app&limit=1") || STATUS="none"
+          case "$STATUS" in
+            200)
+              if grep -q '"type"[[:space:]]*:[[:space:]]*"apps"' "$RUNNER_TEMP/asc-apps.json"; then
+                echo "Apple accepted the key, and the app com.slateproapp.app exists on App Store Connect."
+              else
+                echo "::warning::Apple accepted the key, but it found no app with the bundle ID com.slateproapp.app. Check that the app page was made with that bundle ID."
+              fi ;;
+            401)
+              echo "::error::Apple does not accept this key (answer 401, not authorized). One of these three does not match the key you downloaded: ASC_KEY_ID (must be the Key ID of that same key; it is in the file name AuthKey_XXXXXXXXXX.p8), ASC_ISSUER_ID (the Issuer ID at the top of the Team Keys page, not the Key ID), or ASC_KEY_P8 (the contents of that same .p8 file). It also fails if the key was revoked, or if it is an Individual key instead of a Team key. Fix the secret, or make a new Team key and replace all three."
+              exit 1 ;;
+            403)
+              echo "::error::Apple recognises the key but will not let it in (answer 403). Make the key with Admin access: App Store Connect > Users and Access > Integrations > App Store Connect API > Team Keys."
+              exit 1 ;;
+            *)
+              echo "::warning::Could not check the key with Apple (answer $STATUS). Going on to the build, which will say more." ;;
+          esac
+
       - name: Build the app
         run: |
           mkdir -p build
@@ -141,10 +211,10 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/Slate.xcarchive \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             $EXTRA \
             > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -60; tail -n 60 build/archive.log; exit 1; }
@@ -159,7 +229,7 @@ jobs:
           <dict>
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
-            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>teamID</key><string>$TEAM_ID</string>
             <key>signingStyle</key><string>automatic</string>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
@@ -171,9 +241,9 @@ jobs:
             -exportOptionsPlist build/ExportOptions.plist \
             -exportPath build/export \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
             > build/export.log 2>&1 || { grep -E "error:|Error" build/export.log | sort -u | head -40; tail -n 60 build/export.log; exit 1; }
           tail -n 8 build/export.log
           echo "Uploaded build $GITHUB_RUN_NUMBER. It shows up in App Store Connect ▸ TestFlight in a few minutes, after Apple has processed it."
