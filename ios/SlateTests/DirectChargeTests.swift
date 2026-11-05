@@ -206,9 +206,11 @@ final class DirectChargeTests: XCTestCase {
 
         let confirmed = try await booking(held.id)
         XCTAssertEqual(confirmed.status, .confirmed)
-        let money = try await payments(for: held.id).filter { $0.kind == .deposit }
+        // The client had opened Apple Pay (a pending payment) before closing the sheet; marking it received closes that one.
+        let all = try await payments(for: held.id).filter { $0.kind == .deposit }
+        XCTAssertEqual(all.filter { $0.status == .pending }.count, 0, "nothing is left waiting to be paid twice")
+        let money = all.filter { $0.status == .succeeded }
         XCTAssertEqual(money.count, 1)
-        XCTAssertEqual(money.first?.status, .succeeded)
         XCTAssertEqual(money.first?.method, .manual)
         XCTAssertEqual(money.first?.amountCents, 50_000, "the amount is the booking's, not the creator's to type")
         let contract = try await backend.loadContract(bookingID: held.id, for: creator.id)
