@@ -245,6 +245,18 @@ jobs:
               print("::warning::Could not list identifiers (answer " + bstatus + "); skipping the team check.")
           sys.exit(1 if bad else 0)
           PY
+              # Signing needs more than reading apps: ask about the things Xcode will touch, and print Apple's reason if refused.
+              for path in "certificates?limit=1" "profiles?limit=1" "devices?limit=1"; do
+                CODE=$(curl -sS -m 30 -o "$RUNNER_TEMP/asc-probe.json" -w '%{http_code}' \
+                  -H "Authorization: Bearer $HEADER.$PAYLOAD.$SIGNATURE" \
+                  "https://api.appstoreconnect.apple.com/v1/$path") || CODE="none"
+                if [ "$CODE" = "200" ]; then
+                  echo "Apple lets this key read ${path%%\?*}: yes."
+                else
+                  DETAIL=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=(d.get("errors") or [{}])[0]; print((e.get("title","") + " - " + e.get("detail","")).strip(" -"))' "$RUNNER_TEMP/asc-probe.json" 2>/dev/null || true)
+                  echo "::warning::Apple does not let this key read ${path%%\?*} (answer $CODE): $DETAIL"
+                fi
+              done
               ;;
             401)
               echo "::error::Apple does not accept this key (answer 401, not authorized). One of these three does not match the key you downloaded: ASC_KEY_ID (must be the Key ID of that same key; it is in the file name AuthKey_XXXXXXXXXX.p8), ASC_ISSUER_ID (the Issuer ID at the top of the Team Keys page, not the Key ID), or ASC_KEY_P8 (the contents of that same .p8 file). It also fails if the key was revoked, or if it is an Individual key instead of a Team key. Fix the secret, or make a new Team key and replace all three."
@@ -275,7 +287,14 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             $EXTRA \
-            > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -60; tail -n 60 build/archive.log; exit 1; }
+            > build/archive.log 2>&1 || {
+              echo "::group::What Apple answered while signing"
+              grep -iE "DVTServices|Received response|Communication with Apple|bearer|Authentication failed|forbidden|not authorized" build/archive.log | cut -c1-500 | sort -u | head -30
+              echo "::endgroup::"
+              grep -E "error:" build/archive.log | sort -u | head -60
+              tail -n 60 build/archive.log
+              exit 1
+            }
           tail -n 5 build/archive.log
 
       - name: Upload to App Store Connect
