@@ -191,6 +191,38 @@ jobs:
                 echo "Apple accepted the key, and the app com.slateproapp.app exists on App Store Connect."
               else
                 echo "::warning::Apple accepted the key, but it found no app with the bundle ID com.slateproapp.app. Check that the app page was made with that bundle ID."
+              fi
+              # Which team owns the app's identifier? It has to be the team in APPLE_TEAM_ID, or signing says "No Account for Team".
+              BSTATUS=$(curl -sS -m 30 -o "$RUNNER_TEMP/asc-bundles.json" -w '%{http_code}' \
+                -H "Authorization: Bearer $HEADER.$PAYLOAD.$SIGNATURE" \
+                "https://api.appstoreconnect.apple.com/v1/bundleIds?limit=200") || BSTATUS="none"
+              if [ "$BSTATUS" = "200" ]; then
+                python3 - "$RUNNER_TEMP/asc-bundles.json" "$TEAM_ID" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1])).get("data", [])
+          team = sys.argv[2]
+          owners = {}
+          for item in data:
+              a = item.get("attributes", {})
+              owners[a.get("identifier")] = a.get("seedId")
+          wanted = ["com.slateproapp.app", "com.slateproapp.app.widgets"]
+          missing = [w for w in wanted if w not in owners]
+          for w in missing:
+              print("::warning::Apple has no identifier called " + w + " yet (Part A of the guide). The build may be able to make it itself.")
+          found = [owners[w] for w in wanted if w in owners]
+          if not found:
+              print("Apple lists " + str(len(owners)) + " identifiers for this team, and neither of ours is among them yet.")
+          elif all(t == team for t in found):
+              print("The team that owns the app's identifiers matches APPLE_TEAM_ID.")
+          else:
+              other = sorted(set(t for t in found if t != team))
+              print("::error::APPLE_TEAM_ID is not the team that owns this app. Apple says the app identifiers belong to team " + ", ".join(other) + ", but the APPLE_TEAM_ID secret holds a different value. Put " + ", ".join(other) + " in the APPLE_TEAM_ID secret (it is the Team ID under Membership details on developer.apple.com/account).")
+              sys.exit(1)
+          PY
+              elif [ "$BSTATUS" = "403" ]; then
+                echo "::warning::The key is not allowed to list identifiers (answer 403). Make the key with Admin access."
+              else
+                echo "::warning::Could not list identifiers with Apple (answer $BSTATUS); skipping the team check."
               fi ;;
             401)
               echo "::error::Apple does not accept this key (answer 401, not authorized). One of these three does not match the key you downloaded: ASC_KEY_ID (must be the Key ID of that same key; it is in the file name AuthKey_XXXXXXXXXX.p8), ASC_ISSUER_ID (the Issuer ID at the top of the Team Keys page, not the Key ID), or ASC_KEY_P8 (the contents of that same .p8 file). It also fails if the key was revoked, or if it is an Individual key instead of a Team key. Fix the secret, or make a new Team key and replace all three."
