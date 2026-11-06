@@ -302,6 +302,12 @@ jobs:
               echo "::group::What Apple answered while signing"
               grep -iE "DVTServices|Received response|Communication with Apple|bearer|Authentication failed|forbidden|not authorized" build/archive.log | cut -c1-500 | sort -u | head -30
               echo "::endgroup::"
+              echo "::group::Signing lines from the build log"
+              grep -n -iE "provision|profile|certificate|signing|team|account|identifier|capabilit" build/archive.log | grep -v "Explicit dependency" | cut -c1-300 | head -60
+              echo "::endgroup::"
+              echo "::group::Xcode's own record of its calls to Apple (macOS log)"
+              log show --style compact --last 15m --info --debug --predicate 'process == "xcodebuild" || process == "ibtoold" || process == "xcbuildservice"' 2>/dev/null | grep -iE "bearer|token|jwt|401|403|api\.appstoreconnect|developerservices|xcbuild|authenticat|issuer|forbidden|provisioning" | cut -c1-420 | head -60 || true
+              echo "::endgroup::"
               grep -E "error:" build/archive.log | sort -u | head -60
               tail -n 60 build/archive.log
               exit 1
