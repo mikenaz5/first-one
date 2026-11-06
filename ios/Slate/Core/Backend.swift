@@ -263,8 +263,13 @@ protocol SlateBackend {
     func loadBilling(organizationID: UUID, for userID: UUID) async throws -> BillingOverview
     /// What adding (`delta` > 0) or removing people does to the bill, for the sheet that asks first.
     func previewSeatChange(delta: Int, organizationID: UUID, for userID: UUID) async throws -> SeatPlan
-    /// A Stripe-hosted page to start the plan or manage it. Open it in a web authentication session.
+    /// A Stripe-hosted page to start the plan or manage it. Open it in a web authentication session. (The older way to
+    /// pay; the app buys plans with Apple's purchase sheet now, see `recordApplePurchase`.)
     func beginBilling(_ action: BillingAction, organizationID: UUID, by userID: UUID) async throws -> URL
+    /// Hands the server a company's plan purchase exactly as Apple signed it. The server checks Apple's signature and
+    /// records the plan; the app can't say a plan is paid. Throws `planNotConfirmed` when it can't confirm it yet,
+    /// `planAlreadyUsed`, `notAllowed` (only the Owner buys), `billingUnavailable` (no server).
+    func recordApplePurchase(_ purchase: SignedPurchase, organizationID: UUID, by userID: UUID) async throws
 
     // Assigning bookings
     /// Bookings waiting for someone, soonest first.

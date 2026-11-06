@@ -183,13 +183,15 @@ enum AssignmentMode: String, Codable, CaseIterable, Identifiable, Hashable {
 /// The numbers that are meant to change without touching rules code. The database holds the real values
 /// (`app_settings`); the app asks for them, and uses these until it has.
 struct TeamConfig: Codable, Equatable, Hashable {
-    /// Billing floor: a company is billed for at least this many seats.
+    /// The people the smallest plan covers (and the floor the older seat billing used).
     var seatMinimum: Int
-    /// The most people a company can have, counting open invites.
+    /// The most people any company can have, counting open invites. A company on a plan is held to what its plan covers.
     var seatMaximum: Int
     var inviteExpiryDays: Int
     /// How long a company keeps working after a payment fails.
     var graceDays: Int
+    /// The steps of the company plan on offer (`apple_plans`).
+    var plans: [PlanOffer] = PlanOffer.standard
 
     static let standard = TeamConfig(seatMinimum: 5, seatMaximum: 250, inviteExpiryDays: 7, graceDays: 7)
 }
@@ -281,6 +283,8 @@ struct PlanSummary: Codable, Equatable, Hashable {
     var graceUntil: Date?
     var cancelAtPeriodEnd: Bool
     var periodEnd: Date?
+    /// How many people the plan covers, when the company has one bought with Apple's purchase sheet.
+    var seatsCovered: Int? = nil
 
     static let unsubscribed = PlanSummary(required: true, status: .none, isOK: false, graceUntil: nil, cancelAtPeriodEnd: false, periodEnd: nil)
     static let notRequired = PlanSummary(required: false, status: .none, isOK: true, graceUntil: nil, cancelAtPeriodEnd: false, periodEnd: nil)
@@ -288,7 +292,8 @@ struct PlanSummary: Codable, Equatable, Hashable {
     /// Builds the summary from what the database reports. The company may take members and bookings while the plan is
     /// trialing or active, or payment failed and the grace period hasn't run out (`public.org_billing_ok`).
     static func make(
-        required: Bool, status: PlanStatus, graceUntil: Date?, cancelAtPeriodEnd: Bool, periodEnd: Date?, now: Date = Date()
+        required: Bool, status: PlanStatus, graceUntil: Date?, cancelAtPeriodEnd: Bool, periodEnd: Date?, seatsCovered: Int? = nil,
+        now: Date = Date()
     ) -> PlanSummary {
         let good: Bool
         switch status {
@@ -298,7 +303,7 @@ struct PlanSummary: Codable, Equatable, Hashable {
         }
         return PlanSummary(
             required: required, status: status, isOK: !required || good, graceUntil: graceUntil,
-            cancelAtPeriodEnd: cancelAtPeriodEnd, periodEnd: periodEnd
+            cancelAtPeriodEnd: cancelAtPeriodEnd, periodEnd: periodEnd, seatsCovered: seatsCovered
         )
     }
 
@@ -308,8 +313,8 @@ struct PlanSummary: Codable, Equatable, Hashable {
         switch status {
         case .none: return "Choose a plan to invite your team and take bookings."
         case .pastDue:
-            if let graceUntil { return "A payment failed. Update your card by \(graceUntil.formatted(date: .abbreviated, time: .omitted)) to keep working." }
-            return "A payment failed. Update your card to keep working."
+            if let graceUntil { return "A payment failed. Update your payment method in your Apple Account by \(graceUntil.formatted(date: .abbreviated, time: .omitted)) to keep working." }
+            return "A payment failed. Update your payment method in your Apple Account to keep working."
         case .canceled: return "The plan ended. Choose a plan to take bookings again."
         case .trialing, .active:
             if cancelAtPeriodEnd, let periodEnd { return "The plan ends on \(periodEnd.formatted(date: .abbreviated, time: .omitted))." }
@@ -701,4 +706,6 @@ struct BillingOverview: Equatable {
     var seatsBilledByStripe: Int
     var trialEnd: Date?
     var state: OrgState
+    /// The step of the plan the company is on (its product id in App Store Connect), when it is on one.
+    var productID: String? = nil
 }

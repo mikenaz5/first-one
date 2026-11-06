@@ -310,6 +310,8 @@ enum SlateError: LocalizedError, Equatable {
     case memberUnavailable
     case profileRequired
     case billingUnavailable
+    case planNotConfirmed
+    case planAlreadyUsed
     case invalidEmail
     case invalidCode
     case nameRequired
@@ -476,7 +478,11 @@ enum SlateError: LocalizedError, Equatable {
         case .profileRequired:
             "Set up your own profile first."
         case .billingUnavailable:
-            "Billing isn't available in this build. It needs a server with Stripe set up; see the README."
+            "Plans can't be bought here. The company plan needs a server and the App Store; see the README."
+        case .planNotConfirmed:
+            "Apple took the payment, but Slate Pro couldn't confirm it just yet. Open Billing and tap Restore Purchases in a minute. You won't be charged twice."
+        case .planAlreadyUsed:
+            "That subscription already belongs to a company, or this company already has a plan. Open Billing to see which."
         case .invalidEmail:
             "Check the email address and try again."
         case .invalidCode:

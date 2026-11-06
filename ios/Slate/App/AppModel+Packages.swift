@@ -17,6 +17,7 @@ extension AppModel {
 
     /// Runs once the account has loaded and the person is in the app.
     func afterAccountLoaded() {
+        startListeningForPurchases()
         calendarAccess = calendar.access
         publishWidget()
         startupTasks = [

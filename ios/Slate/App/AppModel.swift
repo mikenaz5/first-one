@@ -33,6 +33,10 @@ final class AppModel {
     let notifications: any NotificationCenterClient
     /// Tells the home screen widget what the next booking is.
     let widget: any WidgetPublisher
+    /// Where company plans are bought: StoreKit in the app, a stand-in in tests and previews.
+    let planStore: any PlanStore
+    /// Listens for purchases that arrive on their own (a renewal, a purchase waiting for approval). See AppModel+Plans.
+    @ObservationIgnored var purchaseListener: Task<Void, Never>?
 
     private(set) var phase: Phase = .launching
     private(set) var loadErrorMessage: String?
@@ -146,9 +150,11 @@ final class AppModel {
         notifications: (any NotificationCenterClient)? = nil,
         widget: (any WidgetPublisher)? = nil,
         filePreparer: (any FilePreparing)? = nil,
-        fileTransfer: (any FileTransferring)? = nil
+        fileTransfer: (any FileTransferring)? = nil,
+        planStore: (any PlanStore)? = nil
     ) {
         self.backend = backend
+        self.planStore = planStore ?? InertPlanStore()
         self.filePreparer = filePreparer ?? PreviewMaker()
         self.fileTransfer = fileTransfer ?? FileTransfer()
         self.authorizer = authorizer ?? PaymentAuthorizerFactory.make(for: backend)
@@ -314,6 +320,7 @@ final class AppModel {
     }
 
     private func clearAccount() async {
+        stopListeningForPurchases()
         UserDefaults.standard.removeObject(forKey: AppConfig.appleUserIDKey)
         session = nil
         profile = nil

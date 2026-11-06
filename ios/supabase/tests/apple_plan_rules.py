@@ -261,6 +261,10 @@ out = apple(ORG, TEAM10, "active", renews=False)
 check("the company works until the period ends", out["state"] == "active" and sub(ORG)[5] is True)
 check("the Owner can see it is ending", rpc(owner, "billing_overview", ORG)["cancel_at_period_end"] is True)
 apple(ORG, TEAM10, "active", renews=True)
+out = apple(ORG, TEAM10, "active", renews=False)
+out = apple(ORG, TEAM10, "active", renews=None)
+check("a message that doesn't say whether it renews leaves the flag as it was", sub(ORG)[5] is True, sub(ORG))
+apple(ORG, TEAM10, "active", renews=True)
 
 # =============================================================================
 print("\n[a payment fails]")

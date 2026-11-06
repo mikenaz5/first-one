@@ -25,12 +25,14 @@ extension SupabaseBackend {
         var graceUntil: Date?
         var cancelAtPeriodEnd: Bool?
         var periodEnd: Date?
+        var seatsCovered: Int?
 
         enum CodingKeys: String, CodingKey {
             case required, status, ok
             case graceUntil = "grace_until"
             case cancelAtPeriodEnd = "cancel_at_period_end"
             case periodEnd = "period_end"
+            case seatsCovered = "seats_covered"
         }
     }
 
@@ -227,9 +229,13 @@ extension SupabaseBackend {
         var cancelAtPeriodEnd: Bool?
         var graceUntil: Date?
         var state: String
+        var seatsCovered: Int?
+        var appleProductId: String?
 
         enum CodingKeys: String, CodingKey {
             case required, status, seats, state
+            case seatsCovered = "seats_covered"
+            case appleProductId = "apple_product_id"
             case seatsBilledByStripe = "seats_billed_by_stripe"
             case currentPeriodEnd = "current_period_end"
             case trialEnd = "trial_end"
@@ -259,12 +265,24 @@ extension SupabaseBackend {
         var seatMaximum: Int
         var inviteExpiryDays: Int
         var graceDays: Int
+        var applePlans: [ApplePlanRow]?
 
         enum CodingKeys: String, CodingKey {
             case seatMinimum = "seat_minimum"
             case seatMaximum = "seat_maximum"
             case inviteExpiryDays = "invite_expiry_days"
             case graceDays = "grace_days"
+            case applePlans = "apple_plans"
+        }
+    }
+
+    struct ApplePlanRow: Decodable {
+        var productId: String
+        var seats: Int
+
+        enum CodingKeys: String, CodingKey {
+            case productId = "product_id"
+            case seats
         }
     }
 
@@ -398,6 +416,24 @@ extension SupabaseBackend {
 
     private struct BillingSessionReply: Decodable {
         var url: String
+    }
+
+    private struct ApplePurchaseReply: Decodable {
+        var status: String?
+        var seats: Int?
+        var state: String?
+    }
+
+    private struct ApplePurchaseBody: Encodable {
+        var organizationId: String
+        var signedTransaction: String
+        var signedRenewalInfo: String?
+
+        enum CodingKeys: String, CodingKey {
+            case organizationId = "organization_id"
+            case signedTransaction = "signed_transaction"
+            case signedRenewalInfo = "signed_renewal_info"
+        }
     }
 
     // MARK: - Parameters
@@ -731,7 +767,7 @@ extension SupabaseBackend {
         let plan = row.plan.map { plan in
             PlanSummary.make(
                 required: plan.required, status: PlanStatus(rawValue: plan.status) ?? .none, graceUntil: plan.graceUntil,
-                cancelAtPeriodEnd: plan.cancelAtPeriodEnd ?? false, periodEnd: plan.periodEnd
+                cancelAtPeriodEnd: plan.cancelAtPeriodEnd ?? false, periodEnd: plan.periodEnd, seatsCovered: plan.seatsCovered
             )
         } ?? PlanSummary.notRequired
         return Organization(
@@ -831,7 +867,11 @@ extension SupabaseBackend {
 
     func loadTeamConfig() async throws -> TeamConfig {
         let row: TeamConfigRow = try await rpcValue("team_config", NoParams())
-        return TeamConfig(seatMinimum: row.seatMinimum, seatMaximum: row.seatMaximum, inviteExpiryDays: row.inviteExpiryDays, graceDays: row.graceDays)
+        let plans = (row.applePlans ?? []).map { PlanOffer(productID: $0.productId, seats: $0.seats) }
+        return TeamConfig(
+            seatMinimum: row.seatMinimum, seatMaximum: row.seatMaximum, inviteExpiryDays: row.inviteExpiryDays, graceDays: row.graceDays,
+            plans: plans.isEmpty ? PlanOffer.standard : plans
+        )
     }
 
     func loadAccounts(for userID: UUID) async throws -> AccountList {
@@ -1001,13 +1041,14 @@ extension SupabaseBackend {
         let row: BillingRow = try await rpcValue("billing_overview", OrgParams(pOrg: Self.key(organizationID)))
         let plan = PlanSummary.make(
             required: row.required, status: PlanStatus(rawValue: row.status) ?? .none, graceUntil: row.graceUntil,
-            cancelAtPeriodEnd: row.cancelAtPeriodEnd ?? false, periodEnd: row.currentPeriodEnd
+            cancelAtPeriodEnd: row.cancelAtPeriodEnd ?? false, periodEnd: row.currentPeriodEnd, seatsCovered: row.seatsCovered
         )
         return BillingOverview(
             plan: plan,
             seats: SeatCounts(used: row.seats.used, pending: row.seats.pending, billed: row.seats.billed,
                               minimum: row.seats.minimum, maximum: row.seats.maximum),
-            seatsBilledByStripe: row.seatsBilledByStripe ?? 0, trialEnd: row.trialEnd, state: OrgState(rawValue: row.state) ?? .active
+            seatsBilledByStripe: row.seatsBilledByStripe ?? 0, trialEnd: row.trialEnd, state: OrgState(rawValue: row.state) ?? .active,
+            productID: row.appleProductId
         )
     }
 
@@ -1033,6 +1074,31 @@ extension SupabaseBackend {
             }
             throw SlateError.billingUnavailable
         }
+    }
+
+    func recordApplePurchase(_ purchase: SignedPurchase, organizationID: UUID, by userID: UUID) async throws {
+        do {
+            let _: ApplePurchaseReply = try await client.functions.invoke(
+                "apple-verify",
+                options: FunctionInvokeOptions(body: ApplePurchaseBody(
+                    organizationId: Self.key(organizationID), signedTransaction: purchase.signedTransaction,
+                    signedRenewalInfo: purchase.signedRenewalInfo
+                ))
+            )
+        } catch let error as FunctionsError {
+            if case .httpError(let code, let data) = error {
+                throw Self.mapPurchaseFailure(status: code, body: String(data: data, encoding: .utf8) ?? "")
+            }
+            throw SlateError.planNotConfirmed
+        }
+    }
+
+    /// What the `apple-verify` function answered, as something a person can act on. A purchase that Apple has taken money
+    /// for but the server can't confirm is never reported as a plain failure: the purchase is still held and goes again.
+    static func mapPurchaseFailure(status: Int, body: String) -> SlateError {
+        if body.contains("not_found") || status == 404 { return .notAllowed }
+        if body.contains("plan_exists") || body.contains("transaction_in_use") { return .planAlreadyUsed }
+        return .planNotConfirmed
     }
 
     // MARK: - Assigning bookings

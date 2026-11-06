@@ -12,7 +12,7 @@
   "my_role": "admin",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -46,26 +46,26 @@
  "activity_list": [
   {
    "action": "booking.assigned",
-   "actor_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+   "actor_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
    "actor_name": "Mia K",
-   "created_at": "2026-11-06T15:07:52.605742+00:00",
-   "entity_id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+   "created_at": "2026-11-06T15:17:40.896839+00:00",
+   "entity_id": "39050265-9915-4c41-a242-6fcc36af1b9e",
    "entity_type": "booking",
-   "id": "4707f10b-2da0-4564-9c87-32fc72e90ab7",
+   "id": "d96bc7b2-b098-4620-ad10-460b550f1010",
    "metadata": {
     "from": null,
-    "to": "36656be5-5c8a-460e-afbb-0be31764940b"
+    "to": "62130414-d187-4897-9c4c-6d9304d43576"
    },
    "summary": "Assigned Wedding film to Cal R"
   },
   {
    "action": "booking.created",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "entity_id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "entity_id": "39050265-9915-4c41-a242-6fcc36af1b9e",
    "entity_type": "booking",
-   "id": "a10217a0-77f5-4ce6-86f8-d4977e4fc423",
+   "id": "58d8799f-f155-4130-986a-f1f18193bc0c",
    "metadata": {
     "requested_member": false
    },
@@ -73,163 +73,163 @@
   },
   {
    "action": "contract.executed",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "entity_id": "d96f6f86-6bb5-4242-9226-26d4f555207b",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "entity_id": "46c9ea06-af4a-425f-8a81-b694bf0329af",
    "entity_type": "contract",
-   "id": "2cb8c1ce-da6c-42f4-a27b-2b1e2c74b8f2",
+   "id": "2bb2f8ff-6d37-43ec-98b2-e37f59ca9f9a",
    "metadata": {},
    "summary": "Contract signed for Wedding film (Alex Client), countersigned by Dee Okafor (Director)"
   },
   {
    "action": "org.updated",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.513208+00:00",
-   "entity_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.794733+00:00",
+   "entity_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "entity_type": "company",
-   "id": "3a14d423-bafa-465f-abae-fd83e2dbd7b2",
+   "id": "81c24a20-9cbc-45e2-8d5a-dd475edad38c",
    "metadata": {},
    "summary": "Changed company settings (assignment: manual)"
   },
   {
-   "action": "booking.created",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "action": "contract.executed",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.48304+00:00",
-   "entity_id": "26880d60-5d08-4c86-8c2c-5c8ce950880a",
+   "created_at": "2026-11-06T15:17:40.763344+00:00",
+   "entity_id": "15498a93-f25d-41e5-aaf7-bbffca8b7e7b",
+   "entity_type": "contract",
+   "id": "50fd71ca-5aa2-4684-b056-fe461e7275a2",
+   "metadata": {},
+   "summary": "Contract signed for Wedding film (Alex Client), countersigned by Dee Okafor (Director)"
+  },
+  {
+   "action": "booking.created",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
+   "actor_name": "Someone",
+   "created_at": "2026-11-06T15:17:40.763344+00:00",
+   "entity_id": "11b0ea91-eda4-4c77-9785-c3b49b3376be",
    "entity_type": "booking",
-   "id": "702240d9-7c08-415a-add9-0f7aeb5bcef5",
+   "id": "0ab76876-e5d4-47c4-9220-ad3b4bbf24d2",
    "metadata": {
     "requested_member": true
    },
    "summary": "New booking: Wedding film for Alex Client, with Kim T"
   },
   {
-   "action": "contract.executed",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
-   "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.48304+00:00",
-   "entity_id": "5ce19a21-3979-4a26-b051-a23ad0f1cbc7",
-   "entity_type": "contract",
-   "id": "42e458e2-aa37-42b4-a9a3-81b0f7020bdb",
-   "metadata": {},
-   "summary": "Contract signed for Wedding film (Alex Client), countersigned by Dee Okafor (Director)"
-  },
-  {
-   "action": "contract.executed",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
-   "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.435674+00:00",
-   "entity_id": "58a3ac73-44b2-47ca-8a2c-e73a56c1d2da",
-   "entity_type": "contract",
-   "id": "e6460199-70b8-420c-a47d-f673f7d33a73",
-   "metadata": {},
-   "summary": "Contract signed for Wedding film (Alex Client), countersigned by Dee Okafor (Director)"
-  },
-  {
    "action": "booking.created",
-   "actor_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "actor_name": "Someone",
-   "created_at": "2026-11-06T15:07:52.435674+00:00",
-   "entity_id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
+   "created_at": "2026-11-06T15:17:40.715902+00:00",
+   "entity_id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
    "entity_type": "booking",
-   "id": "c2e91312-ce37-4fd2-93cc-7a05bf3b6afb",
+   "id": "f3ea49c5-e9c6-4df5-a8e3-df065096997a",
    "metadata": {
     "requested_member": false
    },
    "summary": "New booking: Wedding film for Alex Client, with Cal R"
   },
   {
+   "action": "contract.executed",
+   "actor_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
+   "actor_name": "Someone",
+   "created_at": "2026-11-06T15:17:40.715902+00:00",
+   "entity_id": "1c202b9f-40c9-40d5-b5c0-3233c34fed78",
+   "entity_type": "contract",
+   "id": "e1d81c92-4352-4180-8e4d-283a81e51234",
+   "metadata": {},
+   "summary": "Contract signed for Wedding film (Alex Client), countersigned by Dee Okafor (Director)"
+  },
+  {
    "action": "package.offered_by",
-   "actor_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "actor_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "actor_name": "Dee Okafor",
-   "created_at": "2026-11-06T15:07:52.378774+00:00",
-   "entity_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "created_at": "2026-11-06T15:17:40.646783+00:00",
+   "entity_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "entity_type": "package",
-   "id": "c547005f-efd1-4e15-9b26-0bf86452506d",
+   "id": "cae8a490-118e-4636-8183-e02d2bf5b1cc",
    "metadata": {},
    "summary": "Wedding film is offered by 2 people"
   },
   {
    "action": "signer.designated",
-   "actor_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "actor_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "actor_name": "Dee Okafor",
-   "created_at": "2026-11-06T15:07:52.366292+00:00",
-   "entity_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.631308+00:00",
+   "entity_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "entity_type": "company",
-   "id": "28868371-3042-49f8-ac23-2c0d52d8ca44",
+   "id": "48393379-ff24-4944-8768-44524d57d66c",
    "metadata": {},
    "summary": "Named Dee Okafor as the signer for company contracts"
   },
   {
    "action": "package.created",
-   "actor_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "actor_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "actor_name": "Dee Okafor",
-   "created_at": "2026-11-06T15:07:52.355055+00:00",
-   "entity_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "created_at": "2026-11-06T15:17:40.619109+00:00",
+   "entity_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "entity_type": "package",
-   "id": "b600769a-b406-4186-8dc9-a2ae5a2df001",
+   "id": "3d08979d-2ae8-4d5f-8d02-3b5f8dd166d7",
    "metadata": {},
    "summary": "Added the service Wedding film at $2,000"
   },
   {
    "action": "template.created",
-   "actor_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "actor_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "actor_name": "Dee Okafor",
-   "created_at": "2026-11-06T15:07:52.34306+00:00",
-   "entity_id": "a71d58d8-8b6f-4283-a4ac-6be385be992c",
+   "created_at": "2026-11-06T15:17:40.599447+00:00",
+   "entity_id": "98cba553-63de-4c31-9eab-aa291cb8377c",
    "entity_type": "template",
-   "id": "a5adc1a7-f6f0-4c05-9840-5ff6f81855aa",
+   "id": "3a2c06fa-035d-4b53-9025-faf4edab3916",
    "metadata": {},
    "summary": "Added the contract template Wedding terms"
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.245892+00:00",
-   "entity_id": "cf3364c7-9773-4843-815e-efcdd047935a",
+   "created_at": "2026-11-06T15:17:40.478407+00:00",
+   "entity_id": "f0123ca7-bd20-4e73-bf93-214b33f3a897",
    "entity_type": "invite",
-   "id": "ffa54224-e1e1-43f7-be00-666acd3c0d0d",
+   "id": "8a3b6a00-9fd2-46f4-99bb-0abceecee249",
    "metadata": {
     "role": "viewer"
    },
    "summary": "Invited someone as viewer"
   },
   {
-   "action": "invite.revoked",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "action": "invite.created",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.231548+00:00",
-   "entity_id": "d641d620-d70e-43a8-9ae6-4df279d4aefc",
+   "created_at": "2026-11-06T15:17:40.461654+00:00",
+   "entity_id": "b3603a2e-1aa9-4248-8b4c-f5c23a76a665",
    "entity_type": "invite",
-   "id": "db7d901e-6075-4474-a625-9c2e11886e47",
+   "id": "71c042ca-7540-4343-ac20-2a932077a636",
+   "metadata": {
+    "role": "creator"
+   },
+   "summary": "Invited new.hire@example.com as creator"
+  },
+  {
+   "action": "invite.revoked",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
+   "actor_name": "Olivia Ng",
+   "created_at": "2026-11-06T15:17:40.461654+00:00",
+   "entity_id": "95683478-5b67-46d8-ad61-e40af03fb054",
+   "entity_type": "invite",
+   "id": "36d906a1-76e0-4672-afa9-066b0a1e6cd6",
    "metadata": {},
    "summary": "Cancelled the invite for new.hire@example.com"
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.231548+00:00",
-   "entity_id": "508b856b-a134-456b-9cc1-119f33049332",
+   "created_at": "2026-11-06T15:17:40.44517+00:00",
+   "entity_id": "95683478-5b67-46d8-ad61-e40af03fb054",
    "entity_type": "invite",
-   "id": "a1483ae3-8df1-472b-89fd-4f58b3b869e3",
-   "metadata": {
-    "role": "creator"
-   },
-   "summary": "Invited new.hire@example.com as creator"
-  },
-  {
-   "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
-   "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.219133+00:00",
-   "entity_id": "d641d620-d70e-43a8-9ae6-4df279d4aefc",
-   "entity_type": "invite",
-   "id": "c11ada11-446e-4ede-885a-73ba0e019c95",
+   "id": "9c5a020a-bc5e-4bda-bae4-7e84e7ad6072",
    "metadata": {
     "role": "creator"
    },
@@ -237,45 +237,45 @@
   },
   {
    "action": "member.updated",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.208776+00:00",
-   "entity_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+   "created_at": "2026-11-06T15:17:40.425867+00:00",
+   "entity_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
    "entity_type": "member",
-   "id": "17305b2c-7e90-47c2-b26b-bd5d68490eed",
+   "id": "236a9ba8-a13f-4a9e-ac78-616f4f19ec42",
    "metadata": {},
    "summary": "Updated Mia K's team profile"
   },
   {
    "action": "member.updated",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.198547+00:00",
-   "entity_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "created_at": "2026-11-06T15:17:40.409988+00:00",
+   "entity_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "entity_type": "member",
-   "id": "3e0747dc-083a-407a-bd6b-345cdfdad1c9",
+   "id": "276db69c-2673-409d-802d-a5db21e507c3",
    "metadata": {},
    "summary": "Updated Dee Okafor's team profile"
   },
   {
    "action": "member.updated",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.188295+00:00",
-   "entity_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "created_at": "2026-11-06T15:17:40.395874+00:00",
+   "entity_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "entity_type": "member",
-   "id": "653c3fa8-8891-46a6-b5f8-300c6cad568f",
+   "id": "01c1c950-4efd-44e4-a744-bd21dc794dcc",
    "metadata": {},
    "summary": "Updated Olivia Ng's team profile"
   },
   {
    "action": "member.joined",
-   "actor_id": "2af5eac6-2490-40e0-8d4d-fb5925d41be6",
+   "actor_id": "56924f0b-8311-4cdd-9bd0-b79638db9e1f",
    "actor_name": "Vee T",
-   "created_at": "2026-11-06T15:07:52.173894+00:00",
-   "entity_id": "2af5eac6-2490-40e0-8d4d-fb5925d41be6",
+   "created_at": "2026-11-06T15:17:40.368979+00:00",
+   "entity_id": "56924f0b-8311-4cdd-9bd0-b79638db9e1f",
    "entity_type": "member",
-   "id": "23af5c02-3d1e-442d-a3b1-4f5e12013bf7",
+   "id": "0ac8213c-22f7-43c2-a95e-1fe769d6a26e",
    "metadata": {
     "role": "viewer"
    },
@@ -283,12 +283,12 @@
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.161086+00:00",
-   "entity_id": "6943088c-d154-4764-be49-1845b16f7df3",
+   "created_at": "2026-11-06T15:17:40.357209+00:00",
+   "entity_id": "d64533aa-771b-4031-9c24-cb52834949a9",
    "entity_type": "invite",
-   "id": "2efc4216-9ac5-4b55-a79d-8de31f53037a",
+   "id": "a3f86c4f-1155-41ed-8b39-732d832e29cf",
    "metadata": {
     "role": "viewer"
    },
@@ -296,12 +296,12 @@
   },
   {
    "action": "member.joined",
-   "actor_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+   "actor_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
    "actor_name": "Kim T",
-   "created_at": "2026-11-06T15:07:52.148077+00:00",
-   "entity_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+   "created_at": "2026-11-06T15:17:40.34389+00:00",
+   "entity_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
    "entity_type": "member",
-   "id": "c2a994d4-4fd8-476d-9b9e-cbca6d16b633",
+   "id": "b6350071-6bbd-4ddc-9c9b-10228a456a0d",
    "metadata": {
     "role": "creator"
    },
@@ -309,12 +309,12 @@
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.135069+00:00",
-   "entity_id": "f3cab45e-19d8-443c-a6c3-c447f7a64dac",
+   "created_at": "2026-11-06T15:17:40.330748+00:00",
+   "entity_id": "b4a7f9c6-3cc1-470a-a304-619be4b29f63",
    "entity_type": "invite",
-   "id": "962bf46e-684e-4dc5-9081-f62ec9331c42",
+   "id": "11849072-c1dc-42a2-aba2-8c2bfb58fac7",
    "metadata": {
     "role": "creator"
    },
@@ -322,12 +322,12 @@
   },
   {
    "action": "member.joined",
-   "actor_id": "36656be5-5c8a-460e-afbb-0be31764940b",
+   "actor_id": "62130414-d187-4897-9c4c-6d9304d43576",
    "actor_name": "Cal R",
-   "created_at": "2026-11-06T15:07:52.12177+00:00",
-   "entity_id": "36656be5-5c8a-460e-afbb-0be31764940b",
+   "created_at": "2026-11-06T15:17:40.318011+00:00",
+   "entity_id": "62130414-d187-4897-9c4c-6d9304d43576",
    "entity_type": "member",
-   "id": "425536d6-c109-429f-b387-c971a6d4ccab",
+   "id": "9fd08445-863f-4eff-98cf-4ec59f9dd71f",
    "metadata": {
     "role": "creator"
    },
@@ -335,12 +335,12 @@
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.108977+00:00",
-   "entity_id": "fdf77e45-8011-4e4c-9baf-09a89b74f92a",
+   "created_at": "2026-11-06T15:17:40.30444+00:00",
+   "entity_id": "861ed686-14e6-4ba2-aa46-253d757b4c90",
    "entity_type": "invite",
-   "id": "b51aaafd-6538-4503-87db-e1a066467df9",
+   "id": "b8ec3979-5b95-4d2f-8bd0-58e7a926bf59",
    "metadata": {
     "role": "creator"
    },
@@ -348,12 +348,12 @@
   },
   {
    "action": "member.joined",
-   "actor_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+   "actor_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
    "actor_name": "Mia K",
-   "created_at": "2026-11-06T15:07:52.095727+00:00",
-   "entity_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+   "created_at": "2026-11-06T15:17:40.291394+00:00",
+   "entity_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
    "entity_type": "member",
-   "id": "bd065a31-9720-47ac-830c-92ff4905b0d3",
+   "id": "8ff186bd-b703-41cf-b217-8e5d515e49d0",
    "metadata": {
     "role": "manager"
    },
@@ -361,12 +361,12 @@
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.082624+00:00",
-   "entity_id": "3ae84e38-b140-4c59-b457-f1c76ed19d76",
+   "created_at": "2026-11-06T15:17:40.278464+00:00",
+   "entity_id": "167392a8-ffc8-4a32-9dba-cf5239b16d26",
    "entity_type": "invite",
-   "id": "b49b33b0-d9e7-4da7-9a8b-735ca376030f",
+   "id": "feb19a95-9ddd-4226-b238-232ea6e986d6",
    "metadata": {
     "role": "manager"
    },
@@ -374,12 +374,12 @@
   },
   {
    "action": "member.joined",
-   "actor_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "actor_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "actor_name": "Dee Okafor",
-   "created_at": "2026-11-06T15:07:52.067948+00:00",
-   "entity_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "created_at": "2026-11-06T15:17:40.26103+00:00",
+   "entity_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "entity_type": "member",
-   "id": "ce2e57cf-c67e-488d-80d7-a20fa49e989a",
+   "id": "0a967315-e904-4133-9205-6552d155b88b",
    "metadata": {
     "role": "admin"
    },
@@ -387,12 +387,12 @@
   },
   {
    "action": "invite.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.044624+00:00",
-   "entity_id": "da92acb0-8cef-49a4-ba64-1a54558957ef",
+   "created_at": "2026-11-06T15:17:40.23699+00:00",
+   "entity_id": "7b470682-23c4-4792-809a-04f0dac04f8d",
    "entity_type": "invite",
-   "id": "4659bc71-7df8-4990-8ddc-d126290391f6",
+   "id": "7a7e8b82-6007-4eb6-a04c-8aadb6cad5e0",
    "metadata": {
     "role": "admin"
    },
@@ -400,29 +400,29 @@
   },
   {
    "action": "org.created",
-   "actor_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+   "actor_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
    "actor_name": "Olivia Ng",
-   "created_at": "2026-11-06T15:07:52.030914+00:00",
-   "entity_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.223692+00:00",
+   "entity_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "entity_type": "company",
-   "id": "c9f4b740-92cc-4485-ae5f-7a022203b7a0",
+   "id": "55ceb1f2-6ea0-4058-9191-3c48b1bbd3f3",
    "metadata": {},
    "summary": "Created Acme Films"
   }
  ],
  "assign_booking": {
   "add_ons": [],
-  "assigned_at": "2026-11-06T15:07:52.605742+00:00",
-  "assigned_to": "36656be5-5c8a-460e-afbb-0be31764940b",
+  "assigned_at": "2026-11-06T15:17:40.896839+00:00",
+  "assigned_to": "62130414-d187-4897-9c4c-6d9304d43576",
   "assignee_share_bps": null,
   "blocked_until": "2026-11-30T22:30:00+00:00",
   "cancellation_policy": "moderate",
   "cancelled_at": null,
   "cancelled_by": null,
-  "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+  "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
   "client_name": "Alex Client",
-  "created_at": "2026-11-06T15:07:52.541327+00:00",
-  "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "created_at": "2026-11-06T15:17:40.827318+00:00",
+  "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "creator_name": "Acme Films",
   "currency_code": "USD",
   "delivered_at": null,
@@ -431,9 +431,9 @@
   "deposit_cents": 0,
   "end_at": "2026-11-30T22:00:00+00:00",
   "hold_expires_at": null,
-  "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+  "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
   "notes": "",
-  "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+  "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
   "package_name": "Wedding film",
   "receipt_confirmed_at": null,
   "requested_member": false,
@@ -447,13 +447,13 @@
    "display_name": "Cal R",
    "free": true,
    "reason": null,
-   "user_id": "36656be5-5c8a-460e-afbb-0be31764940b"
+   "user_id": "62130414-d187-4897-9c4c-6d9304d43576"
   },
   {
    "display_name": "Kim T",
    "free": false,
    "reason": "Not available",
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   }
  ],
  "assignment_queue": [
@@ -466,10 +466,10 @@
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -478,9 +478,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T22:00:00+00:00",
    "hold_expires_at": null,
-   "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+   "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": false,
@@ -494,7 +494,7 @@
   "apple_environment": null,
   "apple_product_id": null,
   "cancel_at_period_end": false,
-  "current_period_end": "2026-11-26T15:07:52.695571+00:00",
+  "current_period_end": "2026-11-26T15:17:40.991655+00:00",
   "grace_until": null,
   "provider": "stripe",
   "required": true,
@@ -510,6 +510,27 @@
   "state": "active",
   "status": "active",
   "trial_end": null
+ },
+ "billing_overview_apple": {
+  "apple_environment": "Sandbox",
+  "apple_product_id": "com.slateproapp.app.company.team10",
+  "cancel_at_period_end": false,
+  "current_period_end": "2026-11-26T15:17:40.991655+00:00",
+  "grace_until": null,
+  "provider": "apple",
+  "required": true,
+  "seats": {
+   "billed": 5,
+   "maximum": 10,
+   "minimum": 5,
+   "pending": 0,
+   "used": 1
+  },
+  "seats_billed_by_stripe": 0,
+  "seats_covered": 10,
+  "state": "active",
+  "status": "trialing",
+  "trial_end": "2026-11-26T15:17:40.991655+00:00"
  },
  "billing_overview_none": {
   "apple_environment": null,
@@ -538,24 +559,24 @@
   "billed_now": 6,
   "change": "increase",
   "effective": "now",
-  "period_end": "2026-11-26T15:07:52.695571+00:00",
+  "period_end": "2026-11-26T15:17:40.991655+00:00",
   "used": 6,
   "used_after": 7
  },
  "bookings_select": [
   {
    "add_ons": [],
-   "assigned_at": "2026-11-06T15:07:52.435674+00:00",
-   "assigned_to": "36656be5-5c8a-460e-afbb-0be31764940b",
+   "assigned_at": "2026-11-06T15:17:40.715902+00:00",
+   "assigned_to": "62130414-d187-4897-9c4c-6d9304d43576",
    "assignee_share_bps": null,
    "blocked_until": "2026-11-30T17:30:00+00:00",
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.435674+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.715902+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -564,9 +585,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T17:00:00+00:00",
    "hold_expires_at": null,
-   "id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
+   "id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": false,
@@ -577,17 +598,17 @@
   },
   {
    "add_ons": [],
-   "assigned_at": "2026-11-06T15:07:52.48304+00:00",
-   "assigned_to": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+   "assigned_at": "2026-11-06T15:17:40.763344+00:00",
+   "assigned_to": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
    "assignee_share_bps": null,
    "blocked_until": "2026-11-30T19:30:00+00:00",
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.48304+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.763344+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -596,9 +617,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T19:00:00+00:00",
    "hold_expires_at": null,
-   "id": "26880d60-5d08-4c86-8c2c-5c8ce950880a",
+   "id": "11b0ea91-eda4-4c77-9785-c3b49b3376be",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": true,
@@ -616,10 +637,10 @@
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -628,9 +649,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T22:00:00+00:00",
    "hold_expires_at": null,
-   "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+   "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": false,
@@ -643,17 +664,17 @@
  "create_booking": {
   "booking": {
    "add_ons": [],
-   "assigned_at": "2026-11-06T15:07:52.435674+00:00",
-   "assigned_to": "36656be5-5c8a-460e-afbb-0be31764940b",
+   "assigned_at": "2026-11-06T15:17:40.715902+00:00",
+   "assigned_to": "62130414-d187-4897-9c4c-6d9304d43576",
    "assignee_share_bps": null,
    "blocked_until": "2026-11-30T17:30:00+00:00",
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.435674+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.715902+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -662,9 +683,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T17:00:00+00:00",
    "hold_expires_at": null,
-   "id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
+   "id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": false,
@@ -674,16 +695,16 @@
    "total_cents": 200000
   },
   "contract": {
-   "booking_id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
-   "countersigner_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "booking_id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
+   "countersigner_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "countersigner_name": "Dee Okafor",
    "countersigner_title": "Director",
-   "created_at": "2026-11-06T15:07:52.435674+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.715902+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "document_hash": "e2074b0990ee4ff2c9bbcac3ad032647c21496dcea9ba87779849a1705496beb",
-   "executed_at": "2026-11-06T15:07:52.435674+00:00",
-   "id": "58a3ac73-44b2-47ca-8a2c-e73a56c1d2da",
+   "executed_at": "2026-11-06T15:17:40.715902+00:00",
+   "id": "1c202b9f-40c9-40d5-b5c0-3233c34fed78",
    "provider_legal_name": "Acme Films LLC",
    "sections": [
     {
@@ -714,37 +735,37 @@
    "signatures": [
     {
      "consent_version": 1,
-     "contract_id": "58a3ac73-44b2-47ca-8a2c-e73a56c1d2da",
+     "contract_id": "1c202b9f-40c9-40d5-b5c0-3233c34fed78",
      "device": "test",
-     "id": "067d8625-eae5-4ec8-8e50-263e10dfec45",
+     "id": "388d8665-7371-42e6-bc66-eadfc4ebc61f",
      "image_png": null,
      "ip": null,
      "method": "typed",
      "on_behalf_of": null,
      "role": "client",
-     "signed_at": "2026-11-06T15:07:52.435674+00:00",
+     "signed_at": "2026-11-06T15:17:40.715902+00:00",
      "signed_name": "Alex Client",
      "signer_title": null,
-     "user_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b"
+     "user_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1"
     },
     {
      "consent_version": 1,
-     "contract_id": "58a3ac73-44b2-47ca-8a2c-e73a56c1d2da",
+     "contract_id": "1c202b9f-40c9-40d5-b5c0-3233c34fed78",
      "device": "Signature on file, applied for the company when the booking was confirmed",
-     "id": "ba8a9bd4-da5a-4c09-9e51-ab2d7affbc79",
+     "id": "f747755a-36cd-441c-8570-f5cc5fbed8fd",
      "image_png": null,
      "ip": null,
      "method": "onFile",
      "on_behalf_of": "Acme Films LLC",
      "role": "creator",
-     "signed_at": "2026-11-06T15:07:52.435674+00:00",
+     "signed_at": "2026-11-06T15:17:40.715902+00:00",
      "signed_name": "Dee Okafor",
      "signer_title": "Director",
-     "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1"
+     "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875"
     }
    ],
    "status": "executed",
-   "template_id": "a71d58d8-8b6f-4283-a4ac-6be385be992c",
+   "template_id": "98cba553-63de-4c31-9eab-aa291cb8377c",
    "template_version": 1,
    "title": "Wedding terms"
   }
@@ -752,17 +773,17 @@
  "create_booking_named": {
   "booking": {
    "add_ons": [],
-   "assigned_at": "2026-11-06T15:07:52.48304+00:00",
-   "assigned_to": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+   "assigned_at": "2026-11-06T15:17:40.763344+00:00",
+   "assigned_to": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
    "assignee_share_bps": null,
    "blocked_until": "2026-11-30T19:30:00+00:00",
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.48304+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.763344+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -771,9 +792,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T19:00:00+00:00",
    "hold_expires_at": null,
-   "id": "26880d60-5d08-4c86-8c2c-5c8ce950880a",
+   "id": "11b0ea91-eda4-4c77-9785-c3b49b3376be",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": true,
@@ -783,16 +804,16 @@
    "total_cents": 200000
   },
   "contract": {
-   "booking_id": "26880d60-5d08-4c86-8c2c-5c8ce950880a",
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
-   "countersigner_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "booking_id": "11b0ea91-eda4-4c77-9785-c3b49b3376be",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
+   "countersigner_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "countersigner_name": "Dee Okafor",
    "countersigner_title": "Director",
-   "created_at": "2026-11-06T15:07:52.48304+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.763344+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "document_hash": "e0b6e1bf3d7a3cac1ce38d86f9d7581d99199b46cd727d74c36a6463c3e09a2a",
-   "executed_at": "2026-11-06T15:07:52.48304+00:00",
-   "id": "5ce19a21-3979-4a26-b051-a23ad0f1cbc7",
+   "executed_at": "2026-11-06T15:17:40.763344+00:00",
+   "id": "15498a93-f25d-41e5-aaf7-bbffca8b7e7b",
    "provider_legal_name": "Acme Films LLC",
    "sections": [
     {
@@ -823,37 +844,37 @@
    "signatures": [
     {
      "consent_version": 1,
-     "contract_id": "5ce19a21-3979-4a26-b051-a23ad0f1cbc7",
+     "contract_id": "15498a93-f25d-41e5-aaf7-bbffca8b7e7b",
      "device": "test",
-     "id": "d71f223d-5a89-49ad-87d0-a391f00561f3",
+     "id": "ba207d02-159c-4657-b47c-e3611d8f280e",
      "image_png": null,
      "ip": null,
      "method": "typed",
      "on_behalf_of": null,
      "role": "client",
-     "signed_at": "2026-11-06T15:07:52.48304+00:00",
+     "signed_at": "2026-11-06T15:17:40.763344+00:00",
      "signed_name": "Alex Client",
      "signer_title": null,
-     "user_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b"
+     "user_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1"
     },
     {
      "consent_version": 1,
-     "contract_id": "5ce19a21-3979-4a26-b051-a23ad0f1cbc7",
+     "contract_id": "15498a93-f25d-41e5-aaf7-bbffca8b7e7b",
      "device": "Signature on file, applied for the company when the booking was confirmed",
-     "id": "381d2830-3ab3-4649-948b-928470e2fe1a",
+     "id": "eeda9f5a-e208-487e-8b28-779ac19cd52a",
      "image_png": null,
      "ip": null,
      "method": "onFile",
      "on_behalf_of": "Acme Films LLC",
      "role": "creator",
-     "signed_at": "2026-11-06T15:07:52.48304+00:00",
+     "signed_at": "2026-11-06T15:17:40.763344+00:00",
      "signed_name": "Dee Okafor",
      "signer_title": "Director",
-     "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1"
+     "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875"
     }
    ],
    "status": "executed",
-   "template_id": "a71d58d8-8b6f-4283-a4ac-6be385be992c",
+   "template_id": "98cba553-63de-4c31-9eab-aa291cb8377c",
    "template_version": 1,
    "title": "Wedding terms"
   }
@@ -868,10 +889,10 @@
    "cancellation_policy": "moderate",
    "cancelled_at": null,
    "cancelled_by": null,
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
    "client_name": "Alex Client",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "creator_name": "Acme Films",
    "currency_code": "USD",
    "delivered_at": null,
@@ -880,9 +901,9 @@
    "deposit_cents": 0,
    "end_at": "2026-11-30T22:00:00+00:00",
    "hold_expires_at": null,
-   "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+   "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
    "notes": "",
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
    "package_name": "Wedding film",
    "receipt_confirmed_at": null,
    "requested_member": false,
@@ -892,16 +913,16 @@
    "total_cents": 200000
   },
   "contract": {
-   "booking_id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
-   "client_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b",
-   "countersigner_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+   "booking_id": "39050265-9915-4c41-a242-6fcc36af1b9e",
+   "client_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1",
+   "countersigner_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
    "countersigner_name": "Dee Okafor",
    "countersigner_title": "Director",
-   "created_at": "2026-11-06T15:07:52.541327+00:00",
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "created_at": "2026-11-06T15:17:40.827318+00:00",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "document_hash": "16400ecd865050dc3bd28c7f8df139b631d6b90596af32e3e8fd68b45278cce7",
-   "executed_at": "2026-11-06T15:07:52.541327+00:00",
-   "id": "d96f6f86-6bb5-4242-9226-26d4f555207b",
+   "executed_at": "2026-11-06T15:17:40.827318+00:00",
+   "id": "46c9ea06-af4a-425f-8a81-b694bf0329af",
    "provider_legal_name": "Acme Films LLC",
    "sections": [
     {
@@ -932,68 +953,68 @@
    "signatures": [
     {
      "consent_version": 1,
-     "contract_id": "d96f6f86-6bb5-4242-9226-26d4f555207b",
+     "contract_id": "46c9ea06-af4a-425f-8a81-b694bf0329af",
      "device": "test",
-     "id": "3932b270-e834-4fa1-b598-7e32746fc44f",
+     "id": "56c7f163-29e4-4e98-ae8e-2c93431c90a9",
      "image_png": null,
      "ip": null,
      "method": "typed",
      "on_behalf_of": null,
      "role": "client",
-     "signed_at": "2026-11-06T15:07:52.541327+00:00",
+     "signed_at": "2026-11-06T15:17:40.827318+00:00",
      "signed_name": "Alex Client",
      "signer_title": null,
-     "user_id": "51ac58ba-ea9d-45b0-a59e-a095a46acc3b"
+     "user_id": "24a2f1b3-da5f-4dbc-bf02-1d20d222c8f1"
     },
     {
      "consent_version": 1,
-     "contract_id": "d96f6f86-6bb5-4242-9226-26d4f555207b",
+     "contract_id": "46c9ea06-af4a-425f-8a81-b694bf0329af",
      "device": "Signature on file, applied for the company when the booking was confirmed",
-     "id": "5efda0d8-670a-424d-b770-46ed72574bb9",
+     "id": "75f28f55-b086-4b3d-aa45-ac6ab9873099",
      "image_png": null,
      "ip": null,
      "method": "onFile",
      "on_behalf_of": "Acme Films LLC",
      "role": "creator",
-     "signed_at": "2026-11-06T15:07:52.541327+00:00",
+     "signed_at": "2026-11-06T15:17:40.827318+00:00",
      "signed_name": "Dee Okafor",
      "signer_title": "Director",
-     "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1"
+     "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875"
     }
    ],
    "status": "executed",
-   "template_id": "a71d58d8-8b6f-4283-a4ac-6be385be992c",
+   "template_id": "98cba553-63de-4c31-9eab-aa291cb8377c",
    "template_version": 1,
    "title": "Wedding terms"
   }
  },
  "invite_create": {
   "invite": {
-   "created_at": "2026-11-06T15:07:52.044624+00:00",
+   "created_at": "2026-11-06T15:17:40.23699+00:00",
    "email": "dee@example.com",
-   "expires_at": "2026-11-13T15:07:52.044624+00:00",
-   "id": "da92acb0-8cef-49a4-ba64-1a54558957ef",
-   "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "expires_at": "2026-11-13T15:17:40.23699+00:00",
+   "id": "7b470682-23c4-4792-809a-04f0dac04f8d",
+   "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "role": "admin",
    "status": "pending"
   },
-  "token": "tEC5E1za_0Pl9Gg9woch1IkST0Ue8Zb_"
+  "token": "H91Oa_b2ZJKgy8B4HoIUAXK76DX0iS6w"
  },
  "invite_list": [
   {
-   "created_at": "2026-11-06T15:07:52.245892+00:00",
+   "created_at": "2026-11-06T15:17:40.478407+00:00",
    "email": null,
-   "expires_at": "2026-11-05T15:07:52.252744+00:00",
-   "id": "cf3364c7-9773-4843-815e-efcdd047935a",
+   "expires_at": "2026-11-05T15:17:40.488561+00:00",
+   "id": "f0123ca7-bd20-4e73-bf93-214b33f3a897",
    "invited_by_name": "Olivia Ng",
    "role": "viewer",
    "status": "expired"
   },
   {
-   "created_at": "2026-11-06T15:07:52.231548+00:00",
+   "created_at": "2026-11-06T15:17:40.461654+00:00",
    "email": "new.hire@example.com",
-   "expires_at": "2026-11-13T15:07:52.231548+00:00",
-   "id": "508b856b-a134-456b-9cc1-119f33049332",
+   "expires_at": "2026-11-13T15:17:40.461654+00:00",
+   "id": "b3603a2e-1aa9-4248-8b4c-f5c23a76a665",
    "invited_by_name": "Olivia Ng",
    "role": "creator",
    "status": "pending"
@@ -1001,24 +1022,24 @@
  ],
  "invite_preview": {
   "already_member": false,
-  "expires_at": "2026-11-13T15:07:52.044624+00:00",
+  "expires_at": "2026-11-13T15:17:40.23699+00:00",
   "has_profile": false,
   "invited_by_name": "Olivia Ng",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "organization_name": "Acme Films",
   "role": "admin"
  },
  "invite_resend": {
   "invite": {
-   "created_at": "2026-11-06T15:07:52.231548+00:00",
+   "created_at": "2026-11-06T15:17:40.461654+00:00",
    "email": "new.hire@example.com",
-   "expires_at": "2026-11-13T15:07:52.231548+00:00",
-   "id": "508b856b-a134-456b-9cc1-119f33049332",
-   "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "expires_at": "2026-11-13T15:17:40.461654+00:00",
+   "id": "b3603a2e-1aa9-4248-8b4c-f5c23a76a665",
+   "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "role": "creator",
    "status": "pending"
   },
-  "token": "bJhp7ek2a7LrQmpBZsed9d7cYO2uzfsQ"
+  "token": "M4-NC9AqNmmTjd8E4PDjx3M117o8SfjQ"
  },
  "member_list_admin": [
   {
@@ -1027,25 +1048,25 @@
    "display_name": "Olivia Ng",
    "handle": "olivia-ng",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.030914+00:00",
+   "joined_at": "2026-11-06T15:17:40.223692+00:00",
    "listed": true,
    "role": "owner",
    "share_bps": 0,
    "title": "",
-   "user_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8"
+   "user_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1"
   },
   {
    "avatar_path": null,
    "bookable": false,
    "display_name": "Dee Okafor",
-   "handle": "dee-okafor-808f1",
+   "handle": "dee-okafor-22a2c",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.067948+00:00",
+   "joined_at": "2026-11-06T15:17:40.26103+00:00",
    "listed": true,
    "role": "admin",
    "share_bps": 0,
    "title": "",
-   "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1"
+   "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875"
   },
   {
    "avatar_path": null,
@@ -1053,12 +1074,12 @@
    "display_name": "Mia K",
    "handle": "mia-k",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.095727+00:00",
+   "joined_at": "2026-11-06T15:17:40.291394+00:00",
    "listed": true,
    "role": "manager",
    "share_bps": 0,
    "title": "",
-   "user_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520"
+   "user_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321"
   },
   {
    "avatar_path": null,
@@ -1066,12 +1087,12 @@
    "display_name": "Cal R",
    "handle": "cal-r",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.12177+00:00",
+   "joined_at": "2026-11-06T15:17:40.318011+00:00",
    "listed": true,
    "role": "creator",
    "share_bps": 0,
    "title": "",
-   "user_id": "36656be5-5c8a-460e-afbb-0be31764940b"
+   "user_id": "62130414-d187-4897-9c4c-6d9304d43576"
   },
   {
    "avatar_path": null,
@@ -1079,12 +1100,12 @@
    "display_name": "Kim T",
    "handle": "kim-t",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.148077+00:00",
+   "joined_at": "2026-11-06T15:17:40.34389+00:00",
    "listed": true,
    "role": "creator",
    "share_bps": 0,
    "title": "",
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   },
   {
    "avatar_path": null,
@@ -1092,12 +1113,12 @@
    "display_name": "Vee T",
    "handle": "vee-t",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.173894+00:00",
+   "joined_at": "2026-11-06T15:17:40.368979+00:00",
    "listed": true,
    "role": "viewer",
    "share_bps": 0,
    "title": "",
-   "user_id": "2af5eac6-2490-40e0-8d4d-fb5925d41be6"
+   "user_id": "56924f0b-8311-4cdd-9bd0-b79638db9e1f"
   }
  ],
  "member_list_owner": [
@@ -1107,25 +1128,25 @@
    "display_name": "Olivia Ng",
    "handle": "olivia-ng",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.030914+00:00",
+   "joined_at": "2026-11-06T15:17:40.223692+00:00",
    "listed": true,
    "role": "owner",
    "share_bps": 0,
    "title": "",
-   "user_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8"
+   "user_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1"
   },
   {
    "avatar_path": null,
    "bookable": false,
    "display_name": "Dee Okafor",
-   "handle": "dee-okafor-808f1",
+   "handle": "dee-okafor-22a2c",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.067948+00:00",
+   "joined_at": "2026-11-06T15:17:40.26103+00:00",
    "listed": true,
    "role": "admin",
    "share_bps": 0,
    "title": "",
-   "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1"
+   "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875"
   },
   {
    "avatar_path": null,
@@ -1133,12 +1154,12 @@
    "display_name": "Mia K",
    "handle": "mia-k",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.095727+00:00",
+   "joined_at": "2026-11-06T15:17:40.291394+00:00",
    "listed": true,
    "role": "manager",
    "share_bps": 0,
    "title": "",
-   "user_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520"
+   "user_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321"
   },
   {
    "avatar_path": null,
@@ -1146,12 +1167,12 @@
    "display_name": "Cal R",
    "handle": "cal-r",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.12177+00:00",
+   "joined_at": "2026-11-06T15:17:40.318011+00:00",
    "listed": true,
    "role": "creator",
    "share_bps": 0,
    "title": "",
-   "user_id": "36656be5-5c8a-460e-afbb-0be31764940b"
+   "user_id": "62130414-d187-4897-9c4c-6d9304d43576"
   },
   {
    "avatar_path": null,
@@ -1159,12 +1180,12 @@
    "display_name": "Kim T",
    "handle": "kim-t",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.148077+00:00",
+   "joined_at": "2026-11-06T15:17:40.34389+00:00",
    "listed": true,
    "role": "creator",
    "share_bps": 0,
    "title": "",
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   },
   {
    "avatar_path": null,
@@ -1172,12 +1193,12 @@
    "display_name": "Vee T",
    "handle": "vee-t",
    "is_signer": null,
-   "joined_at": "2026-11-06T15:07:52.173894+00:00",
+   "joined_at": "2026-11-06T15:17:40.368979+00:00",
    "listed": true,
    "role": "viewer",
    "share_bps": 0,
    "title": "",
-   "user_id": "2af5eac6-2490-40e0-8d4d-fb5925d41be6"
+   "user_id": "56924f0b-8311-4cdd-9bd0-b79638db9e1f"
   }
  ],
  "my_accounts_after": {
@@ -1186,7 +1207,7 @@
     "avatar_path": null,
     "handle": "acme-films",
     "name": "Acme Films",
-    "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+    "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
     "role": "creator",
     "state": "active",
     "title": ""
@@ -1197,7 +1218,7 @@
    "display_name": "Kim T",
    "handle": "kim-t",
    "has_profile": true,
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   }
  },
  "my_accounts_before": {
@@ -1207,7 +1228,7 @@
    "display_name": "Olivia Ng",
    "handle": "olivia-ng",
    "has_profile": true,
-   "user_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8"
+   "user_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1"
   }
  },
  "org_create": {
@@ -1222,7 +1243,7 @@
   "my_role": "owner",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1253,6 +1274,46 @@
   "split_enabled": false,
   "state": "active"
  },
+ "org_overview_apple": {
+  "assignment_mode": "auto",
+  "avatar_path": null,
+  "bio": "",
+  "handle": "pia-films",
+  "legal_address": "",
+  "legal_name": "Pia Films LLC",
+  "location_name": null,
+  "my_hours": null,
+  "my_role": "owner",
+  "my_title": "",
+  "name": "Pia Films",
+  "organization_id": "bbd1d05d-f204-4ecf-80cd-955d2af2f3fa",
+  "plan": {
+   "cancel_at_period_end": false,
+   "grace_until": null,
+   "ok": true,
+   "period_end": "2026-11-26T15:17:40.991655+00:00",
+   "provider": "apple",
+   "required": true,
+   "seats_covered": 10,
+   "status": "trialing"
+  },
+  "seats": {
+   "billed": 5,
+   "maximum": 10,
+   "minimum": 5,
+   "pending": 0,
+   "used": 1
+  },
+  "signer_roles": [
+   "owner",
+   "admin"
+  ],
+  "signer_title": "",
+  "signer_user_id": null,
+  "specialties": [],
+  "split_enabled": false,
+  "state": "active"
+ },
  "org_overview_creator": {
   "assignment_mode": "auto",
   "avatar_path": null,
@@ -1265,7 +1326,7 @@
   "my_role": "creator",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1308,7 +1369,7 @@
   "my_role": "owner",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1351,12 +1412,12 @@
   "my_role": "owner",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
    "ok": true,
-   "period_end": "2026-11-26T15:07:52.695571+00:00",
+   "period_end": "2026-11-26T15:17:40.991655+00:00",
    "provider": "stripe",
    "required": true,
    "seats_covered": null,
@@ -1374,7 +1435,7 @@
    "admin"
   ],
   "signer_title": "Director",
-  "signer_user_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+  "signer_user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
   "specialties": [
    "weddings",
    "corporate"
@@ -1394,7 +1455,7 @@
   "my_role": "owner",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1417,7 +1478,7 @@
    "admin"
   ],
   "signer_title": "Director",
-  "signer_user_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+  "signer_user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
   "specialties": [
    "weddings",
    "corporate"
@@ -1473,7 +1534,7 @@
   "my_role": "creator",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1516,7 +1577,7 @@
   "my_role": "owner",
   "my_title": "",
   "name": "Acme Films",
-  "organization_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+  "organization_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
   "plan": {
    "cancel_at_period_end": false,
    "grace_until": null,
@@ -1539,7 +1600,7 @@
    "admin"
   ],
   "signer_title": "Director",
-  "signer_user_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+  "signer_user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
   "specialties": [
    "weddings",
    "corporate"
@@ -1555,7 +1616,7 @@
    "handle": "cal-r",
    "specialties": [],
    "title": "",
-   "user_id": "36656be5-5c8a-460e-afbb-0be31764940b"
+   "user_id": "62130414-d187-4897-9c4c-6d9304d43576"
   },
   {
    "avatar_path": null,
@@ -1564,17 +1625,17 @@
    "handle": "kim-t",
    "specialties": [],
    "title": "",
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   }
  ],
  "package_members": [
   {
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
-   "user_id": "36656be5-5c8a-460e-afbb-0be31764940b"
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
+   "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947"
   },
   {
-   "package_id": "4c874ddb-eed3-402e-9901-63b0945aba7e",
-   "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7"
+   "package_id": "9e6e6d46-af35-4d82-bf01-4acb83d770fa",
+   "user_id": "62130414-d187-4897-9c4c-6d9304d43576"
   }
  ],
  "team_availability": {
@@ -1583,7 +1644,7 @@
    {
     "busy": [],
     "display_name": "Cal R",
-    "user_id": "36656be5-5c8a-460e-afbb-0be31764940b",
+    "user_id": "62130414-d187-4897-9c4c-6d9304d43576",
     "weekly": [
      {
       "weekday": 2,
@@ -1625,7 +1686,7 @@
    {
     "busy": [],
     "display_name": "Kim T",
-    "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+    "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
     "weekly": [
      {
       "weekday": 2,
@@ -1668,12 +1729,12 @@
   "settings": {
    "blackouts": [],
    "buffer_minutes": 30,
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "max_advance_days": 180,
    "min_notice_hours": 2,
    "slot_interval_minutes": 30,
    "time_zone": "America/Chicago",
-   "updated_at": "2026-11-06T15:07:52.333585+00:00",
+   "updated_at": "2026-11-06T15:17:40.589363+00:00",
    "weekly": [
     {
      "weekday": 2,
@@ -1725,7 +1786,7 @@
      }
     ],
     "display_name": "Kim T",
-    "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+    "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
     "weekly": [
      {
       "weekday": 2,
@@ -1768,12 +1829,12 @@
   "settings": {
    "blackouts": [],
    "buffer_minutes": 30,
-   "creator_id": "eaa8e505-c041-4098-9f34-fd9d69dfde9e",
+   "creator_id": "1ff820af-7f2b-49ca-bd0a-5b7126febdd9",
    "max_advance_days": 180,
    "min_notice_hours": 2,
    "slot_interval_minutes": 30,
    "time_zone": "America/Chicago",
-   "updated_at": "2026-11-06T15:07:52.333585+00:00",
+   "updated_at": "2026-11-06T15:17:40.589363+00:00",
    "weekly": [
     {
      "weekday": 2,
@@ -1824,7 +1885,7 @@
     "display_name": "Olivia Ng",
     "role": "owner",
     "title": "",
-    "user_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+    "user_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
     "weekly": []
    },
    {
@@ -1835,7 +1896,7 @@
     "display_name": "Dee Okafor",
     "role": "admin",
     "title": "",
-    "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+    "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
     "weekly": []
    },
    {
@@ -1846,7 +1907,7 @@
     "display_name": "Mia K",
     "role": "manager",
     "title": "",
-    "user_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+    "user_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
     "weekly": []
    },
    {
@@ -1857,7 +1918,7 @@
       "blocked_until": "2026-11-30T17:30:00+00:00",
       "client_name": "Alex Client",
       "end_at": "2026-11-30T17:00:00+00:00",
-      "id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
+      "id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
       "package_name": "Wedding film",
       "requested_member": false,
       "start_at": "2026-11-30T16:00:00+00:00",
@@ -1867,7 +1928,7 @@
       "blocked_until": "2026-11-30T22:30:00+00:00",
       "client_name": "Alex Client",
       "end_at": "2026-11-30T22:00:00+00:00",
-      "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+      "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
       "package_name": "Wedding film",
       "requested_member": false,
       "start_at": "2026-11-30T21:00:00+00:00",
@@ -1878,7 +1939,7 @@
     "display_name": "Cal R",
     "role": "creator",
     "title": "",
-    "user_id": "36656be5-5c8a-460e-afbb-0be31764940b",
+    "user_id": "62130414-d187-4897-9c4c-6d9304d43576",
     "weekly": [
      {
       "weekday": 2,
@@ -1936,7 +1997,7 @@
     "display_name": "Kim T",
     "role": "creator",
     "title": "",
-    "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+    "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
     "weekly": [
      {
       "weekday": 2,
@@ -1989,7 +2050,7 @@
     "display_name": "Olivia Ng",
     "role": "owner",
     "title": "",
-    "user_id": "7e6e63d5-4acb-4c57-b6c5-abad9d1cc9f8",
+    "user_id": "df785904-d9a7-481b-ba6c-3d7e9dbfc5d1",
     "weekly": []
    },
    {
@@ -2000,7 +2061,7 @@
     "display_name": "Dee Okafor",
     "role": "admin",
     "title": "",
-    "user_id": "b802b13d-e91a-4a93-8121-c722884c47f1",
+    "user_id": "ca5d6200-8cc2-496a-bd7e-194d40969875",
     "weekly": []
    },
    {
@@ -2011,7 +2072,7 @@
     "display_name": "Mia K",
     "role": "manager",
     "title": "",
-    "user_id": "645b5ccc-95aa-4e40-8227-d3f2eeab6520",
+    "user_id": "3e866cb6-4382-42e7-8ab3-1d5ef5b46321",
     "weekly": []
    },
    {
@@ -2022,7 +2083,7 @@
       "blocked_until": "2026-11-30T17:30:00+00:00",
       "client_name": "Alex Client",
       "end_at": "2026-11-30T17:00:00+00:00",
-      "id": "ec54587b-f810-4e5e-bf51-c6b1c1df45d1",
+      "id": "a93504c6-0f40-42cf-a9a3-9917746f41a1",
       "package_name": "Wedding film",
       "requested_member": false,
       "start_at": "2026-11-30T16:00:00+00:00",
@@ -2032,7 +2093,7 @@
       "blocked_until": "2026-11-30T22:30:00+00:00",
       "client_name": "Alex Client",
       "end_at": "2026-11-30T22:00:00+00:00",
-      "id": "edff8f17-81c7-4d28-b6f3-91096202a4bb",
+      "id": "39050265-9915-4c41-a242-6fcc36af1b9e",
       "package_name": "Wedding film",
       "requested_member": false,
       "start_at": "2026-11-30T21:00:00+00:00",
@@ -2043,7 +2104,7 @@
     "display_name": "Cal R",
     "role": "creator",
     "title": "",
-    "user_id": "36656be5-5c8a-460e-afbb-0be31764940b",
+    "user_id": "62130414-d187-4897-9c4c-6d9304d43576",
     "weekly": [
      {
       "weekday": 2,
@@ -2090,7 +2151,7 @@
       "blocked_until": "2026-11-30T19:30:00+00:00",
       "client_name": "Alex Client",
       "end_at": "2026-11-30T19:00:00+00:00",
-      "id": "26880d60-5d08-4c86-8c2c-5c8ce950880a",
+      "id": "11b0ea91-eda4-4c77-9785-c3b49b3376be",
       "package_name": "Wedding film",
       "requested_member": true,
       "start_at": "2026-11-30T18:00:00+00:00",
@@ -2101,7 +2162,7 @@
     "display_name": "Kim T",
     "role": "creator",
     "title": "",
-    "user_id": "b475d0ce-dd92-45f4-acdc-0491bf170ad7",
+    "user_id": "1267afe2-3651-4e50-b82e-7bb91c8aa947",
     "weekly": [
      {
       "weekday": 2,

@@ -854,8 +854,13 @@ extension LocalBackend {
         return SeatPlan.make(used: activeMembers(org).count, delta: delta, config: teamConfig)
     }
 
-    /// Plans are Stripe's. On a device with no server there is nothing to open.
+    /// Plans are bought with Apple's purchase sheet and recorded by a server. On a device with no server there is nothing
+    /// to open, and no plan is needed (`loadBilling` says so).
     func beginBilling(_ action: BillingAction, organizationID: UUID, by userID: UUID) async throws -> URL {
+        throw SlateError.billingUnavailable
+    }
+
+    func recordApplePurchase(_ purchase: SignedPurchase, organizationID: UUID, by userID: UUID) async throws {
         throw SlateError.billingUnavailable
     }
 }

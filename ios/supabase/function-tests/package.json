@@ -2,12 +2,13 @@
   "name": "slate-function-tests",
   "private": true,
   "type": "module",
-  "description": "Tests for the payment logic behind the Supabase Edge Functions. Runs with plain Node; no Deno, database or Stripe account needed.",
+  "description": "Tests for the payment, billing and Apple plan logic behind the Supabase Edge Functions. Runs with plain Node; no Deno, database, Stripe or Apple account needed.",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test-reporter=spec --test \"*.test.ts\""
   },
   "devDependencies": {
+    "@apple/app-store-server-library": "3.1.0",
     "@types/node": "^22.10.0",
     "typescript": "^5.8.0"
   }

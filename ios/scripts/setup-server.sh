@@ -99,6 +99,10 @@ deploy() { supabase functions deploy "$@" --use-api 2>/dev/null || supabase func
 say "Putting the first server functions online"
 deploy delete-account
 deploy calendar-feed --no-verify-jwt
+# The company plan is bought with Apple's purchase sheet; these two check what Apple signed (no Apple key needed). If either
+# can't go online the rest still works, and the company plan waits.
+deploy apple-verify || say "The Apple purchase check (apple-verify) couldn't go online. The company plan won't work until it does; send Claude this window."
+deploy apple-notifications --no-verify-jwt || say "The Apple notification receiver (apple-notifications) couldn't go online. Renewals and cancellations won't reach the server until it does; send Claude this window."
 
 # 4. Optionally point the app at the project.
 say "The server is ready: $url"
@@ -129,5 +133,8 @@ else
   say "Left the app as it was (on-device demo account)."
 fi
 
+echo
+echo "For the company plan, Apple tells the server about renewals at:  $url/functions/v1/apple-notifications"
+echo "(You paste that address into App Store Connect later; the guide, docs/APP_STORE.md, says where.)"
 echo
 echo "Done. The database and the first functions are online. Next steps are in ios/README.md under \"Using a real Supabase project\" and \"Turning on…\"."

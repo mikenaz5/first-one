@@ -16,6 +16,11 @@
 // For seat billing (billing-session, billing-sync):
 //   STRIPE_SEAT_PRICE_ID    the id of the Stripe Price for one seat for one month (price_…); billing is off without it
 //   BILLING_TRIAL_DAYS      optional, free-trial days for a company's first plan, defaults to 14 (0 for none)
+// For the company plan bought with Apple's In-App Purchase (apple-verify, apple-notifications). No Apple key is needed: the
+// server checks the signatures on what Apple sends against Apple's public root certificate (apple_roots.ts).
+//   APPLE_APP_ID            the app's Apple id, the number on the app's page in App Store Connect (General, App Information).
+//                           Needed to verify real (Production) purchases; without it only TestFlight and sandbox ones work
+//   APPLE_BUNDLE_ID         optional, defaults to com.slateproapp.app
 // For push notifications (send-push):
 //   APNS_KEY_P8             the contents of the AuthKey_XXXX.p8 file from your Apple developer account
 //   APNS_KEY_ID             that key's ID
@@ -29,7 +34,11 @@ import Stripe from "npm:stripe@17";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DbError } from "./payments.ts";
 import type { Db, Deps, HttpResult } from "./payments.ts";
+import { Environment, SignedDataVerifier } from "npm:@apple/app-store-server-library@3.1.0";
 import { createApnsSender } from "./apns.ts";
+import { appleRootCertificates } from "./apple_roots.ts";
+import { createAppleVerifier } from "./apple_signed.ts";
+import type { AppleDeps } from "./apple_plan.ts";
 import { makeConnectApi } from "./connect_v2.ts";
 import type { BillingDeps } from "./billing.ts";
 import type { CalendarDeps } from "./calendar.ts";
@@ -230,4 +239,20 @@ export function makeFilesDeps(): FilesDeps {
 /** Who may call send-push and expire-files: the service role key, or PUSH_CRON_SECRET. */
 export function pushSecrets(): (string | undefined)[] {
   return [Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), Deno.env.get("PUSH_CRON_SECRET")];
+}
+
+/** Everything the Apple plan functions need. Production purchases need APPLE_APP_ID; sandbox ones work without it. */
+export function makeAppleDeps(): AppleDeps {
+  const appId = Number(Deno.env.get("APPLE_APP_ID") ?? "");
+  return {
+    db: adminDb(),
+    verifier: createAppleVerifier({
+      bundleId: Deno.env.get("APPLE_BUNDLE_ID") || "com.slateproapp.app",
+      appAppleId: Number.isInteger(appId) && appId > 0 ? appId : null,
+      roots: appleRootCertificates(),
+      library: { Environment, SignedDataVerifier } as never,
+    }),
+    now: () => new Date(),
+    log: (message, detail) => console.error(message, detail ?? ""),
+  };
 }

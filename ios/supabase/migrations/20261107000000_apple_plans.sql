@@ -151,7 +151,8 @@ $$;
 -- What Apple tells us
 -- ---------------------------------------------------------------------------
 -- Records a subscription from data the Edge Function has already checked against Apple's signature. Apple's own
--- statuses are folded into the five before they get here. Safe to call again with the same facts, and a message older
+-- statuses are folded into the five before they get here. `p_renews` is null when the message doesn't say, and the flag is then
+-- left as it was. Safe to call again with the same facts, and a message older
 -- than the one already recorded is ignored.
 create or replace function public.apple_record_subscription(
   p_org                     uuid,
@@ -227,7 +228,7 @@ begin
                                         apple_environment, apple_signed_at, seats_covered, status, seats_billed, seats_wanted,
                                         current_period_end, trial_end, cancel_at_period_end, grace_until)
   values (p_org, 'apple', p_original_transaction_id, p_product_id, p_environment, p_signed_at, v_seats, p_status, v_seats,
-          public.org_seats_wanted(p_org), p_period_end, p_trial_end, not coalesce(p_renews, true), v_grace)
+          public.org_seats_wanted(p_org), p_period_end, p_trial_end, coalesce(not p_renews, v_old.cancel_at_period_end, false), v_grace)
   on conflict (organization_id) do update
     set provider = 'apple',
         apple_original_transaction_id = excluded.apple_original_transaction_id,

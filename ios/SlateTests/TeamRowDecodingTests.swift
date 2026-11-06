@@ -49,6 +49,28 @@ final class TeamRowDecodingTests: XCTestCase {
         XCTAssertEqual(row.seatMaximum, standard.seatMaximum)
         XCTAssertEqual(row.inviteExpiryDays, standard.inviteExpiryDays)
         XCTAssertEqual(row.graceDays, standard.graceDays)
+        let plans = (row.applePlans ?? []).map { PlanOffer(productID: $0.productId, seats: $0.seats) }
+        XCTAssertEqual(plans, standard.plans, "The steps the database ships with are the steps the app falls back on")
+    }
+
+    func testACompanyOnAPlanBoughtWithApple() throws {
+        let org = try backend.makeOrganization(try load("org_overview_apple"))
+        XCTAssertEqual(org.plan.status, .trialing)
+        XCTAssertTrue(org.plan.isOK)
+        XCTAssertEqual(org.plan.seatsCovered, 10, "What the plan covers")
+        XCTAssertEqual(org.seats.maximum, 10, "The company is held to what its plan covers")
+        XCTAssertEqual(org.seats.remaining, 9)
+
+        let billing: SupabaseBackend.BillingRow = try load("billing_overview_apple")
+        XCTAssertEqual(billing.appleProductId, "com.slateproapp.app.company.team10")
+        XCTAssertEqual(billing.seatsCovered, 10)
+        XCTAssertEqual(billing.seatsBilledByStripe, 0)
+        XCTAssertNotNil(PlanRules.offer(forProduct: try XCTUnwrap(billing.appleProductId), in: TeamConfig.standard.plans))
+    }
+
+    func testAStripePlanCoversNoOneInParticular() throws {
+        let paid = try backend.makeOrganization(try load("org_overview_paid"))
+        XCTAssertNil(paid.plan.seatsCovered)
     }
 
     func testAccounts() throws {
