@@ -12,9 +12,12 @@ struct AvatarPicker: View {
     @Bindable var draft: ProfileDraft
     var size: CGFloat = Metrics.avatarXL
 
+    @Environment(AppModel.self) private var model
     @State private var item: PhotosPickerItem?
+    @State private var toCrop: CropRequest?
 
     var body: some View {
+        // The system picker needs no Photos permission: the person chooses a photo and the app is handed only that one.
         PhotosPicker(selection: $item, matching: .images) {
             ZStack(alignment: .bottomTrailing) {
                 AvatarView(name: draft.displayName, url: draft.avatarURL, imageData: draft.avatarJPEG, size: size)
@@ -29,24 +32,43 @@ struct AvatarPicker: View {
             }
         }
         .accessibilityLabel("Profile photo")
-        .accessibilityHint("Choose a photo from your library")
+        .accessibilityHint("Choose a photo from your library, then move and zoom it to fit")
         .onChange(of: item) { _, newItem in
             guard let newItem else { return }
             Task { await load(newItem) }
         }
+        .fullScreenCover(item: $toCrop) { request in
+            AvatarCropView(
+                photo: request.photo,
+                onCancel: { toCrop = nil },
+                onDone: { data in
+                    draft.avatarJPEG = data
+                    toCrop = nil
+                }
+            )
+        }
         .motionSafe(.slateSpring, value: draft.avatarJPEG)
     }
 
+    /// Reads the chosen photo, then opens the crop screen on it.
     private func load(_ pick: PhotosPickerItem) async {
         defer { item = nil }
-        guard let data = try? await pick.loadTransferable(type: Data.self) else { return }
-        let processed = await Task.detached(priority: .userInitiated) {
-            MediaProcessing.jpeg(from: data, maxPixel: 1024, quality: 0.85)
-        }.value
-        if let processed {
-            draft.avatarJPEG = processed.data
+        var photo: WorkingPhoto?
+        if let data = try? await pick.loadTransferable(type: Data.self) {
+            photo = await Task.detached(priority: .userInitiated) { PhotoCrop.workingPhoto(from: data) }.value
         }
+        guard let photo else {
+            model.show(SlateError.mediaUnreadable, title: "Couldn't use that photo")
+            return
+        }
+        toCrop = CropRequest(photo: photo)
     }
+}
+
+/// A photo waiting to be cropped (`fullScreenCover(item:)` needs something identifiable).
+private struct CropRequest: Identifiable {
+    let id = UUID()
+    let photo: WorkingPhoto
 }
 
 // MARK: - Handle
