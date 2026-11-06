@@ -306,7 +306,13 @@ jobs:
               grep -n -iE "provision|profile|certificate|signing|team|account|identifier|capabilit" build/archive.log | grep -v "Explicit dependency" | cut -c1-300 | head -60
               echo "::endgroup::"
               echo "::group::Xcode's own record of its calls to Apple (macOS log)"
-              log show --style compact --last 15m --info --debug --predicate 'process == "xcodebuild" || process == "ibtoold" || process == "xcbuildservice"' 2>/dev/null | grep -iE "bearer|token|jwt|401|403|api\.appstoreconnect|developerservices|xcbuild|authenticat|issuer|forbidden|provisioning" | cut -c1-420 | head -60 || true
+              log show --style compact --last 15m --info --debug --predicate 'process == "xcodebuild"' 2>/dev/null > build/xcode-log.txt || true
+              echo "-- requests Xcode sent, and the last answers it got (certificate data is public; no keys appear here)"
+              grep -n -E "Sending request|Received response|Response payload|HTTP|status|Status|errors|detail|title|code\"" build/xcode-log.txt | grep -v -E "CFNetwork|CarbonCore|xpc:connection|PackageSupport" | cut -c1-360 | tail -70 || true
+              echo "::endgroup::"
+              echo "::group::Last answer from Apple in full"
+              LAST=$(grep -n "Received response" build/xcode-log.txt | tail -1 | cut -d: -f1)
+              if [ -n "$LAST" ]; then sed -n "${LAST},$((LAST + 40))p" build/xcode-log.txt | cut -c1-360; fi
               echo "::endgroup::"
               grep -E "error:" build/archive.log | sort -u | head -60
               tail -n 60 build/archive.log
