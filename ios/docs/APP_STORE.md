@@ -64,6 +64,8 @@ Go to <https://appstoreconnect.apple.com> ▸ **Apps** ▸ the blue **+** ▸ **
 
 The app now has a page. Leave it empty for the moment.
 
+**Check the bundle ID before moving on.** Open the new page and click **App Information** in the left list (under *General*). The **Bundle ID** row must read exactly `com.slateproapp.app`. If it reads anything else, the page was made for the wrong identifier, and a build can never be uploaded to it: remove the page (App Information, then **Remove App** at the bottom, which works while nothing has been uploaded) and make it again after fixing the identifier in Part A. The Bundle ID of an app page can't be changed afterwards, so this is the moment to be sure.
+
 ---
 
 ## Part C. Let GitHub upload builds for you
