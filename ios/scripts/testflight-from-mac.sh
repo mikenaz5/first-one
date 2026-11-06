@@ -46,6 +46,8 @@ case "$(value_of SUPABASE_ANON_KEY)" in
   sb_secret_*) die "Config/Secrets.xcconfig holds a SECRET Supabase key. Only the publishable key (sb_publishable_...) may go in the app. Run: bash scripts/setup-server.sh" ;;
 esac
 
+remembered=build/testflight-team.txt
+if [[ -z "$team" && -f "$remembered" ]]; then team="$(tr -d '[:space:]' < "$remembered")"; fi
 if [[ -z "$team" ]]; then team="$(value_of DEVELOPMENT_TEAM)"; fi
 if [[ -z "$team" ]]; then
   printf 'Your Apple Team ID (10 letters and numbers; developer.apple.com/account, then Membership details): '
@@ -53,6 +55,7 @@ if [[ -z "$team" ]]; then
 fi
 team="$(printf '%s' "$team" | tr -d '[:space:]')"
 [[ "$team" =~ ^[A-Za-z0-9]{10}$ ]] || die "A Team ID is exactly 10 letters and numbers, like ABCDE12345. You gave: '$team'"
+mkdir -p build && printf '%s\n' "$team" > "$remembered"   # so the next run doesn't ask again
 
 # A friendly hint if Xcode has no Apple ID yet (Xcode keeps the list of accounts in its settings).
 if ! defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists >/dev/null 2>&1; then
@@ -104,17 +107,29 @@ extra=()
 if [[ -n "$version" ]]; then extra+=("MARKETING_VERSION=$version"); fi
 
 explain_failure() {
-  local log="$1"
+  local log="$1" said=0
   {
     echo
     echo "----- What went wrong -----"
-    grep -E "error:" "$log" | sort -u | head -12 || true
-    if grep -qE "No Account for Team|Communication with Apple failed|Authentication failed|not signed in|provide your Apple ID" "$log"; then
+    grep -E "error:" "$log" | sed -E 's#^/[^ ]*Slate\.xcodeproj: ##' | sort -u | head -12 || true
+    if grep -qE "no devices from which to generate a provisioning profile" "$log"; then
+      said=1
+      echo
+      echo "Apple needs at least one iPhone registered to your developer account before it will make the signing files."
+      echo "This is a one-time rule for new accounts, and it is not a problem with the app. To fix it:"
+      echo "  1. Plug your iPhone into this Mac with its cable, unlock it, and tap Trust if it asks."
+      echo "  2. In Xcode choose Window > Devices and Simulators, click your iPhone on the left, and copy the line called Identifier."
+      echo "  3. On developer.apple.com/account choose Certificates, Identifiers & Profiles > Devices > the + button."
+      echo "     Platform iOS, any name (for example My iPhone), paste the Identifier, then Continue and Register."
+      echo "Then run the same line again."
+    fi
+    if grep -qE "No Account for Team|Add a new account|not signed in|provide your Apple ID" "$log"; then
+      said=1
       echo
       echo "Xcode doesn't have your Apple ID. Open Xcode, choose Xcode > Settings (or press the command key and comma),"
       echo "click Accounts, press +, choose Apple ID, sign in with the Apple ID your developer account belongs to, then run this again."
     fi
-    if grep -qE "No profiles for|doesn't include|provisioning profile" "$log"; then
+    if [[ $said -eq 0 ]] && grep -qE "No profiles for|doesn't include|provisioning profile" "$log"; then
       echo
       echo "Xcode couldn't make the signing files. Check that developer.apple.com > Certificates, Identifiers & Profiles > Identifiers"
       echo "lists com.slateproapp.app and com.slateproapp.app.widgets, both with App Groups ticked and set to group.com.slateproapp.app."

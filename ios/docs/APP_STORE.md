@@ -48,6 +48,12 @@ Identifiers ▸ **+** ▸ **Merchant IDs** ▸ Continue. Description `Slate Pro`
 
 **A7. A second key, for Sign in with Apple (not needed yet).** When I add the "revoke Apple's sign-in when someone deletes their account" step (Part F), it needs one more key: Keys ▸ **+** ▸ name `Slate Pro sign in` ▸ tick **Sign in with Apple** ▸ Configure ▸ pick the `Slate Pro` app ID ▸ Save ▸ Register ▸ Download (once). Hold on to it, and I will tell you where it goes.
 
+**A8. Register your iPhone (needed once, even for TestFlight).** A new developer account has no devices, and Apple refuses to make the signing files for a build until at least one iPhone is registered. (It says "Your team has no devices from which to generate a provisioning profile.") It also lets you install test versions straight from your Mac later.
+
+1. Plug your iPhone into the Mac with its cable, unlock it, and tap **Trust** if it asks.
+2. In Xcode choose **Window ▸ Devices and Simulators**, click your iPhone on the left, and copy the line called **Identifier** (a long code of letters and numbers).
+3. On <https://developer.apple.com/account> go to **Certificates, Identifiers & Profiles ▸ Devices ▸ the blue +**. Platform **iOS**, any name (for example `My iPhone`), paste the Identifier, then **Continue** and **Register**.
+
 ---
 
 ## Part B. App Store Connect: the app's page
@@ -86,10 +92,11 @@ Building for real iPhones needs Xcode to know who you are. This takes two minute
 cd ~ && curl -L -o slate.zip https://github.com/mikenaz5/first-one/archive/refs/heads/claude/ecstatic-curie-4456ah.zip && unzip -oq slate.zip && cd first-one-claude-ecstatic-curie-4456ah/ios && bash scripts/testflight-from-mac.sh
 ```
 
-The first time it asks for your **Team ID** (10 letters and numbers, from A1; it remembers it afterwards). Then it builds the app for iPhones and sends it to Apple. The first run takes 10 to 20 minutes (it downloads the app's building blocks); later runs are faster. Xcode may ask permission to use your keychain: choose **Always Allow**. It ends with "Done. Build … is on its way to Apple." Add `--version 1.0.0` to the end of the line to set the version people see.
+The first time it asks for your **Team ID** (10 letters and numbers, from A1); it remembers it after that. Then it builds the app for iPhones and sends it to Apple. The first run takes 10 to 20 minutes (it downloads the app's building blocks); later runs are faster. Xcode may ask permission to use your keychain: choose **Always Allow**. It ends with "Done. Build … is on its way to Apple." Add `--version 1.0.0` to the end of the line to set the version people see.
 
 If it stops with a message, copy everything it printed and send it to me. The usual ones:
 
+- *"Apple needs at least one iPhone registered…"*: do A8, then run the line again.
 - *"Xcode doesn't have your Apple ID"*: do C1, then run the line again.
 - *"Xcode couldn't make the signing files"*: check A3 and A4 (both identifiers exist, with App Groups ticked and set to `group.com.slateproapp.app`), then run the line again.
 - *"The app doesn't know your Supabase project yet"*: do C2.
