@@ -129,6 +129,11 @@ explain_failure() {
       echo "Xcode doesn't have your Apple ID. Open Xcode, choose Xcode > Settings (or press the command key and comma),"
       echo "click Accounts, press +, choose Apple ID, sign in with the Apple ID your developer account belongs to, then run this again."
     fi
+    if grep -qE "bundle version must be higher|has already been used" "$log"; then
+      said=1
+      echo
+      echo "Apple already has a build with this build number. Run the same line again: each run makes a new, higher number."
+    fi
     if [[ $said -eq 0 ]] && grep -qE "No profiles for|doesn't include|provisioning profile" "$log"; then
       echo
       echo "Xcode couldn't make the signing files. Check that developer.apple.com > Certificates, Identifiers & Profiles > Identifiers"
@@ -152,6 +157,14 @@ if ! xcodebuild archive \
   exit 1
 fi
 tail -n 3 build/testflight-archive.log
+
+# Check that the number really went into the app. If it didn't, Apple would refuse the upload as a repeat of an earlier build.
+built="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' "$archive/Info.plist" 2>/dev/null || true)"
+shown="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShortVersionString' "$archive/Info.plist" 2>/dev/null || true)"
+if [[ -n "$built" && "$built" != "$build_number" ]]; then
+  die "The build came out numbered '$built' instead of '$build_number', so Apple would refuse it as a repeat. Send this message to Claude."
+fi
+say "Version ${shown:-?}, build ${built:-$build_number}"
 
 cat > build/ExportOptions.plist <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

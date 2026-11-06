@@ -11,7 +11,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
+    # The version people see (1.0, matching the App Store page) and the build number Apple counts upwards. The two Info.plist
+    # lines below must point at these: XcodeGen otherwise writes a plain "1.0" and "1" into the plist, and then no build
+    # number given on the command line (the TestFlight scripts give a new one each time) ever reaches the app.
+    MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
@@ -52,6 +55,8 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: Slate Pro
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # The same colour the app opens on, so there's no white flash before the opening animation.
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -101,6 +106,8 @@ targets:
       path: Config/SlateWidgets-Info.plist
       properties:
         CFBundleDisplayName: Slate Pro
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         SlateAppGroup: $(APP_GROUP_ID)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
