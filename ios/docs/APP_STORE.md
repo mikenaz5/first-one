@@ -6,8 +6,8 @@ Plain steps, in order. Nothing here needs you to write code. Where a step says "
 
 1. **Apple's developer website:** register the app's names and switch on its features (Part A).
 2. **App Store Connect:** create the app's page (Part B).
-3. **GitHub:** hand it a key so it can upload builds for you, with one button (Part C).
-4. **TestFlight:** press the button, install the app on your own iPhone (Part D).
+3. **Xcode:** sign in with your Apple ID (Part C).
+4. **TestFlight:** run one line in Terminal, then install the app on your own iPhone (Part D).
 5. **The store page:** words, pictures and privacy answers (Part E).
 6. **Submit for review**, after the checklist in Part F.
 
@@ -68,57 +68,37 @@ The app now has a page. Leave it empty for the moment.
 
 ---
 
-## Part C. Let GitHub upload builds for you
+## Part C. Sign Xcode in to your Apple ID
 
-You do this once. It means getting a build to your phone is one button, with no Xcode signing screens.
+Building for real iPhones needs Xcode to know who you are. This takes two minutes, once.
 
-**C1. Make an App Store Connect key.** In App Store Connect ▸ **Users and Access** ▸ **Integrations** ▸ **App Store Connect API** ▸ **Team Keys** ▸ **Generate API Key** (or the **+**).
+**C1.** Open Xcode. In the menu bar choose **Xcode ▸ Settings…** (or press the command key and comma), click **Accounts**, click the **+** at the bottom left, choose **Apple ID**, and sign in with the Apple ID that your developer account belongs to (Apple sends a code to your other devices). Close the window. Your name and team should now be listed.
 
-- Name: `GitHub upload`
-- Access: **Admin** (the build signs the app for you through this key, and signing sometimes needs more than App Manager can do)
-- Generate, then **Download API Key** (once; the file is called `AuthKey_XXXXXXXXXX.p8`).
-- Write down the **Key ID** (in the table, next to the key) and the **Issuer ID** (at the top of the page, a long string with dashes).
-
-**C2. Give GitHub the secrets.** On GitHub open the `first-one` repository ▸ **Settings** ▸ **Secrets and variables** ▸ **Actions** ▸ **New repository secret**. Add these one at a time (name exactly as written):
-
-**Paste the code itself, not the words in the right-hand column.** The examples there are made up, only to show the shape. After you save, the `ASC_KEY_ID` secret should hold something like `AB12CD34EF`, never the words "The Key ID".
-
-| Secret name | What to paste |
-|---|---|
-| `ASC_KEY_ID` | The 10-character Key ID from C1, for example `AB12CD34EF` |
-| `ASC_ISSUER_ID` | The long Issuer ID from C1, with dashes, for example `69a6de7e-1234-47e3-e053-5b8c7c11a4d1` |
-| `ASC_KEY_P8` | Open the `AuthKey_….p8` file in TextEdit, select all, copy, paste. Include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
-| `APPLE_TEAM_ID` | The 10-character Team ID from A1, for example `ABCDE12345` |
-| `SUPABASE_URL` | Your Supabase project address, like `https://abcdefgh.supabase.co` (Supabase ▸ Project Settings ▸ Data API) |
-| `SUPABASE_PUBLISHABLE_KEY` | Supabase's **publishable** key, starting `sb_publishable_`. **Never** the secret key; the button refuses it |
-| `STRIPE_PUBLISHABLE_KEY` | *Optional, for Apple Pay.* Stripe's publishable key, starting `pk_`. Never `sk_` |
-| `APPLE_PAY_MERCHANT_ID` | *Optional, with the one above.* `merchant.com.slateproapp.app` |
-
-These secrets can't be read back by anyone, including me; GitHub only hands them to the upload button's run.
+**C2.** The app has to know your Supabase project, or the TestFlight build would open to a screen with nothing to do. If you ran `bash scripts/setup-server.sh` earlier (the step that connected the app to Supabase), there is nothing to do: the file `ios/Config/Secrets.xcconfig` exists. If not, run that first (the README, "Using a real Supabase project", says how).
 
 ---
 
 ## Part D. Your first build on your own iPhone
 
-**D1. Press the button.** On GitHub open the **Actions** tab ▸ **TestFlight** in the left list ▸ **Run workflow** ▸ pick the branch ▸ (leave *version* empty for now) ▸ the green **Run workflow**. It takes 15 to 25 minutes. A green tick means Apple has the build.
+**D1. Run one line in Terminal.** Open Terminal (press the command key and Space, type Terminal, press Return), paste this and press Return:
 
-If it turns red, open the run, click the red step and send me the first lines of red text. The first run is where small signing messages show up, and they are quick to fix.
+```sh
+cd ~ && curl -L -o slate.zip https://github.com/mikenaz5/first-one/archive/refs/heads/claude/ecstatic-curie-4456ah.zip && unzip -oq slate.zip && cd first-one-claude-ecstatic-curie-4456ah/ios && bash scripts/testflight-from-mac.sh
+```
 
-Two messages you may see, and what to do:
+The first time it asks for your **Team ID** (10 letters and numbers, from A1; it remembers it afterwards). Then it builds the app for iPhones and sends it to Apple. The first run takes 10 to 20 minutes (it downloads the app's building blocks); later runs are faster. Xcode may ask permission to use your keychain: choose **Always Allow**. It ends with "Done. Build … is on its way to Apple." Add `--version 1.0.0` to the end of the line to set the version people see.
 
-- *"The ASC_KEY_P8 secret is not a usable Apple key"* (step **Save the App Store Connect key**): the key was not pasted whole. The button already puts back a missing first or last line and lost line breaks, so this means something else was pasted. Open the `AuthKey_….p8` file in TextEdit (right-click it, **Open With**, **TextEdit**), press Cmd A then Cmd C, and on GitHub (Settings, Secrets and variables, Actions) click the pencil next to `ASC_KEY_P8` and paste it over what is there. The message says how many characters it found; a real key has 184 once the first and last lines are taken away.
-- *"These secrets are not set: …"* (step **Check the secrets are all there**): it names the secrets that are missing; add them as in C2.
-- *"ASC_KEY_ID should be 10 letters and numbers…"*, *"ASC_ISSUER_ID should be the long Issuer ID…"* or *"APPLE_TEAM_ID should be…"* (step **Check the Apple numbers look right**): that secret holds the wrong thing, usually the wrong one of the three numbers. The Key ID is 10 characters and is also in the key's file name (`AuthKey_XXXXXXXXXX.p8`). The Issuer ID is the long one with dashes at the top of the Team Keys page. The Team ID is 10 characters under Membership details on Apple's developer site. Stray spaces and line breaks around a pasted value are removed for you.
-- *"Apple does not accept this key (answer 401, not authorized)"* (step **Ask Apple whether the key works**): the key file is fine, but the Key ID, the Issuer ID and the `.p8` file do not all belong together. Check the Key ID against the file name, check the Issuer ID is the long one from the **Team Keys** tab (not the Key ID, and not from *Individual Keys*), and make sure the `.p8` is the one downloaded for that same key. If in doubt, make a new Team key (Admin access) and replace all three secrets.
-- *"Apple recognises the key but will not let it in (answer 403)"*: the key was made with too little access; make a new one with **Admin**.
-- *"Apple shows no app with the bundle ID com.slateproapp.app for this key"* (step **Ask Apple whether the key works**): the key is real, but it belongs to a different Apple team than the one where the app page was made, or the app page uses another bundle ID. The message lists the apps and identifiers the key can see. In App Store Connect click your name at the top right to see which teams you are in, switch to the team that has the "Slate Pro App" page, and make the key there (Users and Access, Integrations, Team Keys); then replace `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8`. Use that team's Team ID for `APPLE_TEAM_ID`.
-- *"APPLE_TEAM_ID is not the team that owns this app"* (same step), or *"No Account for Team"* in the build: the Team ID secret is a different 10-character code from the one that owns the app. The message names the right one; put it in the `APPLE_TEAM_ID` secret. The Team ID is under **Membership details** on <https://developer.apple.com/account>; the Key ID looks the same (10 characters) but is a different thing.
+If it stops with a message, copy everything it printed and send it to me. The usual ones:
+
+- *"Xcode doesn't have your Apple ID"*: do C1, then run the line again.
+- *"Xcode couldn't make the signing files"*: check A3 and A4 (both identifiers exist, with App Groups ticked and set to `group.com.slateproapp.app`), then run the line again.
+- *"The app doesn't know your Supabase project yet"*: do C2.
 
 **D2. Wait for Apple.** In App Store Connect ▸ your app ▸ **TestFlight**, the build appears under *iOS builds* after 10 to 30 minutes of "Processing". Apple may email you that it finished. (The app declares that it uses only ordinary encryption, so the export questions are already answered.)
 
 **D3. Put yourself on the team of testers.** Still in TestFlight: **Internal Testing** ▸ **+** ▸ name the group `Me` ▸ tick *Enable automatic distribution* ▸ add yourself (your Apple ID must be a user under *Users and Access*; you are one already) ▸ add the build.
 
-**D4. Install it.** On your iPhone, install **TestFlight** from the App Store and sign in with the same Apple ID. Slate Pro appears; tap **Install**. This is the real app on a real phone, talking to your real Supabase project. Builds expire after 90 days, and each new press of the button makes a newer one.
+**D4. Install it.** On your iPhone, install **TestFlight** from the App Store and sign in with the same Apple ID. Slate Pro appears; tap **Install**. This is the real app on a real phone, talking to your real Supabase project. Builds expire after 90 days; run the line again for a newer one.
 
 **D5. Friends and creators.** Internal testing is for up to 100 people who are on your App Store Connect team. For anyone else (a photographer friend, say), make an **External Testing** group and add their email; Apple does a short review of the first external build (about a day), then they get an invite by email.
 
@@ -230,12 +210,58 @@ Paste this into **App Review Information ▸ Notes** and edit it:
 | ☐ | **Privacy answers (Part E) match** the policy and the manifest | You | Written |
 | ☐ | **A real iPhone has run it** from TestFlight, start to finish: sign in, make a profile, book, sign, pay | You | After D4 |
 
-What is already done in the project for you: the privacy manifest (checked on every build), the app icon (1024 px, no transparency, which Apple insists on), the permission wording iOS shows (calendar, photos, location), "Delete account" inside the app, Sign in with Apple offered next to email codes, the export-encryption answer, the product name, and the upload button.
+What is already done in the project for you: the privacy manifest (checked on every build), the app icon (1024 px, no transparency, which Apple insists on), the permission wording iOS shows (calendar, photos, location), "Delete account" inside the app, Sign in with Apple offered next to email codes, the export-encryption answer, the product name, and the upload script.
+
+---
+
+## Appendix: the GitHub button (not working yet)
+
+The repository has a **TestFlight** button on GitHub (Actions) that was meant to do all of this without your Mac. It stops at signing, for a reason I traced in its logs: Xcode asks Apple for your **App Groups** (the widget and the app share data through one), and Apple answers that one request with `401 Authentication failed` when the sign-in is an API key. Every other request works with the key, which is why every check before it passes. Apple's own sign-in (your Apple ID in Xcode) can use App Groups, which is why the Terminal line in Part D works.
+
+Making the button work needs a different way of signing (creating the certificate and signing files through Apple's web service, then signing by hand). That isn't built. What follows is how the button is set up, kept in case you want to try it later, with what its messages mean.
+
+**G1. Make an App Store Connect key.** In App Store Connect ▸ **Users and Access** ▸ **Integrations** ▸ **App Store Connect API** ▸ **Team Keys** ▸ **Generate API Key** (or the **+**).
+
+- Name: `GitHub upload`
+- Access: **Admin** (the build signs the app for you through this key, and signing sometimes needs more than App Manager can do)
+- Generate, then **Download API Key** (once; the file is called `AuthKey_XXXXXXXXXX.p8`).
+- Write down the **Key ID** (in the table, next to the key) and the **Issuer ID** (at the top of the page, a long string with dashes).
+
+**G2. Give GitHub the secrets.** On GitHub open the `first-one` repository ▸ **Settings** ▸ **Secrets and variables** ▸ **Actions** ▸ **New repository secret**. Add these one at a time (name exactly as written):
+
+**Paste the code itself, not the words in the right-hand column.** The examples there are made up, only to show the shape. After you save, the `ASC_KEY_ID` secret should hold something like `AB12CD34EF`, never the words "The Key ID".
+
+| Secret name | What to paste |
+|---|---|
+| `ASC_KEY_ID` | The 10-character Key ID from G1, for example `AB12CD34EF` |
+| `ASC_ISSUER_ID` | The long Issuer ID from G1, with dashes, for example `69a6de7e-1234-47e3-e053-5b8c7c11a4d1` |
+| `ASC_KEY_P8` | Open the `AuthKey_….p8` file in TextEdit, select all, copy, paste. Include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
+| `APPLE_TEAM_ID` | The 10-character Team ID from A1, for example `ABCDE12345` |
+| `SUPABASE_URL` | Your Supabase project address, like `https://abcdefgh.supabase.co` (Supabase ▸ Project Settings ▸ Data API) |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase's **publishable** key, starting `sb_publishable_`. **Never** the secret key; the button refuses it |
+| `STRIPE_PUBLISHABLE_KEY` | *Optional, for Apple Pay.* Stripe's publishable key, starting `pk_`. Never `sk_` |
+| `APPLE_PAY_MERCHANT_ID` | *Optional, with the one above.* `merchant.com.slateproapp.app` |
+
+These secrets can't be read back by anyone, including me; GitHub only hands them to the upload button's run.
+
+**G3. Press the button.** On GitHub open the **Actions** tab ▸ **TestFlight** in the left list ▸ **Run workflow** ▸ pick the branch ▸ (leave *version* empty for now) ▸ the green **Run workflow**. It takes 15 to 25 minutes. A green tick means Apple has the build.
+
+If it turns red, open the run, click the red step and send me the first lines of red text. The first run is where small signing messages show up, and they are quick to fix.
+
+Two messages you may see, and what to do:
+
+- *"The ASC_KEY_P8 secret is not a usable Apple key"* (step **Save the App Store Connect key**): the key was not pasted whole. The button already puts back a missing first or last line and lost line breaks, so this means something else was pasted. Open the `AuthKey_….p8` file in TextEdit (right-click it, **Open With**, **TextEdit**), press Cmd A then Cmd C, and on GitHub (Settings, Secrets and variables, Actions) click the pencil next to `ASC_KEY_P8` and paste it over what is there. The message says how many characters it found; a real key has 184 once the first and last lines are taken away.
+- *"These secrets are not set: …"* (step **Check the secrets are all there**): it names the secrets that are missing; add them as in G2.
+- *"ASC_KEY_ID should be 10 letters and numbers…"*, *"ASC_ISSUER_ID should be the long Issuer ID…"* or *"APPLE_TEAM_ID should be…"* (step **Check the Apple numbers look right**): that secret holds the wrong thing, usually the wrong one of the three numbers. The Key ID is 10 characters and is also in the key's file name (`AuthKey_XXXXXXXXXX.p8`). The Issuer ID is the long one with dashes at the top of the Team Keys page. The Team ID is 10 characters under Membership details on Apple's developer site. Stray spaces and line breaks around a pasted value are removed for you.
+- *"Apple does not accept this key (answer 401, not authorized)"* (step **Ask Apple whether the key works**): the key file is fine, but the Key ID, the Issuer ID and the `.p8` file do not all belong together. Check the Key ID against the file name, check the Issuer ID is the long one from the **Team Keys** tab (not the Key ID, and not from *Individual Keys*), and make sure the `.p8` is the one downloaded for that same key. If in doubt, make a new Team key (Admin access) and replace all three secrets.
+- *"Apple recognises the key but will not let it in (answer 403)"*: the key was made with too little access; make a new one with **Admin**.
+- *"Apple shows no app with the bundle ID com.slateproapp.app for this key"* (step **Ask Apple whether the key works**): the key is real, but it belongs to a different Apple team than the one where the app page was made, or the app page uses another bundle ID. The message lists the apps and identifiers the key can see. In App Store Connect click your name at the top right to see which teams you are in, switch to the team that has the "Slate Pro App" page, and make the key there (Users and Access, Integrations, Team Keys); then replace `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8`. Use that team's Team ID for `APPLE_TEAM_ID`.
+- *"APPLE_TEAM_ID is not the team that owns this app"* (same step), or *"No Account for Team"* in the build: the Team ID secret is a different 10-character code from the one that owns the app. The message names the right one; put it in the `APPLE_TEAM_ID` secret. The Team ID is under **Membership details** on <https://developer.apple.com/account>; the Key ID looks the same (10 characters) but is a different thing.
 
 ---
 
 ## After the first release
 
-- **New version:** press the TestFlight button again with a new *version* (for example `1.0.1`). The build number goes up on its own.
+- **New version:** run the Terminal line from D1 again with `--version 1.0.1` on the end. The build number goes up on its own.
 - **Choose phased release** on the version page so the update reaches people over a week, not all at once.
-- Apple will require builds made with a newer Xcode from time to time; the button uses the newest Xcode on GitHub's machines.
+- Apple will require builds made with a newer Xcode from time to time; your Mac's Xcode needs to be recent enough; update it from the App Store.

@@ -1,8 +1,12 @@
 name: TestFlight
 
+# KNOWN LIMITATION: this does not get a build to Apple yet. Everything before signing works (secrets, the key, the team, the
+# app's identifiers), but Xcode's signing asks Apple for the App Groups the widget needs, and Apple answers that one request
+# with 401 "Authentication failed" when the sign-in is an API key. Use ios/scripts/testflight-from-mac.sh instead (it signs with
+# the Apple ID in Xcode, which Apple does allow to use App Groups). See ios/docs/APP_STORE.md, "Appendix: the GitHub button".
+#
 # Builds Slate Pro for real iPhones and uploads it to App Store Connect, where TestFlight picks it up.
 # It never runs by itself: open the Actions tab, choose "TestFlight", press "Run workflow".
-# It needs an Apple Developer account and six secrets first. ios/docs/APP_STORE.md, step by step, says how to get each one.
 
 on:
   workflow_dispatch:
