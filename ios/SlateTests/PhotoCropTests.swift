@@ -65,7 +65,7 @@ final class CropGeometryTests: XCTestCase {
         let g = geometry(4000, 3000)
         XCTAssertEqual(g.clampedZoom(0.2), 1)
         XCTAssertEqual(g.clampedZoom(99), CropGeometry.maxZoom)
-        XCTAssertEqual(g.clampedZoom(.nan), 1)
+        XCTAssertEqual(g.clampedZoom(CGFloat.nan), 1)
         XCTAssertEqual(g.clampedZoom(2.5), 2.5)
     }
 
@@ -104,7 +104,7 @@ final class CropGeometryTests: XCTestCase {
 
     func testNonsenseOffsetsAreTreatedAsZero() {
         let g = geometry(4000, 3000)
-        XCTAssertEqual(g.clampedOffset(CGSize(width: .nan, height: .infinity), atZoom: 1), .zero)
+        XCTAssertEqual(g.clampedOffset(CGSize(width: CGFloat.nan, height: CGFloat.infinity), atZoom: 1), .zero)
     }
 }
 

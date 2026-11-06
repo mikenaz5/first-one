@@ -608,6 +608,23 @@ check("nobody can overwrite or delete a stored PDF",
       sql_as(bob, "update storage.objects set name = name where name = %s", (path,))[1] == 0
       and sql_as(bob, "delete from storage.objects where name = %s", (path,))[1] == 0)
 
+print("\n[profile photo and portfolio uploads: storage rules]")
+# The file service writes a row, then reads it back (and for a replacement it upserts). Postgres refuses that without a read
+# rule, which showed on a phone as "new row violates row-level security policy" when saving a profile photo.
+for bucket, label in (("avatars", "profile photo"), ("portfolio", "portfolio file")):
+    mine = f"{alice}/{uuid.uuid4().hex[:8]}.jpg"
+    check(f"you can upload a {label} into your own folder", not isinstance(sql_as(alice, "insert into storage.objects (bucket_id, name) values (%s, %s)", (bucket, mine)), str))
+    check(f"the file service can read the {label} row back after an upload",
+          not isinstance(sql_as(alice, "insert into storage.objects (bucket_id, name) values (%s, %s) returning id", (bucket, f"{alice}/{uuid.uuid4().hex[:8]}.jpg")), str))
+    check(f"a replacement (upsert) of a {label} works",
+          not isinstance(sql_as(alice, "insert into storage.objects (id, bucket_id, name) values (gen_random_uuid(), %s, %s) on conflict (id) do update set name = excluded.name returning id",
+                                (bucket, f"{alice}/{uuid.uuid4().hex[:8]}.jpg")), str))
+    check(f"you can't upload a {label} into someone else's folder", isinstance(sql_as(alice, "insert into storage.objects (bucket_id, name) values (%s, %s)", (bucket, f"{bob}/x.jpg")), str))
+    sql_as(bob, "insert into storage.objects (bucket_id, name) values (%s, %s)", (bucket, f"{bob}/theirs-{bucket}.jpg"))
+    check(f"you can read your own {label} rows", sql_as(alice, "select count(*) from storage.objects where bucket_id = %s and name like %s", (bucket, f"{alice}/%"))[0][0][0] >= 3)
+    check(f"you can't read someone else's {label} rows", sql_as(alice, "select count(*) from storage.objects where bucket_id = %s and name like %s", (bucket, f"{bob}/%"))[0][0][0] == 0)
+    check(f"nobody who isn't signed in can read the {label} rows", sql_as(None, "select count(*) from storage.objects where bucket_id = %s", (bucket,), role="anon")[0][0][0] == 0)
+
 # ---- 11. golden fixture: SQL and Swift must render the same words --------------
 print("\n[golden contract text]")
 if GOLDEN.exists():
