@@ -257,6 +257,17 @@ jobs:
                   echo "::warning::Apple does not let this key read ${path%%\?*} (answer $CODE): $DETAIL"
                 fi
               done
+              # Only an Admin key may list the team's users, so this tells us the key's access level without changing anything.
+              UCODE=$(curl -sS -m 30 -o "$RUNNER_TEMP/asc-probe.json" -w '%{http_code}' \
+                -H "Authorization: Bearer $HEADER.$PAYLOAD.$SIGNATURE" \
+                "https://api.appstoreconnect.apple.com/v1/users?limit=1") || UCODE="none"
+              if [ "$UCODE" = "200" ]; then
+                echo "This key has Admin access: yes."
+              elif [ "$UCODE" = "403" ]; then
+                echo "::warning::This key is NOT an Admin key (Apple refuses to let it list the team's users). Xcode needs Admin access to create the signing files, and 'Authentication failed' during the build is what it shows without it. Make a new Team key with Access set to Admin (App Store Connect > Users and Access > Integrations > App Store Connect API > Team Keys > +), then replace ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 on GitHub. The Access level of a key cannot be edited afterwards."
+              else
+                echo "::warning::Could not tell whether the key has Admin access (answer $UCODE)."
+              fi
               ;;
             401)
               echo "::error::Apple does not accept this key (answer 401, not authorized). One of these three does not match the key you downloaded: ASC_KEY_ID (must be the Key ID of that same key; it is in the file name AuthKey_XXXXXXXXXX.p8), ASC_ISSUER_ID (the Issuer ID at the top of the Team Keys page, not the Key ID), or ASC_KEY_P8 (the contents of that same .p8 file). It also fails if the key was revoked, or if it is an Individual key instead of a Team key. Fix the secret, or make a new Team key and replace all three."
