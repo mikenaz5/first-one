@@ -78,6 +78,10 @@ jobs:
           KEY_ID=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
           ISSUER_ID=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
           TEAM_ID=$(printf '%s' "$APPLE_TEAM_ID" | tr -d '[:space:]')
+          # The tidied copies are not the exact saved text, so GitHub would not hide them in the log on its own.
+          for v in "$KEY_ID" "$ISSUER_ID" "$TEAM_ID"; do
+            if [ -n "$v" ]; then echo "::add-mask::$v"; fi
+          done
           {
             echo "KEY_ID=$KEY_ID"
             echo "ISSUER_ID=$ISSUER_ID"

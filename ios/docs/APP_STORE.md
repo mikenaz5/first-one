@@ -79,12 +79,14 @@ You do this once. It means getting a build to your phone is one button, with no 
 
 **C2. Give GitHub the secrets.** On GitHub open the `first-one` repository ▸ **Settings** ▸ **Secrets and variables** ▸ **Actions** ▸ **New repository secret**. Add these one at a time (name exactly as written):
 
+**Paste the code itself, not the words in the right-hand column.** The examples there are made up, only to show the shape. After you save, the `ASC_KEY_ID` secret should hold something like `AB12CD34EF`, never the words "The Key ID".
+
 | Secret name | What to paste |
 |---|---|
-| `ASC_KEY_ID` | The Key ID from C1 |
-| `ASC_ISSUER_ID` | The Issuer ID from C1 |
+| `ASC_KEY_ID` | The 10-character Key ID from C1, for example `AB12CD34EF` |
+| `ASC_ISSUER_ID` | The long Issuer ID from C1, with dashes, for example `69a6de7e-1234-47e3-e053-5b8c7c11a4d1` |
 | `ASC_KEY_P8` | Open the `AuthKey_….p8` file in TextEdit, select all, copy, paste. Include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
-| `APPLE_TEAM_ID` | The Team ID from A1 |
+| `APPLE_TEAM_ID` | The 10-character Team ID from A1, for example `ABCDE12345` |
 | `SUPABASE_URL` | Your Supabase project address, like `https://abcdefgh.supabase.co` (Supabase ▸ Project Settings ▸ Data API) |
 | `SUPABASE_PUBLISHABLE_KEY` | Supabase's **publishable** key, starting `sb_publishable_`. **Never** the secret key; the button refuses it |
 | `STRIPE_PUBLISHABLE_KEY` | *Optional, for Apple Pay.* Stripe's publishable key, starting `pk_`. Never `sk_` |
