@@ -134,7 +134,7 @@ final class TeamRowDecodingTests: XCTestCase {
         XCTAssertTrue(none.required)
         XCTAssertEqual(none.status, "none")
         XCTAssertEqual(none.seats.used, 6)
-        XCTAssertEqual(none.seats.billed, TeamConfig.standard.seatMinimum, "Billed for the floor, not for six")
+        XCTAssertEqual(none.seats.billed, max(TeamConfig.standard.seatMinimum, none.seats.used), "Billed for the team, never below the floor")
         let plan = PlanSummary.make(required: none.required, status: PlanStatus(rawValue: none.status) ?? .none, graceUntil: none.graceUntil,
                                     cancelAtPeriodEnd: none.cancelAtPeriodEnd ?? false, periodEnd: none.currentPeriodEnd)
         XCTAssertFalse(plan.isOK)

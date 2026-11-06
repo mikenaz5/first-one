@@ -4,6 +4,7 @@
 **Platform:** iOS and iPadOS first (SwiftUI). A lightweight web booking page for clients.
 **Changes in v0.2:** two account types, Individual and Company (sections 2, 4.1 to 4.4, 5.4, 6, 7, 8.7 to 8.11, 9, 10, 12, 13). Team accounts moved from "Later" into scope.
 **Changes in v0.3:** Slate Files, hosted delivery of photos and videos with storage in the plan, a 30-day window, previews before payment and originals after, and free revisions once paid (sections 2, 4.4, 5.1, 5.2, 5.5, 7, 8.6, 8.12, 9, 10, 11, 12, 13).
+**Changes in v0.4:** the company plan is an auto-renewable subscription bought through Apple's purchase sheet (In-App Purchase) only, $5.99 a month for up to 5 people with a 7-day free trial, and bigger teams move up in steps of 5 (decisions D6, D7, D12; sections 4.1, 4.4, 5.4, 7, 8.7, 8.11, 12, 13). Stripe seat billing stays in the code, switched off in the app, for a possible website checkout later.
 **Changes in v0.4:** client accounts, a free third account type with Sign in with Apple or an emailed code, and booking links that lead straight to one, search for creators, and a featured-creators grid on a client's Home (sections 2, 4, 4.1, 5.2, 8.13, 9, 10, 13).
 **Changes in v0.5:** cards on file on a client's Profile, and a creator's permission to charge a saved card for the balance of a booking (sections 2, 5.2, 7, 8.3, 8.14, 9, 12, 13).
 
@@ -30,13 +31,13 @@ Decisions made with the product owner:
 | D3 | **Contracts = templates plus in-app e-signature.** The creator attaches a template to each package. The client reviews and signs inside the booking flow. We store a timestamped audit trail and a PDF. | We build template, signing and PDF/audit infrastructure ourselves. Legal review is required before launch. |
 | D4 | **Payments = deposit at booking** via Apple Pay and Stripe Connect. The balance is due later. | A booking is confirmed only when the contract is signed and the deposit is paid. |
 | D5 | **Two account types**, chosen after Sign in with Apple: **Individual** ("Just me") and **Company** ("My company"). An Individual can upgrade to a Company later without losing profile, services, bookings or contracts. | Section 4.1. Team accounts are no longer deferred. |
-| D6 | **Company seats are billed with Stripe Billing, per seat.** The company plan is bought and managed on the web in a system sheet. No In-App Purchase. Individual accounts stay free. | App Review risk R9. Billing state lives on the organization (section 7). |
-| D7 | **The 10-seat minimum is a billing floor,** not a member count. A company can have fewer than 10 members and is billed for at least 10 seats. The maximum is 250. Both numbers are config values (section 4.4). | Changing them is a config change, not a code change. |
+| D6 | **The company plan is an auto-renewable subscription bought with In-App Purchase, and only with In-App Purchase.** Apple's purchase sheet pays with Apple Pay, any card in Wallet or Apple Account balance, so those are covered. Stripe and PayPal are not offered inside the app (Guideline 3.1.1 requires In-App Purchase for features unlocked in the app). The plan is bought by the company's Owner for the company, $5.99 a month for the first step, with a 7-day free trial for a company that has never had a plan. Individual accounts stay free. Supersedes the earlier choice of Stripe Billing per seat (the code stays, switched off in the app). | App Review risk R9 is resolved by using In-App Purchase. Apple keeps 15% under its Small Business Program or 30% otherwise. Billing state lives on the organization (section 7). |
+| D7 | **A plan covers a number of people, and more people mean the next plan.** The first plan covers 5 (so 5 is the minimum; a company may have fewer than 5 members). Apple's subscriptions cannot be bought by quantity, so more people are sold as bigger plans in steps of 5 (5, 10, 15, 20, 25), each its own product. A company that is full is told so and offered the next step. Nobody is ever removed because a plan shrank: a company over its limit keeps its members and takes no new invites until it is under. The steps and what each covers are rows in `apple_plans` (section 4.4). | Changing a step is a config change, not a code change, plus a product in App Store Connect. |
 | D8 | **On upgrade, services move to the company, signed work stays with the person.** Services, packages and contract templates become company-owned. The person's availability stays on their own calendar, which becomes their member calendar. Executed contracts and their bookings stay with the person as the contracting party, because they are immutable and the client agreed to that person. | Section 8.7. |
 | D9 | **Company payments go to the company's own Stripe Connect account.** Optional member payouts are a **split ledger** (a per-member share recorded on each booking for reports and payroll). Slate Pro makes no automatic transfers to members. | Section 4.3. Stripe transfers to members are Later. |
 | D10 | **Company defaults:** bookings are auto-assigned unless an Admin switches the company to manual assignment. Invites are single-use links shared through the system share sheet (no server-sent email yet). Contracts are countersigned automatically by a **designated signer**. | Sections 6, 8.8, 8.9. |
 | D11 | **Slate Pro hosts the delivery files.** A creator delivers photos and videos inside the app, and the client views and saves them there. Delivery by an external link stays as a fallback, for very large files or a creator who prefers their own host. | Section 5.5 and flow 8.12. Slate Pro becomes a host of people's files, so terms of use, reporting and takedown are launch requirements (R16). |
-| D12 | **Storage comes with the plan, and delivered files expire 30 days after delivery.** An Individual account has a storage allowance. A company's allowance grows with its billed seats. Files that are not saved in time are deleted. | Config values in 4.4. Expiry is final, and the app says so before and after delivery (R17). |
+| D12 | **Storage comes with the plan, and delivered files expire 30 days after delivery.** An Individual account has a storage allowance. A company's allowance grows with the people its plan covers. Files that are not saved in time are deleted. | Config values in 4.4. Expiry is final, and the app says so before and after delivery (R17). |
 | D13 | **Previews before payment, originals after.** As soon as files are delivered the client sees reduced, watermarked previews. They cannot save or share a preview. The originals can be saved only when nothing is owed on the booking. | The database decides this on every request, never the app. For hosted files the balance becomes payable at delivery (8.12). |
 | D14 | **Photos and videos both.** | Large video is the hard part (R15, R19). |
 | D15 | **Revisions are a second form of delivery, with no paywall.** After the client has paid, the creator can send revised or extra files that the client can save at once, with no payment step. | Section 5.5 and flow 8.12. A revision cannot exist while a balance is owed, so it is never a way around payment (R21). |
@@ -133,7 +134,7 @@ A person picks an account type in onboarding, right after signing in. The choice
 | Contracts are made with | The person (their legal name) | The company (its legal name), countersigned by a designated signer |
 | Money goes to | The person's Stripe Connect account | The company's own Stripe Connect account |
 | Calendar | One calendar | One calendar **per member**, with a team view |
-| Cost | Free | Per seat, billed with Stripe Billing (section 4.4) |
+| Cost | Free | A subscription bought in the app with Apple's purchase sheet: $5.99 a month for up to 5 people, bigger steps for more (D6, D7) |
 
 **Upgrade.** An Individual can become a Company from Profile at any time (flow in 8.7). Nothing is lost: services, packages and templates move to the new organization, while the personal profile, portfolio, availability and every existing booking and contract stay where they were and remain visible. Executed contracts and their bookings stay with the person (D8). The person becomes the Owner and their personal profile becomes their member sub-profile. The company profile starts prefilled from it (bio, location, specialties) and builds its own portfolio. A downgrade back to Individual is possible only when the Owner is the sole member (8.11).
 
@@ -194,10 +195,11 @@ Kept in one place per layer (`app_settings` in SQL, `TeamConfig` in Swift) so th
 
 | Key | Default | Meaning |
 |---|---|---|
-| `seats.minimum` | 10 | Billing floor: a company is billed for at least this many seats. |
-| `seats.maximum` | 250 | Most members a company can have, counting pending invites. |
+| `seats.minimum` | 5 | The people the smallest plan covers. |
+| `seats.maximum` | 250 | Most members any company can have, counting pending invites. A company with an Apple plan is held to what its plan covers (`apple_plans.seats`) if that is lower. |
 | `invites.expiry_days` | 7 | Lifetime of an invite link. |
-| `billing.grace_days` | 7 | How long a company stays usable after a failed seat payment before it becomes read only. |
+| `billing.grace_days` | 7 | How long a company stays usable after a failed plan payment (Apple's billing retry) before it becomes read only. Apple's own grace period, when it has one, is used instead if it is longer. |
+| `apple_plans` | 5, 10, 15, 20, 25 people | One row per subscription product: its product id, the people it covers, its order. The price and the 7-day trial are set in App Store Connect and shown from what Apple returns, never written in the app. |
 | `files.retention_days` | 30 | How long a delivery stays available, counted from the moment it is delivered. |
 | `files.draft_days` | 7 | How long files that were uploaded but never delivered are kept. |
 | `files.warn_days` | 7, 1 | Reminders to the client, in days before expiry, while anything is unsaved. |
@@ -211,9 +213,9 @@ Kept in one place per layer (`app_settings` in SQL, `TeamConfig` in Swift) so th
 | `files.url_minutes` | 15 | How long a download link works once the app has asked for it. |
 | `files.reservation_hours` | 24 | How long a file that was reserved but never finished uploading keeps its space. |
 
-Seat accounting: **seats used** = active members. **Seats billed** = `max(seats.minimum, seats used)`. Pending invites are not billed until accepted, but count toward `seats.maximum`. Seat additions are prorated by Stripe immediately. Reductions take effect at the next renewal, and the screen says exactly when and what changes before the Owner confirms.
+Seat accounting: **seats used** = active members. **People covered** = what the company's current plan covers (`apple_plans.seats`). Pending invites count toward the limit as soon as they are made. A company moving up a step pays Apple's prorated difference and the new step applies at once; moving down applies at the next renewal, and the screen says exactly when and what changes before the Owner confirms. If a plan that covers fewer people than the company has takes effect, the members stay and new invites wait until the company is under its limit. (Stripe's per-seat accounting, `seats billed = max(minimum, used)`, is still in the database for a possible website checkout and is not used by the app.)
 
-Storage accounting: **storage used** = the bytes of every file, original and preview, that is reserved, uploading or ready and not yet expired or removed, for the account on screen. A company's allowance is `files.quota_gb.per_seat` times its **billed** seats and is shared by everyone in it. Space is reserved when an upload starts and handed back if the upload is not finished within 24 hours. An upload that would go over the allowance is refused before any bytes are sent, and the message says how much is used and what the allowance is. Space comes back when files expire or the creator removes them. A lapsed company plan (4.3) keeps its files until they expire and takes no new uploads.
+Storage accounting: **storage used** = the bytes of every file, original and preview, that is reserved, uploading or ready and not yet expired or removed, for the account on screen. A company's allowance is `files.quota_gb.per_seat` times the people its plan covers and is shared by everyone in it. (How much storage each plan should carry, and whether extra storage is sold, is open: Q27.) Space is reserved when an upload starts and handed back if the upload is not finished within 24 hours. An upload that would go over the allowance is refused before any bytes are sent, and the message says how much is used and what the allowance is. Space comes back when files expire or the creator removes them. A lapsed company plan (4.3) keeps its files until they expire and takes no new uploads.
 
 ## 5. Core features
 
@@ -284,7 +286,7 @@ Everything in 5.1 applies to a company, owned by the organization instead of a p
 | Company payments | Deposits and balances go to the company's Stripe Connect account. | MVP |
 | Member split ledger | Optional per-member share recorded on each booking, shown in reports. | MVP |
 | Activity log | Who changed bookings, contracts, prices and team members. | MVP |
-| Seat billing | Stripe Billing per seat, with upgrade, downgrade and remove-member flows. | MVP |
+| Company plan | An Apple subscription in steps of 5 people with a 7-day trial: choose a plan after creating a company, move up when full, restore, manage or cancel in Apple's own screen. | MVP |
 | Account switcher | Move between Personal and each company, from Profile. | MVP |
 | Automatic Stripe transfers to members | Members connect their own account and shares are transferred. | Later |
 | SSO, SCIM, audit export | Enterprise administration. | Later |
@@ -416,7 +418,7 @@ erDiagram
 | **Membership** | organization id, user id, role (owner, admin, manager, creator, viewer), title, listed on the company page, bookable, split share (basis points), joined at, removed at | One active row per person per company. Removing a member sets `removed at` so history keeps its meaning. |
 | **Invite** | organization id, role, email (label only, optional), token hash, invited by, expires at, status (pending, accepted, revoked, expired), accepted by and at | The token is shown once, when the invite is created. Only its hash is stored. Single use. Never grants Owner. |
 | **PackageMember** | package id, user id | Present only for a per-member service. No rows means every bookable member can take the package. |
-| **OrgSubscription** | organization id, Stripe customer id, subscription id, status (none, trialing, active, past due, canceled), seats billed, seats scheduled for the next renewal, period end, grace until | Written from Stripe's signed webhook only, never by the app. |
+| **OrgSubscription** | organization id, provider (apple or stripe), Apple original transaction id, product id and environment (sandbox or production), people covered, status (none, trialing, active, past due, canceled), period end, trial end, whether it renews, grace until, when Apple last signed it | Written only from data Apple has signed, checked on the server (`apple-verify`, `apple-notifications`), never from what the app says. The Stripe fields are kept for a possible website checkout. |
 | **ActivityEntry** | organization id, actor (user id and a name snapshot), action, entity type and id, summary, metadata, timestamp | Append only. Written by triggers on bookings, contracts, packages, memberships and the organization, so no code path can forget. It is the company-level counterpart of AuditEvent. |
 | **PortfolioItem** | kind (image or video link), url, caption, order | Up to 12 per creator in the MVP. |
 | **Package** | **owner (creator id)**, name, description, category, duration, price, deposit rule, deliverables, turnaround days, location type, travel fee, cancellation policy, buffer before and after, template id, status (draft, active, archived) | Booking stores a **snapshot** of the fields below, so later edits never change an existing booking. |
@@ -519,7 +521,7 @@ stateDiagram-v2
 
 1. Company basics: company name, handle, categories, legal name and address ("used in your contracts").
 2. You as the Owner: your name and photo. If you have no person profile one is created here (A7).
-3. Plan: the seat floor, the per-seat price from Stripe, and a button that opens the Stripe checkout in a system web authentication sheet. Until the plan is active, the company can be set up but can't be published or invite anyone.
+3. Plan: as soon as the company exists, a sheet offers the plan with the price and the free week exactly as Apple returns them, Apple's required subscription wording, links to the terms and privacy policy, a Subscribe button (Apple's purchase sheet, which pays with Apple Pay, Wallet cards or Apple Account), and Restore Purchases. "Not now" is allowed. Until the plan is trialing or active, the company can be set up but can't be published or invite anyone.
 4. First shared service from a starter, with a starter template.
 5. Designated signer: you, with your stored signature, and the auto-countersign authorisation.
 6. Stripe Connect onboarding for the **company's own** Stripe account (or a payment link, section 8.17).
@@ -558,9 +560,9 @@ Balances on existing bookings are still paid to the personal Stripe account. Exi
 
 ### 8.11 Seats, plan changes and leaving
 
-- **Adding members.** Seats rise when an invite is accepted. The Owner sees "14 seats used, 14 billed, 250 maximum".
-- **Removing a member** (swipe on the member row, or Settings, Team). The confirmation says what happens: their future bookings return to the assignment queue, they lose access immediately, and the seat is released at the next renewal (never below the floor). If they are the designated signer, it says auto-countersign will stop until a new signer is chosen.
-- **Billing** (Owner): payment method, invoices and plan cancellation open in Stripe's hosted portal in a system sheet. A failed payment starts the grace period, and a banner tells the Owner and Admins.
+- **Adding members.** The Owner sees "3 of 5 people used". When the company is full, adding someone says so and offers the next plan ("Move to 10 people"), bought with Apple's purchase sheet. Only the Owner can buy.
+- **Removing a member** (swipe on the member row, or Settings, Team). The confirmation says what happens: their future bookings return to the assignment queue, they lose access immediately, and the seat is free to use again straight away. If they are the designated signer, it says auto-countersign will stop until a new signer is chosen.
+- **Billing** (Owner): the plan, what it covers, the renewal date, a button to change plan and one that opens Apple's own subscription screen to change the payment method or cancel. The subscription belongs to the Owner's Apple Account, so it is managed on a phone signed in to it (Restore Purchases finds it on a new one). A failed payment starts the grace period, and a banner tells the Owner and Admins.
 - **Cancel the plan.** At the end of the period the company becomes read only (lapsed). The Owner can resubscribe or downgrade.
 - **Downgrade to Individual.** Allowed when the Owner is the only member and nothing is held. The company's services move back to the person, the company page closes, and the company record is kept because executed contracts name it.
 - **Leave a company.** Any member except the Owner can leave from Settings, Team. Their bookings return to the queue.
@@ -827,7 +829,8 @@ Each of these follows the design rules in section 3: system components, sheets w
 | R6 | Sign in with Apple "Hide My Email" addresses only receive our email if our sending domain is registered with Apple's private email relay. | Register the sending domain before launch. Test delivery of the signed PDF to a relay address. |
 | R7 | Contract retention conflicts with account deletion. | Retain the executed contract and audit record, remove personal data where the law allows, and say so in the deletion flow. |
 | R8 | Chargebacks and disputes. | Contract plus audit certificate serve as evidence. Console supports manual handling in the MVP. |
-| R9 | **Seat billing and App Review.** Guideline 3.1.3(c) lets an app sold directly to organizations take payment outside In-App Purchase, but consumer and single-user sales must use IAP. A one-person "company" is a grey area, though the 10-seat floor prices the plan for organizations and Individual accounts stay free. | Check the current guideline text before submission. The fallback is StoreKit seat bands (the option declined in D6). |
+| R9 | **The company plan and App Review.** Guideline 3.1.1 requires In-App Purchase for features unlocked in the app, and 3.1.3(c) exempts only an app sold directly to organizations for their people, with consumer and single-user sales still on In-App Purchase. A $5.99 plan a one-person company can buy is a consumer-style sale. | Resolved by D6: the plan is an In-App Purchase. Stripe or PayPal buttons are not shown in the app (the US storefront may link out, and a website checkout could be added later; neither is built). The cost is Apple's 15% or 30%. |
+| R18 | **A subscription belongs to the buyer's Apple Account, not to the company.** If the Owner changes, or loses their Apple Account, the plan stays with the old account. | The Owner can restore on a new phone; the plan follows the company id (`appAccountToken`), so only a purchase made for that company is accepted. Handing a company to a new Owner while it is subscribed is a manual step for now. |
 | R10 | **Cross-company data exposure.** A role check missed in one function, or an owner id trusted from the client, could show one company's bookings or contracts to another. | Permissions are enforced in the database (row level security and function checks), never from the client. Tests try every permission with every role, plus a member of another company, and assert the refusal. |
 | R11 | **An upgrade leaves records split between a person and a company,** which can confuse accounting. | The upgrade summary says what moves and what stays. Records show whether they are Personal or the company's. The company's reports cover only the company. |
 | R12 | **A removed designated signer halts bookings.** | Removing or demoting the signer is warned about before it happens, and the company shows a banner until a new signer is chosen. |
@@ -872,10 +875,12 @@ Defaults in brackets are what this spec assumes if you don't change them.
 
 | # | Question | Default |
 |---|---|---|
-| Q19 | **Seat price and free trial length?** The price lives in a Stripe Price object configured outside the app, so the app only shows what Stripe returns. | Price set in Stripe, 14-day trial |
+| Q19 | **Plan price and free trial length?** | **Decided: $5.99 a month for the first plan (up to 5 people) and a 7-day free trial.** The price lives in App Store Connect, so the app only shows what Apple returns. |
+| Q26 | **What do the bigger plans (10, 15, 20, 25 people) cost?** | Not decided. Each step is its own product with its own price. |
+| Q27 | **How much storage should each plan carry, and is extra storage sold?** | Today a plan carries 50 GB for each person it covers (Q25). To be decided with the storage pricing, and likely sold as In-App Purchases too. |
 | Q20 | **May Creators add their own services,** or only Owner and Admin? | Owner and Admin only (`services.manage`) |
 | Q21 | **May a Viewer see money** (earnings and the split ledger)? | Viewers see `reports.view` totals, not the per-member split |
-| Q22 | **How long is the grace period** after a failed seat payment? | 7 days (`billing.grace_days`) |
+| Q22 | **How long is the grace period** after a failed plan payment? | 7 days (`billing.grace_days`), or Apple's own grace period if it is longer |
 | Q23 | **Should the company handle share a namespace with personal handles?** | Yes, one unique `handle` space |
 
 **Added in v0.3 (Slate Files).** Answered by the product owner and recorded as D11 to D15: Slate Pro hosts the files, storage comes with the plan, files expire after 30 days, previews before payment with no full downloads from them, photos and videos both, and free revisions after payment. These remain open:

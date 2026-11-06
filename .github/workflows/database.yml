@@ -57,6 +57,7 @@ jobs:
       - run: python ios/supabase/tests/team_rules.py
       - run: python ios/supabase/tests/company_rules.py
       - run: python ios/supabase/tests/billing_rules.py
+      - run: python ios/supabase/tests/apple_plan_rules.py
       - run: python ios/supabase/tests/search_rules.py
       - run: python ios/supabase/tests/featured_rules.py
       - run: python ios/supabase/tests/card_rules.py

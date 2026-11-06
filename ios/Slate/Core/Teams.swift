@@ -191,7 +191,7 @@ struct TeamConfig: Codable, Equatable, Hashable {
     /// How long a company keeps working after a payment fails.
     var graceDays: Int
 
-    static let standard = TeamConfig(seatMinimum: 10, seatMaximum: 250, inviteExpiryDays: 7, graceDays: 7)
+    static let standard = TeamConfig(seatMinimum: 5, seatMaximum: 250, inviteExpiryDays: 7, graceDays: 7)
 }
 
 // MARK: - Seats

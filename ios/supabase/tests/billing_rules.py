@@ -136,6 +136,10 @@ def sub_row(org):
     return a.fetchone()
 
 
+# The examples below are for the Stripe per-seat path, which they worked out with a floor of 10 seats. The shipped floor
+# is 5 (the smallest Apple plan, see apple_plan_rules.py), so these tests set the older number for themselves.
+a.execute("update app_settings set value = jsonb_set(value, '{minimum}', '10') where key = 'seats'")
+
 # =============================================================================
 print("\n[the seat rule, against the shared fixture]")
 fx = json.loads((FIXTURES / "seat_rules.json").read_text())

@@ -149,8 +149,11 @@ def join(org, inviter, role, uid, name=None):
 # =============================================================================
 print("\n[settings and the shared permission table]")
 cfg = rpc(None, "team_config", role="anon")
+plans = [(x["product_id"], x["seats"]) for x in cfg.get("apple_plans", [])]
 check("team_config answers anyone with the defaults",
-      cfg == dict(seat_minimum=10, seat_maximum=250, invite_expiry_days=7, grace_days=7), cfg)
+      {k: v for k, v in cfg.items() if k != "apple_plans"} == dict(seat_minimum=5, seat_maximum=250, invite_expiry_days=7, grace_days=7), cfg)
+check("...and the plans on offer, smallest first",
+      plans == [(f"com.slateproapp.app.company.team{n}", n) for n in (5, 10, 15, 20, 25)], plans)
 check("the settings table is closed to the API", isinstance(sql_as(new_user(), "select * from app_settings"), str))
 bad = None
 try:
@@ -160,7 +163,7 @@ except psycopg2.Error as e:
 check("a seat maximum below the minimum is refused", bad is not None)
 a.execute("update app_settings set value = '{\"minimum\": 4, \"maximum\": 6}' where key = 'seats'")
 check("changing the setting changes the config the app reads", rpc(None, "team_config", role="anon")["seat_maximum"] == 6)
-a.execute("update app_settings set value = '{\"minimum\": 10, \"maximum\": 250}' where key = 'seats'")
+a.execute("update app_settings set value = '{\"minimum\": 5, \"maximum\": 250}' where key = 'seats'")
 
 fx = json.loads((FIXTURES / "team_permissions.json").read_text())
 wrong = []

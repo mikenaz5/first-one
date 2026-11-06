@@ -577,9 +577,9 @@ for who, name, ok in [(olivia, "the Owner", True), (dee, "an Admin", True), (mia
     got = rpc(who, "files_reserve", b_acme, "photo", "co.heic", "image/heic", 1, 1, None, 1_000, 100)
     check(f"at a company, {name} {'can' if ok else 'can not'} add files", isinstance(got, dict) if ok else err(got, "not_found"), got)
 check("a company's files count against the company, not the person", usage(ORG) == 4 * 1_100 and usage(cal) == 0)
-check("the company's allowance is per billed seat", one("select files_owner_allowance_bytes(%s)", (ORG,)) == 500_000_000_000)
+check("the company's allowance is per person, the team's size with no plan yet (six here, never fewer than the floor of 5)", one("select files_owner_allowance_bytes(%s)", (ORG,)) == 300_000_000_000)
 a.execute("delete from delivery_files where booking_id = %s", (b_acme,))
-check("who can see the company's figures", rpc(olivia, "files_storage_usage", ORG)["allowance_bytes"] == 500_000_000_000
+check("who can see the company's figures", rpc(olivia, "files_storage_usage", ORG)["allowance_bytes"] == 300_000_000_000
       and rpc(dee, "files_storage_usage", ORG)["used_bytes"] is not None)
 check("not a stranger", err(rpc(stranger, "files_storage_usage", ORG), "not_found"))
 check("a person sees their own", rpc(carol, "files_storage_usage", carol)["allowance_bytes"] == 50_000_000_000)
