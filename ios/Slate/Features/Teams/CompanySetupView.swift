@@ -22,6 +22,7 @@ struct CompanySetupView: View {
     @State private var prepared = false
     @State private var isSaving = false
     @State private var created = false
+    @State private var showPlan = false
 
     private var isOnboarding: Bool { onBack != nil }
     /// A person starting out with a company has no profile of their own yet, so the team needs a name for them.
@@ -61,6 +62,7 @@ struct CompanySetupView: View {
         }
         .onAppear(perform: prepare)
         .sensoryFeedback(.success, trigger: created)
+        .sheet(isPresented: $showPlan, onDismiss: { onDone?() }) { PlanSheet() }
     }
 
     // MARK: Layouts
@@ -257,7 +259,12 @@ struct CompanySetupView: View {
                 try await model.upgradeToCompany(organizationDraft, location: draft.location, avatarJPEG: draft.avatarJPEG)
             }
             created = true
-            onDone?()
+            if model.shouldOfferPlan {
+                // The plan sheet comes first; whichever way it closes, the flow carries on (see `.sheet` below).
+                showPlan = true
+            } else {
+                onDone?()
+            }
         } catch SlateError.handleTaken {
             draft.handleStatus = .taken
             model.show(SlateError.handleTaken, title: "Choose another link name")
@@ -316,7 +323,7 @@ struct UpgradeSheet: View {
                     .card()
 
                     Label {
-                        Text("Companies are billed per seat, for at least \(model.teamConfig.seatMinimum) seats. You choose the plan after the company is set up.")
+                        Text("A company needs a plan, bought with Apple's purchase sheet. The first plan covers up to \(model.teamConfig.seatMinimum) people. You choose it right after the company is set up.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } icon: {

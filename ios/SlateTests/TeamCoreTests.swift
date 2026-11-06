@@ -158,9 +158,10 @@ final class TeamRulesTests: XCTestCase {
 
     func testTheSeatSentenceSaysWhenTheBillChanges() {
         let config = TeamConfig.standard
-        XCTAssertTrue(SeatPlan.make(used: 3, delta: 1, config: config).billingSentence(periodEnd: nil).contains("at least 10"))
-        XCTAssertTrue(SeatPlan.make(used: 10, delta: 1, config: config).billingSentence(periodEnd: nil).contains("charged now"))
-        XCTAssertTrue(SeatPlan.make(used: 11, delta: -1, config: config).billingSentence(periodEnd: nil).contains("next invoice"))
+        let floor = config.seatMinimum
+        XCTAssertTrue(SeatPlan.make(used: floor - 2, delta: 1, config: config).billingSentence(periodEnd: nil).contains("at least \(floor)"))
+        XCTAssertTrue(SeatPlan.make(used: floor, delta: 1, config: config).billingSentence(periodEnd: nil).contains("charged now"))
+        XCTAssertTrue(SeatPlan.make(used: floor + 1, delta: -1, config: config).billingSentence(periodEnd: nil).contains("next invoice"))
     }
 
     func testTheActiveAccountSurvivesBeingStoredAsText() {

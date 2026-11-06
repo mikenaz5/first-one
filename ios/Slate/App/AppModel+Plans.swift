@@ -9,6 +9,13 @@ extension AppModel {
     /// Only the Owner buys and manages the company's plan.
     var canBuyPlan: Bool { organization?.can(.billingManage) == true }
 
+    /// True right after a company is made, while it has no working plan: the plan sheet is offered. Never in on-device mode,
+    /// where no plan is needed, and never to someone who can't buy.
+    var shouldOfferPlan: Bool {
+        guard let plan = organization?.plan else { return false }
+        return plan.required && !plan.isOK && canBuyPlan && planStore.canBuy
+    }
+
     /// The steps with the price and free trial Apple will show this person.
     func loadPlanListings() async throws -> [PlanListing] {
         try await planStore.listings(for: planOffers)

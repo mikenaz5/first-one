@@ -9,7 +9,8 @@ Plain steps, in order. Nothing here needs you to write code. Where a step says "
 3. **Xcode:** sign in with your Apple ID (Part C).
 4. **TestFlight:** run one line in Terminal, then install the app on your own iPhone (Part D).
 5. **The store page:** words, pictures and privacy answers (Part E).
-6. **Submit for review**, after the checklist in Part F.
+6. **The company plan:** set up the subscription in App Store Connect and try it from TestFlight (Part G).
+7. **Submit for review**, after the checklist in Part F.
 
 Apple usually takes a day or two to approve an enrollment, and one to three days to review a first submission. Parts A to D can be done as soon as your account is active; E and F can be prepared now.
 
@@ -192,7 +193,9 @@ Paste this into **App Review Information ▸ Notes** and edit it:
 >
 > To sign in, use "Continue with Apple". No other account is needed. (An email-code sign-in also exists for clients.)
 >
-> Payments are for real-world services (a photo shoot), paid to the creator's own Stripe account, so In-App Purchase does not apply. Company accounts pay a per-seat subscription for team features; this is an organisation plan sold to businesses and handled on the web (guideline 3.1.3(c)).
+> Payments for a photo shoot are for a real-world service, paid to the creator's own Stripe account, so In-App Purchase does not apply to them. The company plan (team features inside the app) is an auto-renewable In-App Purchase subscription in the group "Company plan"; there is no other way to buy it in the app.
+>
+> To see it: sign in with Apple, choose "My company", fill in the company's details, and the plan sheet opens. Purchases made in review are sandbox purchases and are recognised by the server.
 >
 > Account deletion: Settings ▸ Delete account.
 > Reporting content: [say where, once report and block are built].
@@ -211,13 +214,56 @@ Paste this into **App Review Information ▸ Notes** and edit it:
 | ☐ | **Report and block** for messages and reviews (guideline 1.2: apps with user-written content). Files can be reported today | **Me** | Not built. Next |
 | ☐ | **Revoke Sign in with Apple when an account is deleted** (guideline 5.1.1(v)) | **Me**, with the key from A7 | Not built |
 | ☐ | **Something for the reviewer to try.** A sample creator with a profile, a package and a payment link on the real server, so the reviewer can book without paying real money (guideline 2.1: the app must be fully usable in review) | **Me** and you | Not built |
-| ☐ | **Seat billing and Apple's rules.** Selling a company plan on the web instead of through In-App Purchase is allowed for organisations (3.1.3(c)) but is a grey area for one-person companies. Re-read the current guideline text before submitting. The fallback is In-App Purchase seat bands | **You** decide | Risk R9 in [`../../SPEC.md`](../../SPEC.md) |
+| ☐ | **The company plan is an In-App Purchase** (guideline 3.1.1), so Apple's rules are met. Everything in Part G is set up, the subscriptions show "Ready to Submit", and they are added to the version you submit | You, with me | Risk R9 in [`../../SPEC.md`](../../SPEC.md), resolved by decision D6 |
 | ☐ | **Stripe tested in a sandbox**: connect a creator, pay a deposit, refund (see "Known gaps" in the README: none of it has run against Stripe yet) | You, with me | Not yet |
 | ☐ | **iPad or iPhone only?** The app is set to run on both, but no one has tried it on an iPad. Choosing iPhone only for 1.0 means no iPad screenshots and no iPad layout to be rejected for | **You** decide | Say the word and I flip the setting |
 | ☐ | **Privacy answers (Part E) match** the policy and the manifest | You | Written |
 | ☐ | **A real iPhone has run it** from TestFlight, start to finish: sign in, make a profile, book, sign, pay | You | After D4 |
 
 What is already done in the project for you: the privacy manifest (checked on every build), the app icon (1024 px, no transparency, which Apple insists on), the permission wording iOS shows (calendar, photos, location), "Delete account" inside the app, Sign in with Apple offered next to email codes, the export-encryption answer, the product name, and the upload script.
+
+---
+
+## Part G. The company plan: a subscription in App Store Connect
+
+A company pays for its plan inside the app with Apple's own purchase sheet (Apple Pay, a card in your Wallet, or Apple Account balance). The first plan covers up to 5 people for $5.99 a month with a 7-day free week; bigger teams buy a bigger plan. Apple moves its screens around from time to time. If a name below isn't where I say, tell me what you see and I'll adjust.
+
+**G1. Let Apple pay you.** In App Store Connect open **Business** (called *Agreements, Tax, and Banking* in older versions). Next to **Paid Apps** choose to set it up: accept the agreement, add your **bank account** and your **tax forms**. When its status says **Active**, subscriptions can be sold and tested. This can take a day or two for Apple to check.
+
+**G2. Join the Small Business Program (as you planned).** Go to developer.apple.com/app-store/small-business-program and enroll. It drops Apple's cut from 30% to 15% while you earn under $1 million a year. Only the Account Holder can do it. Apply early: it starts at the beginning of Apple's next billing month after approval.
+
+**G3. Make the group.** Open your app in App Store Connect, then **Monetization ▸ Subscriptions** (in the left list), and press **Create** under *Subscription Groups*. Name it `Company plan`. A group is the set of plans a company moves between.
+
+**G4. Add the five plans.** Inside the group, add a subscription for each row. The **Product ID** has to match exactly (copy it); nothing else in the app or server needs changing when you do.
+
+| Reference name | Product ID | Covers | Duration |
+|---|---|---|---|
+| Company, up to 5 people | `com.slateproapp.app.company.team5` | 5 | 1 month |
+| Company, up to 10 people | `com.slateproapp.app.company.team10` | 10 | 1 month |
+| Company, up to 15 people | `com.slateproapp.app.company.team15` | 15 | 1 month |
+| Company, up to 20 people | `com.slateproapp.app.company.team20` | 20 | 1 month |
+| Company, up to 25 people | `com.slateproapp.app.company.team25` | 25 | 1 month |
+
+For each one:
+
+1. **Price:** the first is **$5.99**. The prices of the others are yours to choose (tell me and I'll note them in the spec; the app shows whatever Apple holds, so nothing changes in the app).
+2. **Localization (English):** *Display name* `Company plan, up to 5 people` (change the number), *Description* `Shared services, one calendar and bookings in your company's name, for up to 5 people.`
+3. **Introductory offer:** for new subscribers, type **Free**, duration **1 week**. (Do this on all five; Apple gives one free week per person for the whole group.)
+4. **Review screenshot:** a picture of the plan sheet in the app. Take it from TestFlight once the new build is on your phone (Part D). Apple needs it before it will review the plan, though not for testing.
+
+**G5. Order the plans.** In the group, put them in order of level, the biggest (25) on top and the smallest (5) at the bottom. That is what makes moving to a bigger plan take effect at once (with Apple charging only the difference) and moving to a smaller one wait for the next renewal. Give the group a display name too: `Slate Pro company plan`.
+
+**G6. Tell Apple where to send news.** Open the app's page, then **General ▸ App Information**, and find **App Store Server Notifications**. Paste the address below into **both** the Production Server URL and the Sandbox Server URL, and choose **Version 2**:
+
+`https://YOUR-PROJECT.supabase.co/functions/v1/apple-notifications`
+
+(Replace `YOUR-PROJECT` with your project's name; `bash scripts/setup-server.sh` prints the whole address for you at the end.) This is how the server hears about renewals, failed payments, refunds and cancellations.
+
+**G7. Put the checks on the server.** Run `bash scripts/setup-server.sh` again (the same as in the README). It puts two small server functions online, `apple-verify` and `apple-notifications`, and asks for the app's **Apple ID**: the number shown under *General ▸ App Information ▸ Apple ID* on the app's page. It is not a secret. You can press Return to skip it while you are only trying things in TestFlight.
+
+**G8. Try it.** Install the new build from TestFlight (Part D). Sign in, choose **My company**, fill in the details, and the plan sheet opens. Pick a plan and tap **Start free trial**. Apple's purchase sheet says *[Environment: Sandbox]*: you are not charged, and the plan renews every few minutes instead of every month so you can watch it. Then open **Settings ▸ Billing**: it should say *Free trial* and *Covers up to 5 people*. Try inviting a sixth person: it should offer the next plan.
+
+**G9. When you submit the app** (Part F), open the version page and add the five subscriptions under **In-App Purchases and Subscriptions** so they go to review together with the app. The first time, Apple will not accept the app without them.
 
 ---
 

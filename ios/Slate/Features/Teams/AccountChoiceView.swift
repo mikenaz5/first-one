@@ -120,7 +120,7 @@ struct AccountChoiceView: View {
                     ChoiceCard(
                         symbol: "building.2",
                         title: "My company",
-                        subtitle: "A team of \(model.teamConfig.seatMinimum) or more",
+                        subtitle: "For a team or a studio",
                         points: [
                             "A company page, with a profile for each person",
                             "Roles, shared services and one team calendar",

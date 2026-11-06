@@ -77,7 +77,7 @@ xcodebuild test -project Slate.xcodeproj -scheme Slate \
 
 ### Using a real Supabase project
 
-**The short way:** make the project in the Supabase dashboard, then from `ios/` run `bash scripts/setup-server.sh`. It asks for the project URL and the *publishable* key (never the secret key; it refuses one), logs in to Supabase, links the folder, puts the database and the first functions (`delete-account`, `calendar-feed`) online, and offers to point the app at the project. Pointing the app at a server removes the on-device demo account (delete `Config/Secrets.xcconfig` to get it back), and creators then sign in with Sign in with Apple, which needs the steps below. The payments, push and billing functions are turned on in their own sections further down. The long way, step by step:
+**The short way:** make the project in the Supabase dashboard, then from `ios/` run `bash scripts/setup-server.sh`. It asks for the project URL and the *publishable* key (never the secret key; it refuses one), logs in to Supabase, links the folder, puts the database and the first functions (`delete-account`, `calendar-feed`, and the two that check Apple purchases for the company plan, `apple-verify` and `apple-notifications`) online, asks for the app's Apple ID (optional, for real purchases), and offers to point the app at the project. Pointing the app at a server removes the on-device demo account (delete `Config/Secrets.xcconfig` to get it back), and creators then sign in with Sign in with Apple, which needs the steps below. The payments, push and billing functions are turned on in their own sections further down. The long way, step by step:
 
 1. Create a project. Install the [Supabase CLI](https://supabase.com/docs/guides/cli), then from `ios/`:
    ```sh
@@ -289,11 +289,22 @@ An Admin can invite and manage Managers, Creators and Viewers but not other Admi
 
 **Payments** go to the company's own Stripe Connect account (the Owner sets it up under Services ▸ Payments). With splitting on, the Owner sets a share per person and each booking records it for reports; Slate Pro makes no transfers to members.
 
-**Numbers you can change.** Seat minimum (10, the billing floor: a team of four is billed for ten) and maximum (250), how long an invite lives (7 days) and the grace period after a failed payment (7 days) are rows in `app_settings`, read by the app through `team_config()`. To change one, update the row, for example `update app_settings set value = '{"minimum": 5, "maximum": 100}' where key = 'seats';`. The seat maximum counts invites that are still pending. On-device the same numbers come from `TeamConfig.standard`.
+**Numbers you can change.** The smallest plan's size (5), the most people any company can have (250), how long an invite lives (7 days) and the grace period after a failed payment (7 days) are rows in `app_settings`, read by the app through `team_config()`. To change one, update the row, for example `update app_settings set value = '{"minimum": 5, "maximum": 100}' where key = 'seats';`. The maximum counts invites that are still pending. On-device the same numbers come from `TeamConfig.standard`. The plan steps (which product covers how many people) are rows in `apple_plans`.
 
-### Turning on seat billing
+### The company plan (an Apple In-App Purchase)
 
-A company pays for seats with one Stripe Billing subscription (no In-App Purchase). Until you do this, a company can be set up but takes no members and no bookings.
+A company's Owner buys the plan inside the app with Apple's purchase sheet (it pays with Apple Pay, a card in Wallet or Apple Account balance, so Stripe and PayPal are not offered in the app; Apple's guideline 3.1.1 requires In-App Purchase for features unlocked in the app). The first step covers up to 5 people at $5.99 a month with a 7-day free week; bigger teams buy a bigger step (10, 15, 20, 25), each its own subscription product in one group. A company can't take more people than its plan covers, and moving up a step takes effect at once. **To set it up, follow Part G of [`docs/APP_STORE.md`](docs/APP_STORE.md).** The pieces:
+
+- The app (`PlanSheet`, `BillingView`, `AppModel+Plans`, `StoreKitPlanStore`) shows the steps with the price and trial Apple returns, makes the purchase with the company's id as its account token, and hands the server what Apple signed. A purchase is finished only after the server has recorded it, so a dropped connection never loses a payment: Apple hands it back.
+- `apple-verify` (the Owner's app, after a purchase and whenever Billing opens) and `apple-notifications` (Apple's own news: renewals, failed payments, refunds, cancellations; deployed with `--no-verify-jwt`) check Apple's **signature** with Apple's own library against Apple's root certificate (`_shared/apple_roots.ts`, fingerprint-tested), then record the plan with `apple_record_subscription`. No Apple key is needed. The logic is `_shared/apple_plan.ts` and `_shared/apple_signed.ts`, tested in `function-tests` with real signatures from a made-up certificate chain. The app can never say a plan is paid.
+- The database (`…_apple_plans.sql`, tested by `supabase/tests/apple_plan_rules.py`) keeps the plan in `org_subscriptions` (provider `apple`), caps a company at what its plan covers (`org_seat_cap`, so `seats.maximum` in the app is the company's own limit), sizes storage by the people the plan covers, and `billing_sweep()` ends a plan Apple stopped reporting. Nobody is removed when a plan shrinks; the company just takes no new invites until it is under its limit.
+- `APPLE_APP_ID` (a number, not a secret) lets the server verify real Production purchases; TestFlight and sandbox purchases work without it. `APPLE_BUNDLE_ID` defaults to `com.slateproapp.app`.
+
+**Never exercised:** the purchase itself against Apple (no one has bought a plan in TestFlight yet), the Edge Functions on a live Supabase project (the signature checking is tested under Node with Apple's library, not under Supabase's Deno), and Apple's notifications arriving. Expect to fix small things the first time.
+
+### The older seat billing (Stripe, not used by the app)
+
+Before the company plan became an In-App Purchase, a company paid for seats with one Stripe Billing subscription. The database, functions and tests for it are still here, switched off in the app (the Billing screen no longer opens Stripe), in case a website checkout is added later. Notes on it: a company can be set up but takes no members and no bookings until a plan is recorded.
 
 1. In Stripe, make a Product with a recurring monthly Price per unit (one seat) and copy the price id.
 2. `supabase secrets set STRIPE_SEAT_PRICE_ID=price_...` (billing stays off without it).
@@ -304,7 +315,7 @@ A company pays for seats with one Stripe Billing subscription (no In-App Purchas
 
 **Never exercised:** Stripe Billing itself (Checkout, the portal, the webhook events, proration), the Supabase calls behind the team screens against a live project, and a second real phone joining through an invite link. The SQL is tested against a real Postgres and the Swift decodes the rows that Postgres actually returned (`SlateTests/Fixtures/team_rows.json`, written by `supabase/tests/dump_team_rows.py` and checked in CI so it cannot drift).
 
-**On a device with no server,** billing is unavailable (the Billing screen says so), and since there is no second phone, *Invite ▸ Add pretend teammate* adds someone by name to try roles, assignment and the calendar alone. Signed in as one person, `LocalBackend.actAs` (used by the tests) is how other team members' views are checked.
+**On a device with no server,** no plan is needed and nothing can be bought (the Billing screen says so), and since there is no second phone, *Invite ▸ Add pretend teammate* adds someone by name to try roles, assignment and the calendar alone. Signed in as one person, `LocalBackend.actAs` (used by the tests) is how other team members' views are checked.
 
 ## Cards on file
 
@@ -332,7 +343,7 @@ A creator can deliver the finished photos and videos inside Slate Pro instead of
 
 | Step | Who | What happens |
 |---|---|---|
-| **Add files** | Creator | Each file is checked *before* it is sent: not empty, a photo up to 100 MB or a video up to 4 GB, a delivery of up to 1,000 files, and room in the storage allowance (50 GB for a person; 50 GB per billed seat for a company, shared by everyone in it). It is a cap on what is stored at once, not a monthly amount: a delivery's space comes back when it expires after 30 days, or when the creator removes a file. There is no paid extra storage yet. The phone makes the small copy (a watermarked picture, or a reduced watermarked video, for the first delivery; only a small unmarked picture for a revision), asks the database for room (`files_reserve`), sends the two files straight to private storage, and asks the database to check what arrived (`files_finalize`). A file that fails shows why and can be retried; one that arrives bigger than it said is deleted and refused. |
+| **Add files** | Creator | Each file is checked *before* it is sent: not empty, a photo up to 100 MB or a video up to 4 GB, a delivery of up to 1,000 files, and room in the storage allowance (50 GB for a person; 50 GB per person the company's plan covers, shared by everyone in it). It is a cap on what is stored at once, not a monthly amount: a delivery's space comes back when it expires after 30 days, or when the creator removes a file. There is no paid extra storage yet. The phone makes the small copy (a watermarked picture, or a reduced watermarked video, for the first delivery; only a small unmarked picture for a revision), asks the database for room (`files_reserve`), sends the two files straight to private storage, and asks the database to check what arrived (`files_finalize`). A file that fails shows why and can be retried; one that arrives bigger than it said is deleted and refused. |
 | **Deliver** | Creator | `files_deliver` makes the draft a delivery: it starts the 30 days, marks the booking delivered and received (so the balance becomes payable, with no confirm step), completes a booking that owes nothing, and tells the client. The sheet says what will happen and that Slate Pro is not an archive. |
 | **Preview and pay** | Client | Previews open at once, full screen, with no Save or Share. **Pay to unlock downloads** is the same Apple Pay balance payment as ever. The originals open only when the database says nothing is owed, checked every time a link is made, so a link for a locked original can't be made at all. |
 | **Save** | Client | **Save to Photos**, **Save to Files…**, or **Save all** (one after another, with progress and Cancel). The page shows "Saved 12 of 48", and so does the creator. |
@@ -407,9 +418,9 @@ ios/
     Fixtures/file_rows.json         What the files functions really return, written by file_rules.py --dump from a real Postgres
   supabase/
     migrations/               Schema, security and the booking, contract, payment, messaging and delivery functions
-    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, search_rules.py, featured_rules.py, card_rules.py, file_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
-    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts) the card ones (card-setup, card-sync, card-remove, card-redirect, charge-saved-card; _shared/cards.ts) expire-files (_shared/files.ts) and calendar-feed (_shared/calendar.ts)
-    function-tests/           Node tests and type-check for the payment, push, billing, card and files logic
+    tests/                    Postgres rule tests: booking_rules.py, team_rules.py, company_rules.py, billing_rules.py, apple_plan_rules.py, search_rules.py, featured_rules.py, card_rules.py, file_rules.py, and dump_team_rows.py (--check compares its output with the Swift fixture)
+    functions/                Edge Functions: delete-account, the payment ones (logic in _shared/payments.ts), send-push (_shared/push.ts, apns.ts) the seat billing ones (billing-session, billing-redirect, billing-sync; _shared/billing.ts) the Apple plan ones (apple-verify, apple-notifications; _shared/apple_plan.ts, apple_signed.ts, apple_roots.ts) the card ones (card-setup, card-sync, card-remove, card-redirect, charge-saved-card; _shared/cards.ts) expire-files (_shared/files.ts) and calendar-feed (_shared/calendar.ts)
+    function-tests/           Node tests and type-check for the payment, push, billing, Apple plan, card and files logic
 ```
 
 The design system is `Slate/DesignSystem/DesignSystem.swift` (spacing, radii, colors, type scale, card styles, motion) plus `Components.swift`. Everything is built from system fonts, system colors and SF Symbols, so Dark Mode, Dynamic Type and OS-level visual updates apply automatically.

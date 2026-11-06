@@ -1,20 +1,23 @@
-import AuthenticationServices
+import StoreKit
 import SwiftUI
 
-/// The company's plan: what it costs in seats, where the plan stands, and the Stripe pages that change it.
+/// The company's plan: what it covers, where it stands, and the ways to change it. The plan is bought with Apple's purchase
+/// sheet and managed in Apple's own subscription screen, so there is no card to enter here.
 struct BillingView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
 
     @State private var overview: BillingOverview?
     @State private var failure: String?
-    @State private var isOpening = false
+    @State private var showPlans = false
+    @State private var showManage = false
+    @State private var isRestoring = false
+    @State private var restoreNote: String?
 
     var body: some View {
         List {
             if let overview {
                 planSection(overview)
-                seatsSection(overview)
+                peopleSection(overview)
                 if overview.plan.required { actionSection(overview) }
             } else if let failure {
                 Section {
@@ -42,7 +45,15 @@ struct BillingView: View {
         .navigationTitle("Billing")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
-        .task { await load() }
+        .task {
+            await load()
+            // Quietly tell the server what this Apple Account holds, so a renewal is noticed even if Apple's own message
+            // to the server went astray.
+            await model.syncPlanWithStore()
+            await load()
+        }
+        .sheet(isPresented: $showPlans, onDismiss: { Task { await load() } }) { PlanSheet() }
+        .manageSubscriptionsSheet(isPresented: $showManage)
     }
 
     // MARK: Sections
@@ -58,6 +69,10 @@ struct BillingView: View {
                     Image(systemName: plan.isOK ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(plan.isOK ? Color.slateSuccess : Color.slateWarning)
                 }
+                if let covered = plan.seatsCovered, plan.required {
+                    Text("Covers up to \(covered) people.")
+                        .font(.subheadline)
+                }
                 if let banner = plan.banner {
                     Text(banner).font(.subheadline).foregroundStyle(.secondary)
                 } else if !plan.required {
@@ -70,7 +85,7 @@ struct BillingView: View {
                         .foregroundStyle(.secondary)
                 }
                 if let trialEnd = overview.trialEnd, plan.status == .trialing {
-                    Text("Trial ends on \(trialEnd.formatted(date: .abbreviated, time: .omitted)).")
+                    Text("Free trial ends on \(trialEnd.formatted(date: .abbreviated, time: .omitted)).")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -83,20 +98,26 @@ struct BillingView: View {
             .listRowBackground(Color.slateCard)
     }
 
-    private func seatsSection(_ overview: BillingOverview) -> some View {
+    private func peopleSection(_ overview: BillingOverview) -> some View {
         let seats = overview.seats
         return Section {
             LabeledContent("People on the team", value: "\(seats.used)")
             if seats.pending > 0 {
                 LabeledContent("Invited, not joined yet", value: "\(seats.pending)")
             }
-            LabeledContent("Seats billed", value: "\(seats.billed)")
-            LabeledContent("Smallest plan", value: "\(seats.minimum) seats")
-            LabeledContent("Largest team", value: "\(seats.maximum) seats")
+            if overview.plan.required, overview.plan.seatsCovered != nil {
+                LabeledContent("Places left", value: "\(seats.remaining)")
+            }
         } header: {
-            Text("Seats")
+            Text("People")
         } footer: {
-            Text("You pay for each seat. Adding someone charges the rest of this period at once; removing someone lowers your next invoice, with no refund for the period already paid. You're always billed for at least \(seats.minimum) seats.")
+            if overview.plan.required {
+                if let covered = overview.plan.seatsCovered {
+                    Text("Your plan covers up to \(covered) people, counting open invites. When you're full, move to the next plan: Apple charges only the difference for the rest of the period.")
+                } else {
+                    Text("A plan covers up to \(model.teamConfig.seatMinimum) people to start, and bigger ones cover more.")
+                }
+            }
         }
             .listRowBackground(Color.slateCard)
     }
@@ -105,19 +126,34 @@ struct BillingView: View {
         let hasPlan = overview.plan.status != .none && overview.plan.status != .canceled
         return Section {
             Button {
-                Task { await open(hasPlan ? .portal : .checkout) }
+                showPlans = true
+            } label: {
+                Text(hasPlan ? "Change plan" : "Choose a plan")
+                    .frame(minHeight: Metrics.minTapTarget)
+            }
+            if hasPlan {
+                Button {
+                    showManage = true
+                } label: {
+                    Text("Manage subscription")
+                        .frame(minHeight: Metrics.minTapTarget)
+                }
+            }
+            Button {
+                Task { await restore() }
             } label: {
                 HStack {
-                    Text(hasPlan ? "Manage billing" : "Choose a plan")
-                    if isOpening { Spacer(); ProgressView() }
+                    Text("Restore Purchases")
+                    if isRestoring { Spacer(); ProgressView() }
                 }
                 .frame(minHeight: Metrics.minTapTarget)
             }
-            .disabled(isOpening)
+            .disabled(isRestoring)
         } footer: {
-            Text(hasPlan
-                 ? "Stripe's pages let you change the card, read invoices, or cancel at the end of the period."
-                 : "Stripe collects the card on its own pages. Slate Pro never sees it.")
+            VStack(alignment: .leading, spacing: Space.xs) {
+                if let restoreNote { Text(restoreNote) }
+                Text("Apple handles payment: Apple Pay, a card in your Wallet or your Apple Account balance. Slate Pro never sees your card. Manage Subscription opens Apple's own screen to change the payment method or cancel. If you subscribed on another phone, Restore Purchases finds it.")
+            }
         }
             .listRowBackground(Color.slateCard)
     }
@@ -133,20 +169,16 @@ struct BillingView: View {
         }
     }
 
-    private func open(_ action: BillingAction) async {
-        isOpening = true
-        defer { isOpening = false }
+    private func restore() async {
+        isRestoring = true
+        defer { isRestoring = false }
+        restoreNote = nil
         do {
-            let url = try await model.beginBilling(action)
-            do {
-                _ = try await webAuthenticationSession.authenticate(using: url, callbackURLScheme: AppConfig.urlScheme)
-            } catch {
-                // Closing the page early is fine; Stripe keeps where they got to.
-            }
-            await model.billingReturned()
+            let found = try await model.restorePlan()
+            restoreNote = found ? "Your plan is active." : "No plan for this company was found on this Apple Account."
             await load()
         } catch {
-            model.show(error, title: "Couldn't open billing")
+            model.show(error, title: "Couldn't restore")
         }
     }
 }

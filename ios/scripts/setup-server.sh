@@ -104,6 +104,18 @@ deploy calendar-feed --no-verify-jwt
 deploy apple-verify || say "The Apple purchase check (apple-verify) couldn't go online. The company plan won't work until it does; send Claude this window."
 deploy apple-notifications --no-verify-jwt || say "The Apple notification receiver (apple-notifications) couldn't go online. Renewals and cancellations won't reach the server until it does; send Claude this window."
 
+# The company plan's real (not TestFlight) purchases are checked against the app's Apple ID, the number App Store Connect shows
+# on the app's page (General, App Information, "Apple ID"). It isn't a secret, and TestFlight and sandbox purchases work without it.
+apple_id=$(ask "App Store Connect Apple ID of the app, digits only (press Return to skip for now): ")
+apple_id=$(printf '%s' "$apple_id" | tr -d '[:space:]')
+if [[ "$apple_id" =~ ^[0-9]{6,12}$ ]]; then
+  say "Telling the server the app's Apple ID"
+  supabase secrets set "APPLE_APP_ID=$apple_id" --project-ref "$ref" \
+    || say "Couldn't save it. The company plan still works for TestFlight; run this again before you release."
+elif [[ -n "$apple_id" ]]; then
+  say "That doesn't look like an Apple ID (it is only digits), so it was skipped."
+fi
+
 # 4. Optionally point the app at the project.
 say "The server is ready: $url"
 echo "Pointing the app at it changes how it behaves on this Mac:"

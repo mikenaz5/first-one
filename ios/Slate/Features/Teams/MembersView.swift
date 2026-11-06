@@ -142,7 +142,8 @@ struct MembersView: View {
         if member.isSigner {
             parts.append("They sign contracts for the company, so until you choose someone else clients can't book.")
         }
-        if let removalPlan {
+        // Only the older per-seat billing has a bill to explain; a plan bought with Apple covers a number of people.
+        if let removalPlan, model.organization?.plan.seatsCovered == nil, model.organization?.plan.required != true {
             parts.append(removalPlan.billingSentence(periodEnd: model.organization?.plan.periodEnd))
         }
         return parts.joined(separator: " ")
@@ -203,10 +204,13 @@ private struct SeatsSummary: View {
     }
 
     private func billedLine(_ seats: SeatCounts) -> String {
-        if seats.billed > seats.used {
-            return "Billed for \(seats.billed) seats: the plan starts at \(seats.minimum). Room for \(seats.remaining) more, up to \(seats.maximum)."
+        if let covered = organization.plan.seatsCovered {
+            return "Your plan covers up to \(covered) people. Room for \(seats.remaining) more."
         }
-        return "Billed for \(seats.billed) seats. Room for \(seats.remaining) more, up to \(seats.maximum)."
+        if organization.plan.required {
+            return "Choose a plan to add your team. The smallest covers up to \(config.seatMinimum) people."
+        }
+        return "Room for \(seats.remaining) more, up to \(seats.maximum)."
     }
 }
 
@@ -287,6 +291,7 @@ struct InviteSheet: View {
     @State private var plan: SeatPlan?
     @State private var created: CreatedInvite?
     @State private var isWorking = false
+    @State private var showPlans = false
 
     private var roles: [OrgRole] { RoleRules.invitableRoles(by: model.organization?.myRole ?? .viewer) }
     private var cleanedEmail: String? { TeamRules.cleanInviteEmail(email) }
@@ -294,8 +299,19 @@ struct InviteSheet: View {
     private var planProblem: String? {
         guard let organization = model.organization else { return nil }
         if !organization.plan.isOK { return organization.plan.banner ?? "Choose a plan to invite your team." }
-        if let plan, !plan.allowed { return "The team is at its limit of \(model.teamConfig.seatMaximum) seats." }
+        if let plan, !plan.allowed {
+            if organization.plan.seatsCovered != nil {
+                return "Your plan covers up to \(organization.seats.maximum) people and the team is full."
+            }
+            return "The team is at its limit of \(organization.seats.maximum) people."
+        }
         return nil
+    }
+
+    /// True when the way forward is to buy or change the plan, and this person is the one who can.
+    private var planIsTheFix: Bool {
+        guard let organization = model.organization, model.canBuyPlan else { return false }
+        return !organization.plan.isOK || (plan.map { !$0.allowed } ?? false)
     }
 
     var body: some View {
@@ -355,6 +371,13 @@ struct InviteSheet: View {
                     Label(planProblem, systemImage: "exclamationmark.triangle.fill")
                         .font(.subheadline)
                         .foregroundStyle(Color.slateWarning)
+                    if planIsTheFix {
+                        Button(model.organization?.plan.seatsCovered == nil ? "Choose a plan" : "See plans") { showPlans = true }
+                            .frame(minHeight: Metrics.minTapTarget)
+                    }
+                } else if let organization = model.organization, organization.plan.seatsCovered != nil {
+                    Text("Your plan covers up to \(organization.seats.maximum) people. Adding this person leaves \(max(0, organization.seats.remaining - 1)) places.")
+                        .font(.subheadline)
                 } else if let plan {
                     Text(plan.billingSentence(periodEnd: model.organization?.plan.periodEnd))
                         .font(.subheadline)
@@ -370,6 +393,7 @@ struct InviteSheet: View {
         .slatePageBackground()
         .navigationTitle("Invite someone")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPlans, onDismiss: { Task { plan = try? await model.previewSeatChange(delta: 1) } }) { PlanSheet() }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isWorking) }
             ToolbarItem(placement: .confirmationAction) {
