@@ -11,5 +11,7 @@ final class LicensesTests: XCTestCase {
         XCTAssertTrue(text.contains("supabase-swift"))
         XCTAssertTrue(text.contains("stripe-ios-spm"))
         XCTAssertTrue(text.contains("Permission is hereby granted"), "The MIT license text is the point")
+        XCTAssertTrue(text.contains("Inter 4.0 (font files)") && text.contains("JetBrains Mono 2.304 (font files)"), "The fonts the PDF is set in have their notice")
+        XCTAssertTrue(text.contains("SIL OPEN FONT LICENSE Version 1.1"), "The font license text is the point")
     }
 }

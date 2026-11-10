@@ -28,6 +28,9 @@
 <p>The package, date and time, notes, the contract text, the names and signatures of the people who sign (typed or drawn), and the signed PDF. Both people on a booking can see them.</p>
 <h3>Payments</h3>
 <p>Amounts, dates and status of deposits, balances and refunds. Payments are handled by Stripe and Apple Pay. <strong>We never see or store a full card number.</strong> If you save a card, Stripe keeps it; we keep only its brand, last four digits, expiry and a reference only our servers can use.</p>
+<p>A company&rsquo;s plan is bought with Apple&rsquo;s In-App Purchase. Apple takes that payment and tells us the plan&rsquo;s status and renewal date; we never see the payment method.</p>
+<h3>What Stripe&rsquo;s software in the app collects</h3>
+<p>To take a payment with Apple Pay or to save a card, the app uses software from Stripe. That software may collect information about your device (for example its model, operating system version, language, time zone and an identifier that Stripe creates for the device) and about how the payment screens are used (for example which steps are reached, how long they take and any errors), and sends it to Stripe, not to our servers. Stripe uses it to detect and prevent fraud and to keep and improve its own software, under <a href="https://stripe.com/privacy">Stripe&rsquo;s privacy policy</a>. It is not used for advertising or to follow you across other companies&rsquo; apps and websites. We leave Stripe&rsquo;s fraud-prevention signals switched on because they help protect creators from payments made with stolen cards.</p>
 <h3>Messages</h3>
 <p>What you and the other person on a booking write to each other.</p>
 <h3>Photos and videos you deliver or receive</h3>
@@ -54,7 +57,7 @@
 <ul>
   <li><strong>The other person on a booking</strong> sees what is needed to complete it: names, booking details, the contract, messages and delivered files.</li>
   <li><strong>Anyone</strong> can see a creator&rsquo;s public page.</li>
-  <li><strong>Our service providers</strong>, only to run Slate Pro: Supabase (database, sign-in, file storage and server functions), Stripe (payments, creator payout accounts, saved cards and company billing; Stripe may verify a creator&rsquo;s identity itself) and Apple (Sign in with Apple, Apple Pay and notifications).</li>
+  <li><strong>Our service providers</strong>, only to run Slate Pro: Supabase (database, sign-in, file storage and server functions), Stripe (payments, creator payout accounts and saved cards, including the software described above; Stripe may verify a creator&rsquo;s identity itself) and Apple (Sign in with Apple, Apple Pay, the company plan subscription and notifications).</li>
   <li><strong>Authorities</strong>, when the law requires it.</li>
 </ul>
 

@@ -27,8 +27,13 @@
 		</dict>
 	</array>
 
-	<!-- What is sent off the phone to Slate Pro's servers. Every item is linked to the person's account, none is used for
-	     tracking, and all of it is there so the app can do its job (App Functionality). -->
+	<!-- What is sent off the phone to Slate Pro's servers, and what Stripe's payment code in the app sends to Stripe. Every item
+	     is linked to the person (their account, or their device), none is used for tracking, and all of it is there so the app
+	     can do its job (App Functionality). The last three items are collected by Stripe's code, which also uses them to keep
+	     and improve its software (Analytics); the Device ID entry covers Stripe's fraud-prevention identifier as well as the
+	     notification token. Stripe's own list is worded generally here: confirm it with Xcode's privacy report (Organizer >
+	     the archive > Generate Privacy Report), which merges the manifests of the code packages. Keep it in step with
+	     docs/APP_STORE.md and site/privacy/index.html. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>
@@ -77,6 +82,45 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 		<dict>

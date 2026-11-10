@@ -63,10 +63,10 @@ enum ContractPDF {
         let titleStyle = NSMutableParagraphStyle()
         titleStyle.paragraphSpacing = 6
         result.append(NSAttributedString(string: contract.title + "\n", attributes: [
-            .font: UIFont.systemFont(ofSize: 22, weight: .bold), .foregroundColor: UIColor.black, .paragraphStyle: titleStyle,
+            .font: PDFFonts.bold(22), .foregroundColor: UIColor.black, .paragraphStyle: titleStyle,
         ]))
         result.append(NSAttributedString(string: "\(creatorName) and \(clientName)\n\n", attributes: [
-            .font: UIFont.systemFont(ofSize: 11), .foregroundColor: UIColor.darkGray,
+            .font: PDFFonts.regular(11), .foregroundColor: UIColor.darkGray,
         ]))
 
         let headingStyle = NSMutableParagraphStyle()
@@ -79,10 +79,10 @@ enum ContractPDF {
 
         for (index, section) in contract.sections.enumerated() {
             result.append(NSAttributedString(string: "\(index + 1). \(section.title)\n", attributes: [
-                .font: UIFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: UIColor.black, .paragraphStyle: headingStyle,
+                .font: PDFFonts.semibold(13), .foregroundColor: UIColor.black, .paragraphStyle: headingStyle,
             ]))
             result.append(NSAttributedString(string: section.body + "\n", attributes: [
-                .font: UIFont.systemFont(ofSize: 11), .foregroundColor: UIColor.black, .paragraphStyle: bodyStyle,
+                .font: PDFFonts.regular(11), .foregroundColor: UIColor.black, .paragraphStyle: bodyStyle,
             ]))
         }
         return result
@@ -94,7 +94,7 @@ enum ContractPDF {
         style.alignment = .center
         (text as NSString).draw(
             in: CGRect(x: margin, y: pageSize.height - margin + 6, width: pageSize.width - margin * 2, height: 14),
-            withAttributes: [.font: UIFont.systemFont(ofSize: 8.5), .foregroundColor: UIColor.gray, .paragraphStyle: style]
+            withAttributes: [.font: PDFFonts.regular(8.5), .foregroundColor: UIColor.gray, .paragraphStyle: style]
         )
     }
 
@@ -114,17 +114,17 @@ enum ContractPDF {
             y += ceil(rect.height) + spacingAfter
         }
 
-        draw("Signatures", font: .systemFont(ofSize: 20, weight: .bold), spacingAfter: 4)
-        draw("\(contract.title), between \(contract.providerLegalName ?? creatorName) and \(clientName).", font: .systemFont(ofSize: 11), color: .darkGray, spacingAfter: 14)
+        draw("Signatures", font: PDFFonts.bold(20), spacingAfter: 4)
+        draw("\(contract.title), between \(contract.providerLegalName ?? creatorName) and \(clientName).", font: PDFFonts.regular(11), color: .darkGray, spacingAfter: 14)
 
         for role in [SignerRole.client, .creator] {
             guard let signature = contract.signature(for: role) else { continue }
-            draw("\(role.title): \(signature.signedName)", font: .systemFont(ofSize: 13, weight: .semibold), spacingAfter: signature.onBehalfOf == nil ? 6 : 2)
+            draw("\(role.title): \(signature.signedName)", font: PDFFonts.semibold(13), spacingAfter: signature.onBehalfOf == nil ? 6 : 2)
             if let company = signature.onBehalfOf {
                 // A company's contract is signed for the company by a person, who signs with their title.
                 var line = "For \(company)"
                 if let title = signature.signerTitle, !title.isEmpty { line += ", \(title)" }
-                draw(line, font: .systemFont(ofSize: 11), color: .darkGray, spacingAfter: 6)
+                draw(line, font: PDFFonts.regular(11), color: .darkGray, spacingAfter: 6)
             }
 
             let box = CGRect(x: margin, y: y, width: 260, height: 66)
@@ -133,9 +133,9 @@ enum ContractPDF {
             drawSignatureMark(signature, in: box.insetBy(dx: 10, dy: 6))
             y += box.height + 8
 
-            draw(methodDescription(signature), font: .systemFont(ofSize: 10), color: .darkGray, spacingAfter: 1)
-            draw("Signed \(ContractFormat.timestampUTC(signature.signedAt))", font: .systemFont(ofSize: 10), color: .darkGray, spacingAfter: 1)
-            draw(signature.device, font: .systemFont(ofSize: 10), color: .darkGray, spacingAfter: 14)
+            draw(methodDescription(signature), font: PDFFonts.regular(10), color: .darkGray, spacingAfter: 1)
+            draw("Signed \(ContractFormat.timestampUTC(signature.signedAt))", font: PDFFonts.regular(10), color: .darkGray, spacingAfter: 1)
+            draw(signature.device, font: PDFFonts.regular(10), color: .darkGray, spacingAfter: 14)
         }
 
         // Certificate
@@ -147,21 +147,21 @@ enum ContractPDF {
         rule.stroke()
         y += 12
 
-        draw("Certificate of completion", font: .systemFont(ofSize: 15, weight: .semibold), spacingAfter: 6)
-        let mono = UIFont.monospacedSystemFont(ofSize: 9, weight: .regular)
-        draw("Status: \(contract.status.title)", font: .systemFont(ofSize: 10), spacingAfter: 2)
+        draw("Certificate of completion", font: PDFFonts.semibold(15), spacingAfter: 6)
+        let mono = PDFFonts.mono(9)
+        draw("Status: \(contract.status.title)", font: PDFFonts.regular(10), spacingAfter: 2)
         draw("Document ID: \(contract.id.uuidString.lowercased())", font: mono, spacingAfter: 2)
         draw("Booking ID: \(contract.bookingID.uuidString.lowercased())", font: mono, spacingAfter: 2)
-        draw("Template version: \(contract.templateVersion)", font: .systemFont(ofSize: 10), spacingAfter: 2)
-        draw("Created: \(ContractFormat.timestampUTC(contract.createdAt))", font: .systemFont(ofSize: 10), spacingAfter: 2)
+        draw("Template version: \(contract.templateVersion)", font: PDFFonts.regular(10), spacingAfter: 2)
+        draw("Created: \(ContractFormat.timestampUTC(contract.createdAt))", font: PDFFonts.regular(10), spacingAfter: 2)
         if let executed = contract.executedAt {
-            draw("Completed: \(ContractFormat.timestampUTC(executed))", font: .systemFont(ofSize: 10), spacingAfter: 2)
+            draw("Completed: \(ContractFormat.timestampUTC(executed))", font: PDFFonts.regular(10), spacingAfter: 2)
         }
-        draw("SHA-256 of the agreement text:", font: .systemFont(ofSize: 10), spacingAfter: 2)
+        draw("SHA-256 of the agreement text:", font: PDFFonts.regular(10), spacingAfter: 2)
         draw(contract.documentHash, font: mono, spacingAfter: 8)
         draw(
             "The hash identifies the exact wording both parties signed. If a single character of the agreement changed, the hash would not match. Consent wording version \(contract.signatures.first?.consentVersion ?? SigningConsent.version): \"\(SigningConsent.text)\"",
-            font: .systemFont(ofSize: 9), color: .darkGray
+            font: PDFFonts.regular(9), color: .darkGray
         )
     }
 

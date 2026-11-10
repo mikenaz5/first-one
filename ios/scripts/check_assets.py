@@ -37,6 +37,15 @@ ASSET_EXTENSIONS = {
     ".mp3", ".wav", ".m4a", ".aac", ".caf", ".mp4", ".mov", ".m4v", ".lottie", ".riv",
 }
 
+# Font files the app may carry: the family (the file name up to the first dash) -> its licence. Each family needs a section in
+# Slate/Resources/ThirdPartyNotices.txt (scripts/update_notices.py FONTS) and each file a row in docs/ASSETS.md.
+FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2", ".ttc"}
+FONT_FOLDER = "Slate/Resources/Fonts/"
+FONT_FAMILIES = {
+    "Inter": "SIL Open Font License 1.1",
+    "JetBrainsMono": "SIL Open Font License 1.1",
+}
+
 # 1. Addresses that may appear in a string in the app. Our own site is built from AppConfig.bookingLinkHost, never typed in.
 ALLOWED_HOSTS = {
     "calendar.google.com": "the 'Add to Google Calendar' link a person taps; it opens their browser, and nothing is loaded in the app",
@@ -99,6 +108,10 @@ REACHES = {
     },
     "UIFont(name:": {
         "Slate/Services/ContractPDF.swift": "Snell Roundhand by name, to draw a typed signature into a picture (so no font is copied into the PDF)",
+        "Slate/Services/PDFFonts.swift": "the open-licensed fonts carried in Slate/Resources/Fonts (Inter, JetBrains Mono), by name, for the contract PDF",
+    },
+    "CTFontManagerRegister": {
+        "Slate/Services/PDFFonts.swift": "makes the font files carried in Slate/Resources/Fonts known to the app; nothing is loaded from anywhere else",
     },
     ".custom(": {
         "Slate/Features/Contracts/ContractViews.swift": "Snell Roundhand, a font built into iOS, used by name for a typed signature; nothing is bundled",
@@ -109,7 +122,9 @@ REACHES = {
 
 # 4. The website and the sign-in email may link to these addresses (a link someone taps), and load nothing from anywhere
 # but themselves. They name fonts only from this list: fonts the visitor's own device already has. Nothing is ever served.
-SITE_LINK_HOSTS: dict[str, str] = {}
+SITE_LINK_HOSTS: dict[str, str] = {
+    "stripe.com": "a link to Stripe's privacy policy from our privacy page (it names what Stripe's software in the app collects); a visitor taps it, nothing is loaded",
+}
 WEB_FILES = [IOS.parent / "site", IOS / "supabase" / "email-templates"]
 DEVICE_FONTS = {
     "system-ui", "-apple-system", "blinkmacsystemfont", "sf pro text", "sf pro display", "sf pro rounded", "ui-rounded",
@@ -217,7 +232,29 @@ def check_bundled_files() -> list[str]:
         if name not in doc:
             fail(f"{name} is carried inside the app but docs/ASSETS.md doesn't name it. Write down who made it and under what "
                  "licence, or take it out.")
+    check_font_files([n for n in carried if pathlib.PurePath(n).suffix.lower() in FONT_EXTENSIONS])
     return carried
+
+
+def check_font_files(fonts: list[str]) -> None:
+    """A font file in the app must be one of the families decided on, sit in the fonts folder and have its licence in the notices."""
+    if not fonts:
+        return
+    notices = NOTICES.read_text(encoding="utf-8") if NOTICES.exists() else ""
+    headers = [re.sub(r"\s+", "", line).lower() for line in re.findall(r"^={20,}\n([^\n]+)\n", notices, re.M)]
+    for name in fonts:
+        family = pathlib.PurePath(name).name.split("-")[0]
+        if not name.startswith(FONT_FOLDER):
+            fail(f"{name} is a font file outside {FONT_FOLDER}. Font files live there so they can be found and licensed.")
+        if family not in FONT_FAMILIES:
+            fail(f"{name} is a font file from a family ({family}) nobody has decided on. Only open-licensed fonts whose licence allows "
+                 "bundling in an app and embedding in a PDF may be added: put the family in FONT_FAMILIES in scripts/check_assets.py "
+                 "and FONTS in scripts/update_notices.py, and write the row in docs/ASSETS.md.")
+        elif not any(header.startswith(family.lower()) for header in headers):
+            fail(f"{name}: Slate/Resources/ThirdPartyNotices.txt has no section for the font {family}. "
+                 "python3 scripts/update_notices.py writes it.")
+    if "sil open font license" not in notices.lower():
+        fail("Slate/Resources/ThirdPartyNotices.txt doesn't carry the SIL Open Font License, which the bundled fonts are under.")
 
 
 # ---------------------------------------------------------------------------

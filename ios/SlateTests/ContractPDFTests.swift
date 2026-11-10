@@ -117,6 +117,27 @@ final class ContractPDFTests: XCTestCase {
         XCTAssertTrue(last.contains("Client: Alex Rivera"), "The name is still there as text, next to the picture")
     }
 
+    /// The letters of a font are copied into every PDF that uses it, so the PDF may use only fonts we may give away: Inter and
+    /// JetBrains Mono (SIL Open Font License), carried in the app. Not iOS's own fonts, which are licensed for use on Apple devices.
+    func testEveryFontInsideThePDFIsAnOpenLicensedOneCarriedInTheApp() throws {
+        XCTAssertTrue(PDFFonts.allLoaded, "The four files in Resources/Fonts are in the app and load, not replaced by the system font")
+        let pdf = try document(ContractPDF.render(makeContract(clientInk: true, creatorInk: true), creatorName: "M", clientName: "A"))
+        var fonts = Set<String>()
+        for index in 0..<pdf.pageCount {
+            guard let text = pdf.page(at: index)?.attributedString else { continue }
+            text.enumerateAttribute(.font, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+                if let font = value as? UIFont { fonts.insert(font.fontName) }
+            }
+        }
+        XCTAssertFalse(fonts.isEmpty, "The check can see the fonts in the PDF at all")
+        for name in fonts {
+            // A subset in a PDF is named like "ABCDEF+Inter-Regular".
+            let plain = name.split(separator: "+").last.map(String.init) ?? name
+            XCTAssertTrue(plain.hasPrefix("Inter") || plain.hasPrefix("JetBrainsMono"),
+                          "\(name) is inside the contract PDF but isn't one of the fonts we carry and may give away: \(fonts)")
+        }
+    }
+
     func testTheDocumentIsLabelledForFilesAndShareSheets() throws {
         let contract = makeContract()
         let pdf = try document(ContractPDF.render(contract, creatorName: "Maya Chen Photography", clientName: "Alex Rivera"))

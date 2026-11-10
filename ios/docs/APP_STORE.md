@@ -169,21 +169,26 @@ In App Store Connect ▸ your app ▸ **App Privacy** ▸ **Get Started**. These
 
 - **Do you or your third-party partners collect data from this app?** Yes.
 - **Used to track you** (tied to ads or shared with data brokers): **none**. Slate Pro has no advertising and no tracking.
-- **Linked to the person's identity, used only for App Functionality** (running the app), for each of these:
+- **Linked to the person's identity or device, used for App Functionality** (running the app, including preventing fraud), for each of these. The last three are collected by Stripe's payment code, which also uses them to keep and improve its software, so for those three tick **Analytics** as well:
 
 | Apple's heading | What it is in Slate Pro |
 |---|---|
 | Contact Info ▸ Name | Name from Sign in with Apple or the profile |
 | Contact Info ▸ Email Address | Sign-in address (may be Apple's private relay) |
 | Identifiers ▸ User ID | The account's internal ID |
-| Identifiers ▸ Device ID | The notification token Apple gives the phone |
+| Identifiers ▸ Device ID | The notification token Apple gives the phone, and the device identifier Stripe's payment code creates to prevent fraud |
 | User Content ▸ Photos or Videos | Portfolio and delivered photos and videos |
 | User Content ▸ Emails or Text Messages | Messages between a client and a creator |
 | User Content ▸ Other User Content | Contracts and signatures, notes, reviews, calendar busy times, reports |
 | Purchases ▸ Purchase History | Deposits, balances and refunds on bookings |
 | Financial Info ▸ Payment Info | Saved card's brand, last four digits and expiry (Stripe keeps the number) |
+| Usage Data ▸ Product Interaction | How the payment screens are used (which steps are reached), collected by Stripe's code |
+| Diagnostics ▸ Performance Data | How Stripe's payment code performs (timings), collected by Stripe's code |
+| Diagnostics ▸ Other Diagnostic Data | Device and software details and errors from Stripe's payment code |
 
-- **Not collected:** location (the approximate position stays on the phone), contacts, health, browsing or search history, diagnostics. If the free TestFlight or App Store crash reports are all you use, you do not collect them yourself.
+**Stripe's part of this table is worded generally.** Stripe's code in the app sends some device and usage information to Stripe (see "What Stripe's software in the app collects" in the privacy policy), and Stripe's own documentation is the exact list. Before you submit, make Xcode print it: **Product ▸ Archive**, then in the Organizer select the archive and choose **Generate Privacy Report**. It merges what every code package in the app says it collects, so compare it with this table and add anything it shows that is missing here (and in `Config/PrivacyInfo.xcprivacy` and the policy page). We left Stripe's fraud-prevention signals switched on (`StripeAPI.advancedFraudSignalsEnabled`, the default) because they protect creators from stolen-card payments; that is a decision, written in `docs/ASSETS.md`.
+
+- **Not collected by us:** location (the approximate position stays on the phone), contacts, health, browsing or search history, and our own diagnostics or crash data (the free TestFlight and App Store crash reports are Apple's; Slate Pro has no analytics tool). The only diagnostics are the ones Stripe's payment code collects, listed above.
 
 ### Notes for the App Review team
 
