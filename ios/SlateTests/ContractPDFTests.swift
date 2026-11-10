@@ -101,6 +101,22 @@ final class ContractPDFTests: XCTestCase {
         XCTAssertTrue(last.contains("Signed by drawing their signature"))
     }
 
+    func testATypedSignatureIsAPictureSoNoScriptFontIsCopiedIntoThePDF() throws {
+        let pdf = try document(ContractPDF.render(makeContract(), creatorName: "M", clientName: "A"))
+        var fonts = Set<String>()
+        for index in 0..<pdf.pageCount {
+            guard let text = pdf.page(at: index)?.attributedString else { continue }
+            text.enumerateAttribute(.font, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+                if let font = value as? UIFont { fonts.insert(font.fontName) }
+            }
+        }
+        XCTAssertFalse(fonts.isEmpty, "The check can see the fonts in the PDF at all")
+        XCTAssertFalse(fonts.contains { $0.localizedCaseInsensitiveContains("snell") },
+                       "A typed signature is drawn as a picture, so the script font isn't inside the file: \(fonts)")
+        let last = try XCTUnwrap(pdf.page(at: pdf.pageCount - 1)?.string)
+        XCTAssertTrue(last.contains("Client: Alex Rivera"), "The name is still there as text, next to the picture")
+    }
+
     func testTheDocumentIsLabelledForFilesAndShareSheets() throws {
         let contract = makeContract()
         let pdf = try document(ContractPDF.render(contract, creatorName: "Maya Chen Photography", clientName: "Alex Rivera"))

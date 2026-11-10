@@ -97,6 +97,9 @@ REACHES = {
         "Slate/Features/Profile/ProfileView.swift": "the system share sheet, for the person's own booking link",
         "Slate/Features/Teams/MembersView.swift": "the system share sheet, for an invite link",
     },
+    "UIFont(name:": {
+        "Slate/Services/ContractPDF.swift": "Snell Roundhand by name, to draw a typed signature into a picture (so no font is copied into the PDF)",
+    },
     ".custom(": {
         "Slate/Features/Contracts/ContractViews.swift": "Snell Roundhand, a font built into iOS, used by name for a typed signature; nothing is bundled",
         "Slate/Features/Contracts/SignatureCapture.swift": "Snell Roundhand, a font built into iOS, used by name for a typed signature; nothing is bundled",
@@ -104,8 +107,15 @@ REACHES = {
     "UIAppFonts": {},
 }
 
-# 4. The website may link to these addresses (a link someone taps), and loads nothing from anywhere but itself.
+# 4. The website and the sign-in email may link to these addresses (a link someone taps), and load nothing from anywhere
+# but themselves. They name fonts only from this list: fonts the visitor's own device already has. Nothing is ever served.
 SITE_LINK_HOSTS: dict[str, str] = {}
+WEB_FILES = [IOS.parent / "site", IOS / "supabase" / "email-templates"]
+DEVICE_FONTS = {
+    "system-ui", "-apple-system", "blinkmacsystemfont", "sf pro text", "sf pro display", "sf pro rounded", "ui-rounded",
+    "sf mono", "ui-monospace", "menlo", "consolas", "monaco", "segoe ui", "roboto", "helvetica", "helvetica neue", "arial",
+    "sans-serif", "serif", "monospace", "cursive", "inherit", "snell roundhand", "segoe script", "brush script mt",
+}
 
 failures: list[str] = []
 
@@ -216,37 +226,74 @@ def check_bundled_files() -> list[str]:
 EXTERNAL = re.compile(r"^(?:https?:)?//", re.I)
 
 
+def style_segments(path: pathlib.Path, text: str) -> list[str]:
+    """The parts of a file that are style rules: all of a style sheet, or the style attributes and <style> blocks of a page."""
+    if path.suffix.lower() == ".css":
+        return [text]
+    found = re.findall(r'style\s*=\s*"([^"]*)"', text, re.I) + re.findall(r"style\s*=\s*'([^']*)'", text, re.I)
+    found += re.findall(r"<style[^>]*>(.*?)</style>", text, re.I | re.S)
+    return found
+
+
+def font_names(segments: list[str]) -> list[str]:
+    """The font names asked for, from font-family and the font shorthand."""
+    families = []
+    for segment in segments:
+        families += re.findall(r"font-family\s*:\s*([^;}]+)", segment, re.I)
+        families += re.findall(r"font\s*:\s*[^;}]*?(?:px|rem|em|pt|%)(?:/[\d.]+(?:px|rem|em|pt)?)?\s+([^;}]+)", segment, re.I)
+    names = []
+    for family in families:
+        for name in family.split(","):
+            clean = name.strip().strip("'\"").strip().lower()
+            if clean:
+                names.append(clean)
+    return names
+
+
 def check_site() -> int:
     pages = 0
-    if not SITE.exists():
-        return pages
-    for path in sorted(SITE.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in (".html", ".css", ".js"):
+    document = DOC.read_text(encoding="utf-8") if DOC.exists() else ""
+    for root in WEB_FILES:
+        if not root.exists():
             continue
-        pages += 1
-        text = path.read_text(encoding="utf-8")
-        name = str(path.relative_to(IOS.parent))
-        for tag in ("script", "iframe", "embed", "object"):
-            if re.search(rf"<{tag}\b", text, re.I):
-                fail(f"{name}: a <{tag}> tag. The site has none: it is plain pages and one style sheet.")
-        if re.search(r"@import", text, re.I):
-            fail(f"{name}: an @import. Fonts and styles come from our own style sheet only.")
-        for found in re.findall(r"url\(\s*['\"]?([^)'\"]+)", text, re.I):
-            if EXTERNAL.match(found.strip()):
-                fail(f"{name}: url({found}) loads something from another address.")
-        for attribute, value in re.findall(r"""\b(src|href|action|srcset|poster|data)\s*=\s*["']([^"']*)["']""", text, re.I):
-            value = value.strip()
-            if not EXTERNAL.match(value):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file():
                 continue
-            tag_match = None
-            context = text[max(0, text.rfind("<", 0, text.find(value))) : text.find(value)]
-            tag_match = re.match(r"<\s*([a-zA-Z0-9]+)", context)
-            tag = (tag_match.group(1).lower() if tag_match else "")
-            host = re.sub(r"^(?:https?:)?//", "", value).split("/")[0].split(":")[0].lower()
-            if tag == "a" and attribute.lower() == "href" and host in SITE_LINK_HOSTS:
+            name = str(path.relative_to(IOS.parent))
+            if path.suffix.lower() in ASSET_EXTENSIONS:
+                if name not in document:
+                    fail(f"{name} is a picture, font or media file served with the site or sent in an email, and docs/ASSETS.md doesn't name it.")
                 continue
-            fail(f"{name}: {attribute}=\"{value}\" points at another address. The site loads nothing from anywhere else"
-                 + (" (a plain link someone taps needs its host in SITE_LINK_HOSTS)." if tag == "a" else "."))
+            if path.suffix.lower() not in (".html", ".css", ".js"):
+                continue
+            pages += 1
+            text = path.read_text(encoding="utf-8")
+            for tag in ("script", "iframe", "embed", "object"):
+                if re.search(rf"<{tag}\b", text, re.I):
+                    fail(f"{name}: a <{tag}> tag. The site and the email have none: plain pages and one style sheet.")
+            if re.search(r"@import", text, re.I):
+                fail(f"{name}: an @import. Styles come from our own style sheet only.")
+            if re.search(r"@font-face", text, re.I):
+                fail(f"{name}: an @font-face. We serve no fonts: pages name only fonts the visitor's device already has.")
+            for font in font_names(style_segments(path, text)):
+                if font not in DEVICE_FONTS:
+                    fail(f"{name}: the font '{font}' isn't one every device has. Nothing is served, so it would silently fall back. "
+                         "Use a system font, or (if a real font is wanted) add its file, its licence and a row in docs/ASSETS.md first.")
+            for found in re.findall(r"url\(\s*['\"]?([^)'\"]+)", text, re.I):
+                if EXTERNAL.match(found.strip()):
+                    fail(f"{name}: url({found}) loads something from another address.")
+            for attribute, value in re.findall(r"""\b(src|href|action|srcset|poster|data)\s*=\s*["']([^"']*)["']""", text, re.I):
+                value = value.strip()
+                if not EXTERNAL.match(value):
+                    continue
+                context = text[max(0, text.rfind("<", 0, text.find(value))) : text.find(value)]
+                tag_match = re.match(r"<\s*([a-zA-Z0-9]+)", context)
+                tag = tag_match.group(1).lower() if tag_match else ""
+                host = re.sub(r"^(?:https?:)?//", "", value).split("/")[0].split(":")[0].lower()
+                if tag == "a" and attribute.lower() == "href" and host in SITE_LINK_HOSTS:
+                    continue
+                fail(f"{name}: {attribute}=\"{value}\" points at another address. Nothing is loaded from anywhere else"
+                     + (" (a plain link someone taps needs its host in SITE_LINK_HOSTS)." if tag == "a" else "."))
     return pages
 
 

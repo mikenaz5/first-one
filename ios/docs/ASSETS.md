@@ -37,16 +37,32 @@ Colours (`AccentColor`, `LaunchBackground` and the design tokens in `DesignSyste
 | The signature pad and typed signature | `Features/Contracts/` | Strokes the person draws; the typed one uses the font below |
 | The home screen widget | `SlateWidgets/` | Text and shapes, reads a small file, never the network |
 | The contract PDF | `Services/ContractPDF.swift` | Drawn with the system's PDF renderer from text |
-| Marketing videos (the opening animation, the teaser) | Made from the same code-drawn animation, kept outside the app | No third-party footage, music or fonts |
+| Marketing videos (the opening animation, the teaser) | Made from the same code-drawn animation, kept outside the app | No third-party footage or music. The videos that show the name set it in **Inter** (SIL Open Font License 1.1, free for commercial use, including in video; no font file is distributed). The teaser has no text |
 
 ## 3. Provided by iOS (used through the system, not copied)
 
 | What | Licence note |
 |---|---|
-| **San Francisco** (the system font, every screen and the PDF) | Used through the system's own font calls on Apple devices. Don't copy the font files out of iOS, and don't use San Francisco on the website or in marketing. The PDF renderer embeds only the letters it draws, as every iOS app's PDFs do |
-| **Snell Roundhand** (the typed signature, `SnellRoundhand-Bold`) | A font built into iOS, called by name. Nothing is bundled. If it is missing the code falls back to the italic system font |
+| **San Francisco** (the system font, every screen and the PDF) | Used through the system's own font calls on Apple devices. Don't copy the font files out of iOS. The website and the sign-in email only *name* the system font stack (`-apple-system`, `system-ui`, ...), which each visitor's own device resolves; nothing is served. See "Decisions waiting" for the contract PDF |
+| **Snell Roundhand** (the typed signature, `SnellRoundhand-Bold`) | A font built into iOS, called by name on screen. Nothing is bundled. If it is missing the code falls back to the italic system font. In the contract PDF the typed signature is drawn as a **picture** of the name, so no copy of the font goes into the file |
 | **SF Symbols** (every icon in the app) | Apple's licence allows them in apps and mock-ups for Apple platforms. **Do not use them on the website, in the app icon, in a logo, or in marketing artwork.** The website uses none |
 | Apple Pay, Sign in with Apple, the purchase sheet | Apple's own screens; Apple's marketing and button guidelines apply to anything we draw about them |
+
+### Every font, in one place
+
+| Where | Font | How | Font files shipped |
+|---|---|---|---|
+| App screens and the widget | San Francisco (system), its rounded design for the opening animation and initials, its monospaced design for codes and this licenses page | The system, through text styles | None |
+| Typed signature on screen | Snell Roundhand (built into iOS) | By name, with a system fallback | None |
+| Typed signature in the contract PDF | Snell Roundhand, drawn as a picture | Rendered to an image first | None, and none copied into the PDF |
+| Contract PDF body and certificate | System font and its monospaced design | The system's PDF renderer, which embeds the letters it draws | None. See "Decisions waiting" |
+| The website | System font stack (names only: `-apple-system`, `BlinkMacSystemFont`, `SF Pro Text`, `Segoe UI`, `Roboto`, `Helvetica`, `Arial`) | The visitor's own device | None |
+| The sign-in email | System stack, and `SF Mono`, `Menlo`, `Consolas` for the code | The reader's own device | None |
+| Design previews | System stacks (and the same names for the signature) | The viewer's own device | None |
+| Marketing videos that show the name | Inter (SIL OFL 1.1) | Rendered into the video | None distributed |
+
+`scripts/check_assets.py` fails the build for a font file in the app or on the site, an `@font-face`, a web-font link, a custom
+font used in code outside the places above, or a font name in the website or email that isn't a device font.
 
 ## 4. People's own content, and the links they give us
 
@@ -93,6 +109,12 @@ appears. The system font stack is used, so no font files are served.
    policy and `docs/APP_STORE.md`'s App Privacy answers.
 
 ## 9. Decisions waiting
+
+- **Fonts inside the contract PDF.** The PDF's text is set in iOS's system font, and the PDF renderer copies the letters it used
+  into the file, which is how every iOS app's PDFs work. Apple's licence for its fonts is for use on Apple devices through the
+  system; I can't confirm from Apple's terms that sending a PDF that contains pieces of them to another person is covered. The
+  airtight fix is to bundle one open-licensed font (for example Inter or Source Serif, SIL OFL 1.1, which expressly allows
+  embedding in documents) for the PDF only, with its licence in the notices. The PDFs would look slightly different. Not done.
 
 - **Stripe's code in the app.** Paying with Apple Pay uses Stripe's iOS code. By default it sends Stripe some device and diagnostic
   data to help prevent fraud and to measure its own library (switches: `StripeAPI.advancedFraudSignalsEnabled`, on by default;

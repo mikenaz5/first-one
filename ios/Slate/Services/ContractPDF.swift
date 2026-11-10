@@ -175,15 +175,32 @@ enum ContractPDF {
 
     private static func drawSignatureMark(_ signature: ContractSignature, in rect: CGRect) {
         if let data = signature.imagePNG, let image = UIImage(data: data) {
-            let scale = min(rect.width / image.size.width, rect.height / image.size.height)
-            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            image.draw(in: CGRect(x: rect.minX, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            drawFitted(image, in: rect)
         } else {
-            let font = UIFont(name: "SnellRoundhand-Bold", size: 28) ?? UIFont.italicSystemFont(ofSize: 24)
-            (signature.signedName as NSString).draw(
-                in: rect,
-                withAttributes: [.font: font, .foregroundColor: UIColor(red: 0.08, green: 0.12, blue: 0.35, alpha: 1)]
-            )
+            drawFitted(typedSignatureImage(signature.signedName), in: rect)
         }
+    }
+
+    private static func drawFitted(_ image: UIImage, in rect: CGRect) {
+        guard image.size.width > 0, image.size.height > 0 else { return }
+        let scale = min(rect.width / image.size.width, rect.height / image.size.height)
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        image.draw(in: CGRect(x: rect.minX, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+    }
+
+    /// A typed signature is drawn as a picture of the name, not as text. Text would copy a piece of the script font (one that
+    /// belongs to iOS) into every contract PDF that is sent to someone; a picture carries no font.
+    private static func typedSignatureImage(_ name: String) -> UIImage {
+        let font = UIFont(name: "SnellRoundhand-Bold", size: 28) ?? UIFont.italicSystemFont(ofSize: 24)
+        let text = NSAttributedString(
+            string: name,
+            attributes: [.font: font, .foregroundColor: UIColor(red: 0.08, green: 0.12, blue: 0.35, alpha: 1)]
+        )
+        let size = text.size()
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 3
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: CGSize(width: max(ceil(size.width), 1), height: max(ceil(size.height), 1)), format: format)
+            .image { _ in text.draw(at: .zero) }
     }
 }
