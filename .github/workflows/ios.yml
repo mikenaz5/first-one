@@ -39,6 +39,9 @@ jobs:
       - name: Check the privacy manifest
         run: python3 scripts/check_privacy_manifest.py
 
+      - name: Check every asset is ours and written up
+        run: python3 scripts/check_assets.py
+
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -94,6 +97,15 @@ jobs:
           test -n "$APP"
           test -f "$APP/PrivacyInfo.xcprivacy"
           python3 scripts/check_privacy_manifest.py "$APP/PrivacyInfo.xcprivacy"
+
+      - name: Check the licence notices cover every package the build used, and travel in the app
+        run: |
+          RESOLVED=$(find . "$HOME/Library/Developer/Xcode/DerivedData" -name Package.resolved -path "*xcshareddata/swiftpm*" 2>/dev/null | head -n 1)
+          echo "Package.resolved: $RESOLVED"
+          test -n "$RESOLVED"
+          python3 scripts/check_assets.py --resolved "$RESOLVED"
+          APP=$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path "*/Build/Products/Debug-iphonesimulator/Slate.app" | head -n 1)
+          test -f "$APP/ThirdPartyNotices.txt"
 
       - name: Upload build log
         if: always()
