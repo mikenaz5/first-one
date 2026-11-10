@@ -138,6 +138,17 @@ final class ContractPDFTests: XCTestCase {
         }
     }
 
+    /// Inter's contextual alternates would turn the hyphens and colons of a date into private-use look-alikes, so a date copied or
+    /// searched out of the PDF would be garbage. Everything extracted from the PDF has to be plain characters.
+    func testDatesAndTimesStayPlainTextSoTheyCanBeSearchedAndCopied() throws {
+        let pdf = try document(ContractPDF.render(makeContract(), creatorName: "Maya Chen Photography", clientName: "Alex Rivera"))
+        let all = pdf.string ?? ""
+        let privateUse = all.unicodeScalars.filter { (0xE000...0xF8FF).contains($0.value) }
+        XCTAssertTrue(privateUse.isEmpty, "Private-use characters in the PDF's text: \(privateUse.map { String($0.value, radix: 16) })")
+        let last = try XCTUnwrap(pdf.page(at: pdf.pageCount - 1)?.string)
+        XCTAssertTrue(last.contains("2027-01-15 08:00:00 UTC"), "The signing time reads back as typed: \(last)")
+    }
+
     func testTheDocumentIsLabelledForFilesAndShareSheets() throws {
         let contract = makeContract()
         let pdf = try document(ContractPDF.render(contract, creatorName: "Maya Chen Photography", clientName: "Alex Rivera"))

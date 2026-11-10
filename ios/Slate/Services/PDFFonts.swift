@@ -41,6 +41,19 @@ enum PDFFonts {
 
     private static func font(_ face: Face, _ size: CGFloat) -> UIFont? {
         _ = registration
-        return UIFont(name: face.rawValue, size: size)
+        guard let base = UIFont(name: face.rawValue, size: size) else { return nil }
+        return withoutContextualAlternates(base)
+    }
+
+    /// Inter's contextual alternates swap the hyphen and colon in dates and times ("2027-01-15 08:00:00") for look-alike letters
+    /// that are stored at private-use code points. They look right on the page, but a date searched or copied out of the PDF
+    /// comes out as unreadable characters. Switching the feature off keeps every character a plain one.
+    private static func withoutContextualAlternates(_ font: UIFont) -> UIFont {
+        let off: [[String: Any]] = [[
+            kCTFontFeatureTypeIdentifierKey as String: 36,   // Core Text's "Contextual Alternates" (OpenType calt)
+            kCTFontFeatureSelectorIdentifierKey as String: 1, // ... off
+        ]]
+        let descriptor = font.fontDescriptor.addingAttributes([.featureSettings: off])
+        return UIFont(descriptor: descriptor, size: font.pointSize)
     }
 }
